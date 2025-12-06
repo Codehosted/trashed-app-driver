@@ -27,6 +27,8 @@
     "noEmit": true
   },
   "exclude": [
-    ".trashed-app-snippets"
+    ".trashed-app-snippets",
+    ".trashed-app-snippets/**/*",
+    "**/.trashed-app-snippets/**"
   ]
 }
