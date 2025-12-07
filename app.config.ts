@@ -23,6 +23,9 @@ const config: ExpoConfig = {
     backgroundColor: '#0b172a'
   },
   ios: {
+    "infoPlist": {
+      "ITSAppUsesNonExemptEncryption": false
+    },
     supportsTablet: true,
     bundleIdentifier: 'com.trashed.driver'
   },

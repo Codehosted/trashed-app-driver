@@ -10,7 +10,8 @@
     "web": "expo start --web",
     "typecheck": "tsc --noEmit",
     "build:ios:dev": "NODE_ENV=development eas build --profile development --platform ios",
-    "build:ios:dev:local": "NODE_ENV=development eas build --profile development --platform ios --local"
+    "build:ios:dev:local": "NODE_ENV=development eas build --profile development --platform ios --local",
+    "build:ios:prod:local": "NODE_ENV=production eas build --profile production --platform ios --local"
   },
   "dependencies": {
     "@expo/vector-icons": "~14.0.4",
