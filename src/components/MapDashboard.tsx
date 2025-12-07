@@ -1,7 +1,11 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { View, Text, StyleSheet, Pressable, Dimensions, Platform } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { GestureHandlerRootView } from 'react-native-gesture-handler';
+import { GestureHandlerRootView, GestureDetector, Gesture } from 'react-native-gesture-handler';
+import { runOnJS } from 'react-native-reanimated';
+import { useNavigation } from '@react-navigation/native';
+import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import type { RootStackParamList } from '@/types/navigation';
 import { useAuth } from '@/context/AuthContext';
 import { usePreferences } from '@/context/PreferencesContext';
 import { designSchema } from '@/data/designSchema';
@@ -39,10 +43,13 @@ function getDistance(lat1: number, lon1: number, lat2: number, lon2: number): nu
   return R * c; // Distance in km
 }
 
+type NavigationProp = NativeStackNavigationProp<RootStackParamList>;
+
 export const MapDashboard: React.FC<MapDashboardProps> = ({ route: propRoute }) => {
   const { user, isAuthEnabled } = useAuth();
   const { theme } = usePreferences();
   const palette = designSchema.theme[theme];
+  const navigation = useNavigation<NavigationProp>();
 
   // Get the route
   const getRoute = () => {
@@ -171,17 +178,49 @@ export const MapDashboard: React.FC<MapDashboardProps> = ({ route: propRoute }) 
     };
   }, [activeIndex, stops, userLocation]);
 
-  const handleNext = () => {
-    if (activeIndex < stops.length - 1) {
-      setActiveIndex((prev) => prev + 1);
+  const handleNext = useCallback(() => {
+    try {
+      if (stops && stops.length > 0 && activeIndex < stops.length - 1) {
+        setActiveIndex((prev) => Math.min(prev + 1, stops.length - 1));
+      }
+    } catch (error) {
+      console.error('Error in handleNext:', error);
     }
-  };
+  }, [activeIndex, stops]);
 
-  const handlePrev = () => {
-    if (activeIndex > 0) {
-      setActiveIndex((prev) => prev - 1);
+  const handlePrev = useCallback(() => {
+    try {
+      if (stops && stops.length > 0 && activeIndex > 0) {
+        setActiveIndex((prev) => Math.max(prev - 1, 0));
+      }
+    } catch (error) {
+      console.error('Error in handlePrev:', error);
     }
-  };
+  }, [activeIndex, stops]);
+
+  // Swipe gesture for map container - only horizontal swipes
+  // Use runOnJS to safely call state updates from gesture handler
+  const swipeGesture = useMemo(
+    () =>
+      Gesture.Pan()
+        .minDistance(10)
+        .activeOffsetX([-10, 10])
+        .failOffsetY([-10, 10])
+        .onEnd((event) => {
+          'worklet';
+          const threshold = 50;
+          if (Math.abs(event.translationX) > threshold) {
+            if (event.translationX < -threshold) {
+              // Swipe left - next stop
+              runOnJS(handleNext)();
+            } else if (event.translationX > threshold) {
+              // Swipe right - previous stop
+              runOnJS(handlePrev)();
+            }
+          }
+        }),
+    [handleNext, handlePrev]
+  );
 
   const handleUpdateStop = (id: string, updates: Partial<RouteStop>) => {
     setStops((prev) => prev.map((stop) => (stop.uuid === id ? { ...stop, ...updates } : stop)));
@@ -255,17 +294,21 @@ export const MapDashboard: React.FC<MapDashboardProps> = ({ route: propRoute }) 
           <WeatherWidget theme={theme} />
         </View>
 
-      {/* Main 3D Map View Area */}
-      <View style={styles.mapContainer}>
-        <RoadMap
-          stops={stops}
-          activeIndex={activeIndex}
-          onStopClick={setActiveIndex}
-          theme={theme}
-          zoom={zoom}
-          userLocation={userLocation}
-        />
-      </View>
+        {/* Main 3D Map View Area */}
+        <View style={styles.mapContainer}>
+          <GestureDetector gesture={swipeGesture}>
+            <View style={StyleSheet.absoluteFill}>
+              <RoadMap
+                stops={stops}
+                activeIndex={activeIndex}
+                onStopClick={setActiveIndex}
+                theme={theme}
+                zoom={zoom}
+                userLocation={userLocation}
+              />
+            </View>
+          </GestureDetector>
+        </View>
 
         {/* Navigation Hints (Side Chevrons) */}
         {activeIndex > 0 && (
@@ -311,15 +354,15 @@ export const MapDashboard: React.FC<MapDashboardProps> = ({ route: propRoute }) 
           </Pressable>
         )}
 
-      {/* Center Info Card */}
-      <InfoCard
-        stop={activeStop}
-        index={activeIndex}
-        theme={theme}
-        distance={travelStats.distance}
-        driveTime={travelStats.driveTime}
-        onUpdateStop={handleUpdateStop}
-      />
+        {/* Center Info Card */}
+        <InfoCard
+          stop={activeStop}
+          index={activeIndex}
+          theme={theme}
+          distance={travelStats.distance}
+          driveTime={travelStats.driveTime}
+          onUpdateStop={handleUpdateStop}
+        />
 
       {/* Message Carousel - Bottom Center */}
       <MessageCarousel messages={messages} theme={theme} />
@@ -336,10 +379,7 @@ export const MapDashboard: React.FC<MapDashboardProps> = ({ route: propRoute }) 
                 borderColor: theme === 'dark' ? 'rgba(51, 65, 85, 0.7)' : 'rgba(203, 213, 225, 1)',
               },
             ]}
-            onPress={() => {
-              // Navigate to profile - would need navigation prop
-              console.log('Profile pressed');
-            }}
+            onPress={() => navigation.navigate('Profile')}
           >
             {user?.photoURL ? (
               <Text style={styles.profileText}>P</Text>
@@ -418,6 +458,7 @@ export const MapDashboard: React.FC<MapDashboardProps> = ({ route: propRoute }) 
           <Ionicons name="notifications" size={16} color={theme === 'dark' ? '#ffffff' : '#475569'} />
           <View style={styles.alertDot} />
         </Pressable>
+
       </View>
 
         {/* List View Overlay */}

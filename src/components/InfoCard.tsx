@@ -35,7 +35,8 @@ export const InfoCard: React.FC<InfoCardProps> = ({
   const [showNotesPopup, setShowNotesPopup] = useState(false);
   const [tempNotes, setTempNotes] = useState(stop.notes || '');
 
-  const avatarUrl = `https://api.dicebear.com/9.x/avataaars/svg?seed=${stop.uuid}`;
+  // Use PNG format for React Native compatibility (SVG not directly supported)
+  const avatarUrl = `https://api.dicebear.com/9.x/avataaars/png?seed=${stop.uuid}`;
   const isActive = stop.status === 'in-transit' || stop.status === 'arrived';
   const isCompleted = stop.status === 'completed';
 

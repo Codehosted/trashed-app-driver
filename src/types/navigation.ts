@@ -4,4 +4,5 @@ export type RootStackParamList = {
   Reset: undefined;
   Walkthrough: undefined;
   Home: { route?: import('./domain').RouteAssignment } | undefined;
+  Profile: undefined;
 };

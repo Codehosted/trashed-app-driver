@@ -9,6 +9,7 @@ import { LoginScreen } from '@/screens/LoginScreen';
 import { RegisterScreen } from '@/screens/RegisterScreen';
 import { ResetPasswordScreen } from '@/screens/ResetPasswordScreen';
 import { WalkthroughScreen } from '@/screens/WalkthroughScreen';
+import { ProfileScreen } from '@/screens/ProfileScreen';
 import { MapDashboard } from '@/components/MapDashboard';
 import { AuthProvider, useAuth } from '@/context/AuthContext';
 import { PreferencesProvider } from '@/context/PreferencesContext';
@@ -44,6 +45,7 @@ function Navigator() {
       <NavigationContainer onReady={onReady}>
         <Stack.Navigator>
           <Stack.Screen name="Home" component={MapDashboard} options={{ headerShown: false }} />
+          <Stack.Screen name="Profile" component={ProfileScreen} options={{ headerShown: false }} />
         </Stack.Navigator>
       </NavigationContainer>
     );
@@ -62,7 +64,10 @@ function Navigator() {
         ) : needsWalkthrough ? (
           <Stack.Screen name="Walkthrough" component={WalkthroughScreen} options={{ headerShown: false }} />
         ) : (
-          <Stack.Screen name="Home" component={MapDashboard} options={{ headerShown: false }} />
+          <>
+            <Stack.Screen name="Home" component={MapDashboard} options={{ headerShown: false }} />
+            <Stack.Screen name="Profile" component={ProfileScreen} options={{ headerShown: false }} />
+          </>
         )}
       </Stack.Navigator>
     </NavigationContainer>
