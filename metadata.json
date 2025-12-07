@@ -1,7 +1,0 @@
-{
-  "name": "Trashed App for Drivers",
-  "description": "Logistics and route management for drivers.",
-  "requestFramePermissions": [
-    "geolocation"
-  ]
-}

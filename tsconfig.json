@@ -1,34 +1,42 @@
 {
   "compilerOptions": {
     "target": "ES2022",
-    "experimentalDecorators": true,
-    "useDefineForClassFields": false,
-    "module": "ESNext",
     "lib": [
       "ES2022",
       "DOM",
       "DOM.Iterable"
     ],
-    "skipLibCheck": true,
-    "types": [
-      "node"
-    ],
-    "moduleResolution": "bundler",
-    "isolatedModules": true,
-    "moduleDetection": "force",
-    "allowJs": true,
+    "module": "ESNext",
+    "moduleResolution": "node",
+    "allowJs": false,
     "jsx": "react-jsx",
+    "noEmit": true,
+    "isolatedModules": true,
+    "skipLibCheck": true,
+    "strict": true,
+    "resolveJsonModule": true,
+    "allowSyntheticDefaultImports": true,
+    "esModuleInterop": true,
+    "types": [],
     "paths": {
       "@/*": [
-        "./*"
+        "./src/*"
       ]
-    },
-    "allowImportingTsExtensions": true,
-    "noEmit": true
+    }
   },
+  "include": [
+    "src",
+    "App.tsx",
+    "app.config.ts",
+    ".expo/types/**/*.ts",
+    "expo-env.d.ts"
+  ],
   "exclude": [
+    "node_modules",
     ".trashed-app-snippets",
     ".trashed-app-snippets/**/*",
-    "**/.trashed-app-snippets/**"
-  ]
+    "**/.trashed-app-snippets/**",
+    "src/components/legacy/**/*"
+  ],
+  "extends": "expo/tsconfig.base"
 }

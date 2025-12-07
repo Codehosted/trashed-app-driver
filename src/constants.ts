@@ -1,4 +1,4 @@
-import { RouteStop, AppMessage } from './types';
+import { RouteStop, AppMessage } from '@/types/domain';
 
 export const APP_CONFIG = {
   enableAuth: false,
@@ -16,62 +16,83 @@ export const COLORS = {
   green: '#10b981',
 };
 
+export const MAP_CONFIG = {
+  defaultZoom: 13,
+  tilt: 55, // degrees for 3D effect
+};
+
 // Detroit Center approx: 42.3314° N, 83.0458° W
 export const INITIAL_STOPS: RouteStop[] = [
   {
+    uuid: '1',
     id: '1',
+    name: 'Yard / HQ',
     title: 'Yard / HQ',
     description: 'Vehicle inspection and route pickup.',
     address: '1200 Industrial Ave',
     type: 'star',
     color: COLORS.slate,
     time: '07:00 AM',
+    scheduledAt: '07:00 AM',
     status: 'pending',
     taskType: 'service',
     notes: '',
     photos: [],
+    etaMinutes: 0,
     coordinates: { lat: 42.3314, lng: -83.0458 }
   },
   {
+    uuid: '2',
     id: '2',
+    name: 'Construction Site A',
     title: 'Construction Site A',
     description: 'Drop-off: 20-yard Roll-off for demolition debris.',
     address: '450 W Fort St',
-    type: 'rocket', // Heavy load
+    type: 'rocket',
     color: COLORS.blue,
     time: '08:30 AM',
+    scheduledAt: '08:30 AM',
     status: 'pending',
     taskType: 'drop-off',
     notes: 'Gate code: 4590. Call foreman on arrival.',
     photos: [],
+    etaMinutes: 30,
     coordinates: { lat: 42.3486, lng: -83.0405 }
   },
   {
+    uuid: '3',
     id: '3',
+    name: 'Residential Reno',
     title: 'Residential Reno',
     description: 'Pick-up: 12-yard Dumpster. Full concrete load.',
     address: '789 Woodward Ave',
     type: 'time',
     color: COLORS.orange,
     time: '10:00 AM',
+    scheduledAt: '10:00 AM',
     status: 'pending',
     taskType: 'pick-up',
     notes: 'Driveway is tight, back in carefully.',
     photos: [],
+    etaMinutes: 60,
     coordinates: { lat: 42.3620, lng: -83.0725 }
   },
   {
+    uuid: '4',
     id: '4',
+    name: 'Commercial Park',
     title: 'Commercial Park',
     description: 'Swap: Drop empty 30-yard, take full compactor.',
     address: '2200 Michigan Ave',
     type: 'idea',
     color: COLORS.purple,
     time: '01:00 PM',
+    scheduledAt: '01:00 PM',
     status: 'pending',
     taskType: 'swap',
     notes: '',
     photos: [],
+    etaMinutes: 120,
     coordinates: { lat: 42.3292, lng: -83.0782 }
   },
 ];
@@ -100,8 +121,3 @@ export const INITIAL_MESSAGES: AppMessage[] = [
   }
 ];
 
-export const MAP_CONFIG = {
-  defaultZoom: 15,
-  tilt: 55,
-  tileSize: 256,
-};
