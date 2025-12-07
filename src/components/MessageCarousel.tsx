@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { View, Text, StyleSheet, Pressable, Dimensions, PanResponder } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Animated, { FadeIn, FadeOut, useAnimatedStyle, withSpring } from 'react-native-reanimated';
 import { Ionicons } from '@expo/vector-icons';
 import { AppMessage } from '@/types/domain';
@@ -18,6 +19,7 @@ export const MessageCarousel: React.FC<MessageCarouselProps> = ({
   const [messages, setMessages] = useState(initialMessages);
   const [currentIndex, setCurrentIndex] = useState(0);
   const isDark = theme === 'dark';
+  const insets = useSafeAreaInsets();
 
   if (messages.length === 0) return null;
 
@@ -69,7 +71,7 @@ export const MessageCarousel: React.FC<MessageCarouselProps> = ({
   };
 
   return (
-    <View style={styles.container} pointerEvents="box-none">
+    <View style={[styles.container, { bottom: Math.max(16, insets.bottom) }]} pointerEvents="box-none">
       <Animated.View
         key={currentMessage.id}
         entering={FadeIn}

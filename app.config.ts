@@ -43,6 +43,9 @@ const config: ExpoConfig = {
   experiments: {
     typedRoutes: true
   },
+  plugins: [
+    'expo-font'
+  ],
   extra: {
     eas: {
       projectId: '1804841b-3977-429b-af4a-849ba0657920'

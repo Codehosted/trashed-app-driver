@@ -1,5 +1,6 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { View, Text, StyleSheet, Pressable, Dimensions, Platform } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { useAuth } from '@/context/AuthContext';
 import { usePreferences } from '@/context/PreferencesContext';
@@ -222,36 +223,37 @@ export const MapDashboard: React.FC<MapDashboardProps> = ({ route: propRoute }) 
   }
 
   return (
-    <GestureHandlerRootView style={[styles.container, { backgroundColor: palette.background }]}>
-      {/* Notifications Overlay */}
-      <NotificationToast
-        notification={activeNotification}
-        onClose={() => setActiveNotification(null)}
-      />
+    <SafeAreaView style={[styles.container, { backgroundColor: palette.background }]} edges={['top', 'bottom']}>
+      <GestureHandlerRootView style={styles.container}>
+        {/* Notifications Overlay */}
+        <NotificationToast
+          notification={activeNotification}
+          onClose={() => setActiveNotification(null)}
+        />
 
-      {/* Top Overlay Gradient */}
-      <View
-        style={[
-          styles.topGradient,
-          {
-            backgroundColor: theme === 'dark' ? 'rgba(15, 23, 42, 0.8)' : 'rgba(248, 250, 252, 0.8)',
-          },
-        ]}
-        pointerEvents="none"
-      />
+        {/* Top Overlay Gradient */}
+        <View
+          style={[
+            styles.topGradient,
+            {
+              backgroundColor: theme === 'dark' ? 'rgba(15, 23, 42, 0.8)' : 'rgba(248, 250, 252, 0.8)',
+            },
+          ]}
+          pointerEvents="none"
+        />
 
-      {/* Branding */}
-      <View style={styles.branding} pointerEvents="none">
-        <Text style={[styles.brandTitle, { color: palette.text }]}>
-          trash<Text style={{ color: palette.accent }}>ed</Text>
-        </Text>
-        <Text style={[styles.brandSubtitle, { color: palette.subtleText }]}>DRIVER PORTAL</Text>
-      </View>
+        {/* Branding */}
+        <View style={styles.branding} pointerEvents="none">
+          <Text style={[styles.brandTitle, { color: palette.text }]}>
+            trash<Text style={{ color: palette.accent }}>ed</Text>
+          </Text>
+          <Text style={[styles.brandSubtitle, { color: palette.subtleText }]}>DRIVER PORTAL</Text>
+        </View>
 
-      {/* Weather Widget - Top Right */}
-      <View style={styles.weatherWidget} pointerEvents="none">
-        <WeatherWidget theme={theme} />
-      </View>
+        {/* Weather Widget - Top Right */}
+        <View style={styles.weatherWidget} pointerEvents="none">
+          <WeatherWidget theme={theme} />
+        </View>
 
       {/* Main 3D Map View Area */}
       <View style={styles.mapContainer}>
@@ -265,43 +267,49 @@ export const MapDashboard: React.FC<MapDashboardProps> = ({ route: propRoute }) 
         />
       </View>
 
-      {/* Navigation Hints (Side Chevrons) */}
-      {activeIndex > 0 && (
-        <View style={[styles.navHint, styles.navHintLeft]} pointerEvents="none">
-          <View
-            style={[
-              styles.navHintCircle,
-              {
-                backgroundColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.05)',
-              },
-            ]}
+        {/* Navigation Hints (Side Chevrons) */}
+        {activeIndex > 0 && (
+          <Pressable
+            style={[styles.navHint, styles.navHintLeft]}
+            onPress={handlePrev}
           >
-            <Ionicons
-              name="chevron-back"
-              size={24}
-              color={theme === 'dark' ? '#ffffff' : '#0f172a'}
-            />
-          </View>
-        </View>
-      )}
-      {activeIndex < stops.length - 1 && (
-        <View style={[styles.navHint, styles.navHintRight]} pointerEvents="none">
-          <View
-            style={[
-              styles.navHintCircle,
-              {
-                backgroundColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.05)',
-              },
-            ]}
+            <View
+              style={[
+                styles.navHintCircle,
+                {
+                  backgroundColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.1)',
+                },
+              ]}
+            >
+              <Ionicons
+                name="chevron-back"
+                size={24}
+                color={theme === 'dark' ? '#ffffff' : '#0f172a'}
+              />
+            </View>
+          </Pressable>
+        )}
+        {activeIndex < stops.length - 1 && (
+          <Pressable
+            style={[styles.navHint, styles.navHintRight]}
+            onPress={handleNext}
           >
-            <Ionicons
-              name="chevron-forward"
-              size={24}
-              color={theme === 'dark' ? '#ffffff' : '#0f172a'}
-            />
-          </View>
-        </View>
-      )}
+            <View
+              style={[
+                styles.navHintCircle,
+                {
+                  backgroundColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.1)',
+                },
+              ]}
+            >
+              <Ionicons
+                name="chevron-forward"
+                size={24}
+                color={theme === 'dark' ? '#ffffff' : '#0f172a'}
+              />
+            </View>
+          </Pressable>
+        )}
 
       {/* Center Info Card */}
       <InfoCard
@@ -412,20 +420,21 @@ export const MapDashboard: React.FC<MapDashboardProps> = ({ route: propRoute }) 
         </Pressable>
       </View>
 
-      {/* List View Overlay */}
-      {isListViewOpen && (
-        <ListView
-          stops={stops}
-          activeIndex={activeIndex}
-          onSelect={(i) => {
-            setActiveIndex(i);
-            setIsListViewOpen(false);
-          }}
-          onClose={() => setIsListViewOpen(false)}
-          theme={theme}
-        />
-      )}
-    </GestureHandlerRootView>
+        {/* List View Overlay */}
+        {isListViewOpen && (
+          <ListView
+            stops={stops}
+            activeIndex={activeIndex}
+            onSelect={(i) => {
+              setActiveIndex(i);
+              setIsListViewOpen(false);
+            }}
+            onClose={() => setIsListViewOpen(false)}
+            theme={theme}
+          />
+        )}
+      </GestureHandlerRootView>
+    </SafeAreaView>
   );
 };
 
@@ -444,7 +453,7 @@ const styles = StyleSheet.create({
   },
   branding: {
     position: 'absolute',
-    top: 12,
+    top: 8,
     left: 12,
     zIndex: 20,
   },
@@ -463,7 +472,7 @@ const styles = StyleSheet.create({
   },
   weatherWidget: {
     position: 'absolute',
-    top: 24,
+    top: 8,
     right: 80,
     zIndex: 20,
   },
@@ -479,10 +488,10 @@ const styles = StyleSheet.create({
     marginTop: -20,
   },
   navHintLeft: {
-    left: 16,
+    left: 8,
   },
   navHintRight: {
-    right: 16,
+    right: 8,
   },
   navHintCircle: {
     width: 40,
@@ -494,8 +503,8 @@ const styles = StyleSheet.create({
   },
   rightControls: {
     position: 'absolute',
-    top: 24,
-    right: 24,
+    top: 8,
+    right: 12,
     zIndex: 30,
     alignItems: 'flex-end',
     gap: 8,
