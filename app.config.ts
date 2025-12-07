@@ -11,6 +11,7 @@ const firebaseConfig = {
 const config: ExpoConfig = {
   name: 'Trashed Driver',
   slug: 'trashed-driver',
+  owner: 'codehosted-cloud',
   scheme: 'trasheddriver',
   version: '1.0.0',
   orientation: 'portrait',
@@ -41,7 +42,7 @@ const config: ExpoConfig = {
   },
   extra: {
     eas: {
-      projectId: '00000000-0000-0000-0000-000000000000'
+      projectId: '1804841b-3977-429b-af4a-849ba0657920'
     },
     firebaseApiKey: firebaseConfig.apiKey,
     firebaseAuthDomain: firebaseConfig.authDomain,
