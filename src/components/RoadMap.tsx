@@ -1,6 +1,6 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useEffect } from 'react';
 import { View, StyleSheet, Dimensions, Image } from 'react-native';
-import Animated, { useAnimatedStyle, withSpring } from 'react-native-reanimated';
+import Animated, { useAnimatedStyle, withSpring, useSharedValue } from 'react-native-reanimated';
 import { Svg, Path } from 'react-native-svg';
 import { RouteStop } from '@/types/domain';
 import { MAP_CONFIG } from '@/constants';
@@ -40,8 +40,8 @@ const MapTiles: React.FC<{
   const centerTileX = Math.floor(globalCenterX / TILE_SIZE);
   const centerTileY = Math.floor(globalCenterY / TILE_SIZE);
 
-  const rangeX = 6;
-  const rangeY = 12;
+  const rangeX = 10;
+  const rangeY = 20;
 
   const tiles = [];
   for (let x = centerTileX - rangeX; x <= centerTileX + rangeX; x++) {
@@ -133,16 +133,34 @@ export const RoadMap: React.FC<RoadMapProps> = ({
   const fogColor = theme === 'dark' ? 'rgba(10,10,10,1)' : 'rgba(240,244,248,1)';
   const fogTransparent = theme === 'dark' ? 'rgba(10,10,10,0)' : 'rgba(240,244,248,0)';
 
-  // Animated style for map plane
+  // Shared values for smooth spring animations (like framer-motion)
+  const translateX = useSharedValue(-activeLocalPoint.x);
+  const translateY = useSharedValue(-activeLocalPoint.y);
+
+  // Update shared values with spring animation when activeIndex changes
+  useEffect(() => {
+    translateX.value = withSpring(-activeLocalPoint.x, {
+      damping: 20,
+      stiffness: 90,
+      mass: 1,
+    });
+    translateY.value = withSpring(-activeLocalPoint.y, {
+      damping: 20,
+      stiffness: 90,
+      mass: 1,
+    });
+  }, [activeLocalPoint.x, activeLocalPoint.y, translateX, translateY]);
+
+  // Animated style for map plane with spring animation
   const mapPlaneStyle = useAnimatedStyle(() => {
     return {
       transform: [
-        { translateX: -activeLocalPoint.x },
-        { translateY: -activeLocalPoint.y },
+        { translateX: translateX.value },
+        { translateY: translateY.value },
         { rotateX: `${MAP_CONFIG.tilt}deg` },
       ],
     };
-  });
+  }, []);
 
   return (
     <View style={[styles.container, { backgroundColor: bgColor }]}>
@@ -150,16 +168,16 @@ export const RoadMap: React.FC<RoadMapProps> = ({
         style={[
           styles.mapPlane,
           {
-            width: SCREEN_WIDTH * 3,
-            height: SCREEN_HEIGHT * 3,
-            left: SCREEN_WIDTH / 2,
-            top: SCREEN_HEIGHT / 2,
+            width: SCREEN_WIDTH * 5,
+            height: SCREEN_HEIGHT * 5,
+            left: SCREEN_WIDTH * 2,
+            top: SCREEN_HEIGHT * 2,
           },
           mapPlaneStyle,
         ]}
       >
         {/* Tile Layer */}
-        <View style={StyleSheet.absoluteFill}>
+        <View style={[StyleSheet.absoluteFill, { overflow: 'visible' }]}>
           <MapTiles
             localCenter={activeLocalPoint}
             globalOrigin={origin}
@@ -171,8 +189,8 @@ export const RoadMap: React.FC<RoadMapProps> = ({
         {/* Road Layer */}
         <View style={[StyleSheet.absoluteFill, { zIndex: 1 }]} pointerEvents="none">
           <Svg
-            width={SCREEN_WIDTH * 3}
-            height={SCREEN_HEIGHT * 3}
+            width={SCREEN_WIDTH * 5}
+            height={SCREEN_HEIGHT * 5}
             style={{ position: 'absolute', top: 0, left: 0 }}
           >
             {/* Glow under the road */}
@@ -272,6 +290,8 @@ export const RoadMap: React.FC<RoadMapProps> = ({
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    width: '100%',
+    height: '100%',
     overflow: 'hidden',
   },
   mapPlane: {
@@ -282,7 +302,7 @@ const styles = StyleSheet.create({
     top: 0,
     left: 0,
     right: 0,
-    height: 192,
+    height: 120,
     zIndex: 10,
   },
   fogBottom: {
@@ -290,7 +310,7 @@ const styles = StyleSheet.create({
     bottom: 0,
     left: 0,
     right: 0,
-    height: 128,
+    height: 100,
     zIndex: 10,
   },
   fogLeft: {
@@ -298,7 +318,7 @@ const styles = StyleSheet.create({
     top: 0,
     bottom: 0,
     left: 0,
-    width: 128,
+    width: 80,
     zIndex: 10,
   },
   fogRight: {
@@ -306,7 +326,7 @@ const styles = StyleSheet.create({
     top: 0,
     bottom: 0,
     right: 0,
-    width: 128,
+    width: 80,
     zIndex: 10,
   },
 });

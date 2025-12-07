@@ -294,19 +294,17 @@ export const MapDashboard: React.FC<MapDashboardProps> = ({ route: propRoute }) 
           <WeatherWidget theme={theme} />
         </View>
 
-        {/* Main 3D Map View Area */}
+        {/* Main 3D Map View Area - Full Screen Background */}
         <View style={styles.mapContainer}>
           <GestureDetector gesture={swipeGesture}>
-            <View style={StyleSheet.absoluteFill}>
-              <RoadMap
-                stops={stops}
-                activeIndex={activeIndex}
-                onStopClick={setActiveIndex}
-                theme={theme}
-                zoom={zoom}
-                userLocation={userLocation}
-              />
-            </View>
+            <RoadMap
+              stops={stops}
+              activeIndex={activeIndex}
+              onStopClick={setActiveIndex}
+              theme={theme}
+              zoom={zoom}
+              userLocation={userLocation}
+            />
           </GestureDetector>
         </View>
 
@@ -518,9 +516,15 @@ const styles = StyleSheet.create({
     zIndex: 20,
   },
   mapContainer: {
-    flex: 1,
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
     width: '100%',
     height: '100%',
+    overflow: 'hidden',
+    zIndex: 1,
   },
   navHint: {
     position: 'absolute',
@@ -544,7 +548,7 @@ const styles = StyleSheet.create({
   },
   rightControls: {
     position: 'absolute',
-    top: 8,
+    top: 100,
     right: 12,
     zIndex: 30,
     alignItems: 'flex-end',

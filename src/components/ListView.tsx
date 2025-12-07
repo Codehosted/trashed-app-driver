@@ -1,8 +1,13 @@
-import React from 'react';
-import { View, Text, StyleSheet, Pressable, ScrollView, Modal } from 'react-native';
-import Animated, { SlideInRight, SlideOutRight } from 'react-native-reanimated';
+import React, { useState } from 'react';
+import { View, Text, StyleSheet, Pressable, ScrollView, Dimensions } from 'react-native';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import Animated, { useSharedValue, useAnimatedStyle, withSpring, withTiming } from 'react-native-reanimated';
 import { Ionicons } from '@expo/vector-icons';
 import { RouteStop } from '@/types/domain';
+
+const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
+const COLLAPSED_HEIGHT = 60;
+const EXPANDED_HEIGHT = SCREEN_HEIGHT * 0.7;
 
 interface ListViewProps {
   stops: RouteStop[];
@@ -39,71 +44,133 @@ export const ListView: React.FC<ListViewProps> = ({
   theme,
 }) => {
   const isDark = theme === 'dark';
+  const [isExpanded, setIsExpanded] = useState(false);
+  const insets = useSafeAreaInsets();
+  // Start collapsed: visible at bottom with COLLAPSED_HEIGHT
+  const translateY = useSharedValue(0);
+  const height = useSharedValue(COLLAPSED_HEIGHT);
+
+  const toggleExpanded = () => {
+    const newExpanded = !isExpanded;
+    setIsExpanded(newExpanded);
+    
+    if (newExpanded) {
+      // Expand: slide up and increase height
+      const slideUp = -(EXPANDED_HEIGHT - COLLAPSED_HEIGHT);
+      translateY.value = withSpring(slideUp, { damping: 20, stiffness: 90 });
+      height.value = withSpring(EXPANDED_HEIGHT, { damping: 20, stiffness: 90 });
+    } else {
+      // Collapse: slide down and decrease height
+      translateY.value = withSpring(0, { damping: 20, stiffness: 90 });
+      height.value = withSpring(COLLAPSED_HEIGHT, { damping: 20, stiffness: 90 });
+    }
+  };
+
+  const animatedStyle = useAnimatedStyle(() => {
+    return {
+      transform: [{ translateY: translateY.value }],
+      height: height.value,
+    };
+  });
+
+  const handleSelect = (index: number) => {
+    onSelect(index);
+    if (isExpanded) {
+      toggleExpanded();
+    }
+  };
 
   return (
-    <Modal visible={true} transparent animationType="none" onRequestClose={onClose}>
-      <Pressable style={styles.overlay} onPress={onClose}>
-        <Animated.View
-          entering={SlideInRight}
-          exiting={SlideOutRight}
+    <Animated.View
+      style={[
+        styles.bottomSheet,
+        {
+          backgroundColor: isDark ? 'rgba(15, 23, 42, 0.98)' : 'rgba(255, 255, 255, 0.98)',
+          borderTopColor: isDark ? 'rgba(51, 65, 85, 0.8)' : 'rgba(203, 213, 225, 1)',
+        },
+        animatedStyle,
+      ]}
+      pointerEvents={isExpanded ? 'auto' : 'box-none'}
+    >
+      <SafeAreaView edges={['bottom']} style={styles.safeArea}>
+        {/* Handle Bar */}
+        <Pressable
+          onPress={toggleExpanded}
           style={[
-            styles.container,
+            styles.handleBar,
             {
-              backgroundColor: isDark ? 'rgba(15, 23, 42, 0.95)' : 'rgba(255, 255, 255, 0.95)',
-              borderLeftColor: isDark ? 'rgba(51, 65, 85, 0.8)' : 'rgba(203, 213, 225, 1)',
+              backgroundColor: isDark ? 'rgba(15, 23, 42, 0.5)' : 'rgba(248, 250, 252, 0.5)',
             },
           ]}
-          onStartShouldSetResponder={() => true}
+          pointerEvents="auto"
         >
-          <View
+          <View style={styles.handleIndicator} />
+          <Text
             style={[
-              styles.header,
+              styles.headerTitle,
               {
-                backgroundColor: isDark ? 'rgba(15, 23, 42, 0.5)' : 'rgba(248, 250, 252, 0.5)',
-                borderBottomColor: isDark ? 'rgba(51, 65, 85, 0.8)' : 'rgba(203, 213, 225, 1)',
+                color: isDark ? '#ffffff' : '#0f172a',
               },
             ]}
           >
-            <Text
-              style={[
-                styles.headerTitle,
-                {
-                  color: isDark ? '#ffffff' : '#0f172a',
-                },
-              ]}
-            >
-              Today's Route
-            </Text>
+            Today's Route ({stops.length})
+          </Text>
+          <View style={styles.rightButtons}>
             <Pressable
-              onPress={onClose}
-              style={[
-                styles.closeButton,
-                {
-                  backgroundColor: isDark ? 'transparent' : 'transparent',
-                },
-              ]}
+              onPress={toggleExpanded}
+              style={styles.chevronButton}
+              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
             >
               <Ionicons
-                name="close"
+                name={isExpanded ? 'chevron-down' : 'chevron-up'}
                 size={20}
                 color={isDark ? 'rgba(148, 163, 184, 1)' : 'rgba(100, 116, 139, 1)'}
               />
             </Pressable>
+            <Pressable
+              onPress={onClose}
+              style={styles.closeButton}
+              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+            >
+              <Ionicons
+                name="close"
+                size={18}
+                color={isDark ? 'rgba(148, 163, 184, 1)' : 'rgba(100, 116, 139, 1)'}
+              />
+            </Pressable>
           </View>
+        </Pressable>
 
+        {/* Content Area */}
+        {isExpanded && (
           <ScrollView
             style={styles.scrollView}
             contentContainerStyle={styles.scrollContent}
-            showsVerticalScrollIndicator={false}
+            showsVerticalScrollIndicator={true}
+            indicatorStyle={isDark ? 'white' : 'black'}
           >
-            {stops.map((stop, i) => {
+            {stops.length === 0 ? (
+              <View style={styles.emptyState}>
+                <Text
+                  style={[
+                    styles.emptyStateText,
+                    {
+                      color: isDark ? 'rgba(148, 163, 184, 1)' : 'rgba(100, 116, 139, 1)',
+                    },
+                  ]}
+                >
+                  No stops available
+                </Text>
+              </View>
+            ) : (
+              stops.map((stop, i) => {
               const isActive = i === activeIndex;
               const color = stop.color || '#64748b';
 
               return (
-                <Pressable
+                  <Pressable
                   key={stop.uuid}
-                  onPress={() => onSelect(i)}
+                  onPress={() => handleSelect(i)}
                   style={[
                     styles.stopCard,
                     {
@@ -113,7 +180,7 @@ export const ListView: React.FC<ListViewProps> = ({
                           : 'rgba(238, 242, 255, 0.5)'
                         : isDark
                         ? 'rgba(15, 23, 42, 0.5)'
-                        : '#ffffff',
+                        : 'rgba(248, 250, 252, 1)',
                       borderColor: isActive
                         ? '#6366f1'
                         : isDark
@@ -183,42 +250,69 @@ export const ListView: React.FC<ListViewProps> = ({
                   </View>
                 </Pressable>
               );
-            })}
+              })
+            )}
           </ScrollView>
-        </Animated.View>
-      </Pressable>
-    </Modal>
+        )}
+      </SafeAreaView>
+    </Animated.View>
   );
 };
 
 const styles = StyleSheet.create({
-  overlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.6)',
-  },
-  container: {
+  bottomSheet: {
     position: 'absolute',
-    top: 0,
-    right: 0,
     bottom: 0,
-    width: '100%',
-    maxWidth: 384,
-    borderLeftWidth: 1,
-    shadowOffset: { width: -4, height: 0 },
-    shadowRadius: 12,
+    left: 0,
+    right: 0,
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    borderTopWidth: 1,
+    shadowOffset: { width: 0, height: -10 },
+    shadowRadius: 20,
     shadowOpacity: 0.3,
     elevation: 10,
+    overflow: 'hidden',
+    zIndex: 25,
   },
-  header: {
+  safeArea: {
+    flex: 1,
+    minHeight: 0,
+  },
+  handleBar: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    padding: 24,
+    paddingHorizontal: 20,
+    paddingVertical: 12,
     borderBottomWidth: 1,
+    borderBottomColor: 'rgba(203, 213, 225, 0.3)',
+  },
+  handleIndicator: {
+    width: 40,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: 'rgba(148, 163, 184, 0.5)',
+    position: 'absolute',
+    top: 8,
+    left: '50%',
+    marginLeft: -20,
   },
   headerTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
+    fontSize: 16,
+    fontWeight: '600',
+    flex: 1,
+    textAlign: 'center',
+    marginLeft: 20,
+  },
+  rightButtons: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  chevronButton: {
+    padding: 8,
+    borderRadius: 20,
   },
   closeButton: {
     padding: 8,
@@ -275,6 +369,16 @@ const styles = StyleSheet.create({
   stopDescription: {
     fontSize: 14,
     lineHeight: 20,
+  },
+  emptyState: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingVertical: 60,
+  },
+  emptyStateText: {
+    fontSize: 16,
+    textAlign: 'center',
   },
 });
 

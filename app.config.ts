@@ -27,14 +27,16 @@ const config: ExpoConfig = {
       "ITSAppUsesNonExemptEncryption": false
     },
     supportsTablet: true,
-    bundleIdentifier: 'com.trashed.driver'
+    bundleIdentifier: 'com.trashed.driver',
+    googleServicesFile: './GoogleService-Info.plist'
   },
   android: {
     package: 'com.trashed.driver',
     adaptiveIcon: {
       foregroundImage: './assets/adaptive-icon.png',
       backgroundColor: '#0b172a'
-    }
+    },
+    googleServicesFile: './google-services.json'
   },
   web: {
     bundler: 'metro',
@@ -44,7 +46,17 @@ const config: ExpoConfig = {
     typedRoutes: true
   },
   plugins: [
-    'expo-font'
+    'expo-font',
+    '@react-native-firebase/app',
+    '@react-native-firebase/auth',
+    [
+      'expo-build-properties',
+      {
+        ios: {
+          useFrameworks: 'static'
+        }
+      }
+    ]
   ],
   extra: {
     eas: {

@@ -562,6 +562,7 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 10 },
     shadowRadius: 20,
     elevation: 10,
+    zIndex: 40,
   },
   avatarContainer: {
     position: 'absolute',

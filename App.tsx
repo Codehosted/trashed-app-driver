@@ -12,7 +12,7 @@ import { WalkthroughScreen } from '@/screens/WalkthroughScreen';
 import { ProfileScreen } from '@/screens/ProfileScreen';
 import { MapDashboard } from '@/components/MapDashboard';
 import { AuthProvider, useAuth } from '@/context/AuthContext';
-import { PreferencesProvider } from '@/context/PreferencesContext';
+import { PreferencesProvider, usePreferences } from '@/context/PreferencesContext';
 import { ThemedView } from '@/components/ThemedView';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 
@@ -74,15 +74,22 @@ function Navigator() {
   );
 }
 
+function AppContent() {
+  const { theme } = usePreferences();
+  return (
+    <ThemedView>
+      <StatusBar style={theme === 'dark' ? 'light' : 'dark'} />
+      <Navigator />
+    </ThemedView>
+  );
+}
+
 export default function App() {
   return (
     <ErrorBoundary>
       <PreferencesProvider>
         <AuthProvider>
-          <ThemedView>
-            <StatusBar style="light" />
-            <Navigator />
-          </ThemedView>
+          <AppContent />
         </AuthProvider>
       </PreferencesProvider>
     </ErrorBoundary>

@@ -1,15 +1,15 @@
 import React, { createContext, useContext, useEffect, useMemo, useState } from 'react';
-import {
-  auth,
-  onAuthStateChanged,
-  signInWithEmailAndPassword,
-  createUserWithEmailAndPassword,
-  sendPasswordResetEmail,
-  signOut,
-  User,
-} from '@/services/firebase';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Constants from 'expo-constants';
+
+// User type - will be replaced with backend API types
+export interface User {
+  uid: string;
+  email: string | null;
+  displayName: string | null;
+  photoURL: string | null;
+  [key: string]: any;
+}
 
 interface AuthContextValue {
   user: User | null;
@@ -26,6 +26,7 @@ interface AuthContextValue {
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 
 const WALKTHROUGH_KEY = 'driver_walkthrough_complete';
+const USER_STORAGE_KEY = 'driver_user';
 
 // Check if auth is enabled from config
 const isAuthEnabled = () => {
@@ -39,33 +40,52 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [loading, setLoading] = useState(authEnabled);
   const [needsWalkthrough, setNeedsWalkthrough] = useState(false);
 
+  // Load user from storage on mount
   useEffect(() => {
-    if (!authEnabled) {
-      // Auth disabled - immediately mark as loaded
-      setLoading(false);
-      setNeedsWalkthrough(false);
-      return;
-    }
-
-    const unsubscribe = onAuthStateChanged(auth, async (nextUser) => {
-      setUser(nextUser);
-      if (nextUser) {
-        const seen = await AsyncStorage.getItem(`${WALKTHROUGH_KEY}:${nextUser.uid}`);
-        setNeedsWalkthrough(!seen);
+    const loadUser = async () => {
+      if (!authEnabled) {
+        setLoading(false);
+        setNeedsWalkthrough(false);
+        return;
       }
-      setLoading(false);
-    });
 
-    return () => unsubscribe();
+      try {
+        const storedUser = await AsyncStorage.getItem(USER_STORAGE_KEY);
+        if (storedUser) {
+          const userData = JSON.parse(storedUser);
+          setUser(userData);
+          const seen = await AsyncStorage.getItem(`${WALKTHROUGH_KEY}:${userData.uid}`);
+          setNeedsWalkthrough(!seen);
+        }
+      } catch (err) {
+        console.error('Error loading user:', err);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadUser();
   }, [authEnabled]);
 
   const register = async (email: string, password: string) => {
     if (!authEnabled) {
       throw new Error('Authentication is disabled');
     }
-    const credential = await createUserWithEmailAndPassword(auth, email, password);
-    setUser(credential.user);
-    await AsyncStorage.removeItem(`${WALKTHROUGH_KEY}:${credential.user.uid}`);
+    // TODO: Replace with backend API call
+    // const response = await fetch('YOUR_BACKEND_API/register', { ... });
+    // const userData = await response.json();
+    
+    // Placeholder: Create a mock user for now
+    const mockUser: User = {
+      uid: `user_${Date.now()}`,
+      email,
+      displayName: email.split('@')[0],
+      photoURL: null,
+    };
+    
+    setUser(mockUser);
+    await AsyncStorage.setItem(USER_STORAGE_KEY, JSON.stringify(mockUser));
+    await AsyncStorage.removeItem(`${WALKTHROUGH_KEY}:${mockUser.uid}`);
     setNeedsWalkthrough(true);
   };
 
@@ -73,25 +93,42 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     if (!authEnabled) {
       throw new Error('Authentication is disabled');
     }
-    const credential = await signInWithEmailAndPassword(auth, email, password);
-    setUser(credential.user);
-    const seen = await AsyncStorage.getItem(`${WALKTHROUGH_KEY}:${credential.user.uid}`);
+    // TODO: Replace with backend API call
+    // const response = await fetch('YOUR_BACKEND_API/login', { ... });
+    // const userData = await response.json();
+    
+    // Placeholder: Create a mock user for now
+    const mockUser: User = {
+      uid: `user_${Date.now()}`,
+      email,
+      displayName: email.split('@')[0],
+      photoURL: null,
+    };
+    
+    setUser(mockUser);
+    await AsyncStorage.setItem(USER_STORAGE_KEY, JSON.stringify(mockUser));
+    const seen = await AsyncStorage.getItem(`${WALKTHROUGH_KEY}:${mockUser.uid}`);
     setNeedsWalkthrough(!seen);
   };
 
-  const resetPassword = (email: string) => {
+  const resetPassword = async (email: string) => {
     if (!authEnabled) {
       throw new Error('Authentication is disabled');
     }
-    return sendPasswordResetEmail(auth, email);
+    // TODO: Replace with backend API call
+    // await fetch('YOUR_BACKEND_API/reset-password', { ... });
+    throw new Error('Password reset not implemented yet. Use backend API.');
   };
 
   const logout = async () => {
     if (!authEnabled) {
       return;
     }
-    await signOut(auth);
+    // TODO: Call backend API to invalidate session if needed
+    // await fetch('YOUR_BACKEND_API/logout', { ... });
+    
     setUser(null);
+    await AsyncStorage.removeItem(USER_STORAGE_KEY);
   };
 
   const completeWalkthrough = async () => {
