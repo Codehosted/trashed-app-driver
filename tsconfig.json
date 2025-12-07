@@ -36,7 +36,6 @@
     ".trashed-app-snippets",
     ".trashed-app-snippets/**/*",
     "**/.trashed-app-snippets/**",
-    "src/components/legacy/**/*"
   ],
   "extends": "expo/tsconfig.base"
 }

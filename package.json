@@ -8,7 +8,9 @@
     "android": "expo run:android",
     "ios": "IOS_SIMULATOR_DEVICE_NAME=\"iPhone 12 Pro Max\" expo start --ios",
     "web": "expo start --web",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "build:ios:dev": "NODE_ENV=development eas build --profile development --platform ios",
+    "build:ios:dev:local": "NODE_ENV=development eas build --profile development --platform ios --local"
   },
   "dependencies": {
     "@expo/vector-icons": "~14.0.4",
@@ -41,7 +43,6 @@
   "devDependencies": {
     "@babel/core": "^7.26.7",
     "@types/react": "~18.3.12",
-    "@types/react-native": "^0.73.0",
     "babel-plugin-module-resolver": "^5.0.2",
     "typescript": "^5.8.3"
   }
