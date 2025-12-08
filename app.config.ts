@@ -40,7 +40,7 @@ const config: ExpoConfig = {
     },
     supportsTablet: true,
     bundleIdentifier: 'com.trashed.driver',
-    ...(iosGoogleServicesExists && { googleServicesFile: iosGoogleServicesFile })
+    googleServicesFile: iosGoogleServicesFile
   },
   android: {
     package: 'com.trashed.driver',

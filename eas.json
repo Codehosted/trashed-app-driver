@@ -28,11 +28,6 @@
     }
   },
   "submit": {
-    "production": {
-      "env": {
-        "API_BASE_URL": "https://trashed.app",
-        "WEB_APP_URL": "https://trashed-app-driver.vercel.app/"
-      }
-    }
+    "production": {}
   }
 }
