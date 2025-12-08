@@ -1,9 +1,10 @@
-import React, { useRef, useState, useMemo } from 'react';
+import React, { useRef, useState, useMemo, useEffect } from 'react';
 import { View, StyleSheet, ActivityIndicator, Text, Pressable } from 'react-native';
 import { WebView } from 'react-native-webview';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
+import { useAuth } from '@/context/AuthContext';
 import { usePreferences } from '@/context/PreferencesContext';
 import { designSchema } from '@/data/designSchema';
 import { PhotoPickerModal } from '@/components/PhotoPickerModal';
@@ -14,6 +15,7 @@ const WEBVIEW_BASE_URL = 'https://trashed.ngrok.app/';
 
 export const WebViewScreen: React.FC = () => {
   const { theme } = usePreferences();
+  const { user, isAuthEnabled, loading: authLoading } = useAuth();
   const navigation = useNavigation();
   const palette = designSchema.theme[theme];
   const webViewRef = useRef<WebView>(null);
@@ -24,6 +26,13 @@ export const WebViewScreen: React.FC = () => {
   const [selectedPhotos, setSelectedPhotos] = useState<string[]>([]);
   const [notes, setNotes] = useState('');
   const isDark = theme === 'dark';
+
+  // Redirect to login if auth is required but user is not logged in
+  useEffect(() => {
+    if (!authLoading && isAuthEnabled && !user) {
+      navigation.navigate('Login' as never);
+    }
+  }, [authLoading, isAuthEnabled, user, navigation]);
 
   // Construct URL with theme query parameter
   const webViewUrl = useMemo(() => {

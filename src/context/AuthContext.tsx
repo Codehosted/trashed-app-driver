@@ -1,14 +1,41 @@
 import React, { createContext, useContext, useEffect, useMemo, useState } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Constants from 'expo-constants';
+import * as authService from '@/services/auth';
+import type { NextAuthUser } from '@/services/auth';
+import { userDataEmitter, USER_DATA_UPDATED_EVENT } from '@/services/api-response-handler';
 
-// User type - will be replaced with backend API types
+// User type - compatible with NextAuth user
 export interface User {
-  uid: string;
+  uid: string; // Maps to uuid from NextAuth
   email: string | null;
-  displayName: string | null;
-  photoURL: string | null;
+  displayName: string | null; // Maps to name from NextAuth
+  photoURL: string | null; // Maps to image from NextAuth
+  id?: string;
+  uuid?: string;
+  roles?: string[];
+  vendor?: any;
+  emailVerified?: Date | null;
+  phone?: string | null;
   [key: string]: any;
+}
+
+/**
+ * Convert NextAuthUser to User format for compatibility
+ */
+function nextAuthUserToUser(nextAuthUser: NextAuthUser): User {
+  return {
+    uid: nextAuthUser.uuid,
+    email: nextAuthUser.email,
+    displayName: nextAuthUser.name,
+    photoURL: nextAuthUser.image,
+    id: nextAuthUser.id,
+    uuid: nextAuthUser.uuid,
+    roles: nextAuthUser.roles,
+    vendor: nextAuthUser.vendor,
+    emailVerified: nextAuthUser.emailVerified,
+    phone: nextAuthUser.phone,
+  };
 }
 
 interface AuthContextValue {
@@ -40,7 +67,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [loading, setLoading] = useState(authEnabled);
   const [needsWalkthrough, setNeedsWalkthrough] = useState(false);
 
-  // Load user from storage on mount
+  // Load user from session on mount and refresh periodically
   useEffect(() => {
     const loadUser = async () => {
       if (!authEnabled) {
@@ -50,12 +77,23 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
 
       try {
-        const storedUser = await AsyncStorage.getItem(USER_STORAGE_KEY);
-        if (storedUser) {
-          const userData = JSON.parse(storedUser);
-          setUser(userData);
-          const seen = await AsyncStorage.getItem(`${WALKTHROUGH_KEY}:${userData.uid}`);
+        // Check for existing session
+        const sessionResponse = await authService.getSession();
+        if (sessionResponse.success && sessionResponse.user) {
+          const user = nextAuthUserToUser(sessionResponse.user);
+          setUser(user);
+          await AsyncStorage.setItem(USER_STORAGE_KEY, JSON.stringify(user));
+          const seen = await AsyncStorage.getItem(`${WALKTHROUGH_KEY}:${user.uid}`);
           setNeedsWalkthrough(!seen);
+        } else {
+          // Check for stored user as fallback
+          const storedUser = await AsyncStorage.getItem(USER_STORAGE_KEY);
+          if (storedUser) {
+            const userData = JSON.parse(storedUser);
+            setUser(userData);
+            const seen = await AsyncStorage.getItem(`${WALKTHROUGH_KEY}:${userData.uid}`);
+            setNeedsWalkthrough(!seen);
+          }
         }
       } catch (err) {
         console.error('Error loading user:', err);
@@ -65,27 +103,45 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     };
 
     loadUser();
+    
+    // Listen for user data updates from API responses
+    const handleUserDataUpdate = async () => {
+      try {
+        const storedUser = await AsyncStorage.getItem(USER_STORAGE_KEY);
+        if (storedUser) {
+          const userData = JSON.parse(storedUser);
+          setUser(userData);
+          const seen = await AsyncStorage.getItem(`${WALKTHROUGH_KEY}:${userData.uid}`);
+          setNeedsWalkthrough(!seen);
+        } else {
+          setUser(null);
+        }
+      } catch (err) {
+        console.error('Error refreshing user data:', err);
+      }
+    };
+    
+    userDataEmitter.on(USER_DATA_UPDATED_EVENT, handleUserDataUpdate);
+    
+    return () => {
+      userDataEmitter.off(USER_DATA_UPDATED_EVENT, handleUserDataUpdate);
+    };
   }, [authEnabled]);
 
   const register = async (email: string, password: string) => {
     if (!authEnabled) {
       throw new Error('Authentication is disabled');
     }
-    // TODO: Replace with backend API call
-    // const response = await fetch('YOUR_BACKEND_API/register', { ... });
-    // const userData = await response.json();
     
-    // Placeholder: Create a mock user for now
-    const mockUser: User = {
-      uid: `user_${Date.now()}`,
-      email,
-      displayName: email.split('@')[0],
-      photoURL: null,
-    };
+    const result = await authService.register(email, password);
+    if (!result.success || !result.user) {
+      throw new Error(result.error || 'Registration failed');
+    }
     
-    setUser(mockUser);
-    await AsyncStorage.setItem(USER_STORAGE_KEY, JSON.stringify(mockUser));
-    await AsyncStorage.removeItem(`${WALKTHROUGH_KEY}:${mockUser.uid}`);
+    const user = nextAuthUserToUser(result.user);
+    setUser(user);
+    await AsyncStorage.setItem(USER_STORAGE_KEY, JSON.stringify(user));
+    await AsyncStorage.removeItem(`${WALKTHROUGH_KEY}:${user.uid}`);
     setNeedsWalkthrough(true);
   };
 
@@ -93,21 +149,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     if (!authEnabled) {
       throw new Error('Authentication is disabled');
     }
-    // TODO: Replace with backend API call
-    // const response = await fetch('YOUR_BACKEND_API/login', { ... });
-    // const userData = await response.json();
     
-    // Placeholder: Create a mock user for now
-    const mockUser: User = {
-      uid: `user_${Date.now()}`,
-      email,
-      displayName: email.split('@')[0],
-      photoURL: null,
-    };
+    const result = await authService.login(email, password);
+    if (!result.success || !result.user) {
+      throw new Error(result.error || 'Login failed');
+    }
     
-    setUser(mockUser);
-    await AsyncStorage.setItem(USER_STORAGE_KEY, JSON.stringify(mockUser));
-    const seen = await AsyncStorage.getItem(`${WALKTHROUGH_KEY}:${mockUser.uid}`);
+    const user = nextAuthUserToUser(result.user);
+    setUser(user);
+    await AsyncStorage.setItem(USER_STORAGE_KEY, JSON.stringify(user));
+    const seen = await AsyncStorage.getItem(`${WALKTHROUGH_KEY}:${user.uid}`);
     setNeedsWalkthrough(!seen);
   };
 
@@ -115,18 +166,19 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     if (!authEnabled) {
       throw new Error('Authentication is disabled');
     }
-    // TODO: Replace with backend API call
-    // await fetch('YOUR_BACKEND_API/reset-password', { ... });
-    throw new Error('Password reset not implemented yet. Use backend API.');
+    
+    const result = await authService.requestPasswordReset(email);
+    if (!result.success) {
+      throw new Error(result.error || 'Failed to send password reset email');
+    }
   };
 
   const logout = async () => {
     if (!authEnabled) {
       return;
     }
-    // TODO: Call backend API to invalidate session if needed
-    // await fetch('YOUR_BACKEND_API/logout', { ... });
     
+    await authService.logout();
     setUser(null);
     await AsyncStorage.removeItem(USER_STORAGE_KEY);
   };

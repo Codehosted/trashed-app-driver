@@ -34,7 +34,9 @@ const config: ExpoConfig = {
   },
   ios: {
     "infoPlist": {
-      "ITSAppUsesNonExemptEncryption": false
+      "ITSAppUsesNonExemptEncryption": false,
+      "UIViewControllerBasedStatusBarAppearance": false,
+      "UIStatusBarHidden": true
     },
     supportsTablet: true,
     bundleIdentifier: 'com.trashed.driver',
@@ -79,8 +81,14 @@ const config: ExpoConfig = {
     firebaseMessagingSenderId: firebaseConfig.messagingSenderId,
     firebaseAppId: firebaseConfig.appId,
     // Authentication toggle: Set to false to bypass login and go directly to the dashboard
-    // When false, users can navigate the app without Firebase authentication
-    enableAuth: false, // Set to true to require authentication
+    // When false, users can navigate the app without authentication
+    enableAuth: process.env.ENABLE_AUTH === 'true' || true, // Can be set via env var
+    // Backend API base URL for NextAuth and backend services (separate from web mobile app)
+    // Use environment variable or fallback to default
+    apiBaseUrl: process.env.API_BASE_URL || 'https://trashed.ngrok.app',
+    // Web mobile app URL - used by WebView on all platforms
+    // Use environment variable or fallback to production URL
+    webAppUrl: process.env.WEB_APP_URL || 'https://trashed-app-driver.vercel.app/',
   }
 };
 

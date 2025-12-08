@@ -2,13 +2,21 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { View } from 'react-native';
-import * as SplashScreen from 'expo-splash-screen';
+import * as ExpoSplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
 import { RootStackParamList } from '@/types/navigation';
+import { SplashScreen } from '@/screens/SplashScreen';
 import { WebViewScreen } from '@/screens/WebViewScreen';
+import { LoginWebViewScreen } from '@/screens/LoginWebViewScreen';
+import { DashboardWebViewScreen } from '@/screens/DashboardWebViewScreen';
+import { LoginHtmlViewScreen } from '@/screens/LoginHtmlViewScreen';
+import { DashboardHtmlViewScreen } from '@/screens/DashboardHtmlViewScreen';
 import { LoginScreen } from '@/screens/LoginScreen';
 import { RegisterScreen } from '@/screens/RegisterScreen';
 import { ResetPasswordScreen } from '@/screens/ResetPasswordScreen';
+import { NativeLoginScreen } from '@/screens/NativeLoginScreen';
+import { NativeRegisterScreen } from '@/screens/NativeRegisterScreen';
+import { NativeResetPasswordScreen } from '@/screens/NativeResetPasswordScreen';
 import { WalkthroughScreen } from '@/screens/WalkthroughScreen';
 import { ProfileScreen } from '@/screens/ProfileScreen';
 import { MapDashboard } from '@/components/MapDashboard';
@@ -18,7 +26,7 @@ import { ThemedView } from '@/components/ThemedView';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
-SplashScreen.preventAutoHideAsync();
+ExpoSplashScreen.preventAutoHideAsync();
 
 function Navigator() {
   const { user, loading, needsWalkthrough, isAuthEnabled } = useAuth();
@@ -32,7 +40,7 @@ function Navigator() {
 
   const onReady = useCallback(async () => {
     if (appReady) {
-      await SplashScreen.hideAsync();
+      await ExpoSplashScreen.hideAsync();
     }
   }, [appReady]);
 
@@ -40,11 +48,33 @@ function Navigator() {
     return <View style={{ flex: 1 }} />;
   }
 
-  // WebView is now the default view
+  // Always start with Splash screen - it will navigate to the appropriate screen after animation
   return (
     <NavigationContainer onReady={onReady}>
-      <Stack.Navigator initialRouteName="WebView">
-        <Stack.Screen name="WebView" component={WebViewScreen} options={{ headerShown: false }} />
+      <Stack.Navigator initialRouteName="Splash">
+        {/* Splash screen - always shown first */}
+        <Stack.Screen name="Splash" component={SplashScreen} options={{ headerShown: false }} />
+        
+        {/* Native auth screens - match web app design */}
+        {isAuthEnabled && (
+          <>
+            <Stack.Screen name="NativeLogin" component={NativeLoginScreen} options={{ headerShown: false }} />
+            <Stack.Screen name="NativeRegister" component={NativeRegisterScreen} options={{ headerShown: false }} />
+            <Stack.Screen name="NativeReset" component={NativeResetPasswordScreen} options={{ headerShown: false }} />
+          </>
+        )}
+        {/* HtmlView screens for backend routes - renders HTML as native views */}
+        {isAuthEnabled ? (
+          <>
+            <Stack.Screen name="DashboardHtmlView" component={DashboardHtmlViewScreen} options={{ headerShown: false }} />
+            {/* Keep WebView screens as fallback */}
+            <Stack.Screen name="LoginWebView" component={LoginWebViewScreen} options={{ headerShown: false }} />
+            <Stack.Screen name="DashboardWebView" component={DashboardWebViewScreen} options={{ headerShown: false }} />
+            <Stack.Screen name="LoginHtmlView" component={LoginHtmlViewScreen} options={{ headerShown: false }} />
+          </>
+        ) : (
+          <Stack.Screen name="WebView" component={WebViewScreen} options={{ headerShown: false }} />
+        )}
         {/* Keep all existing screens available for navigation */}
         {!isAuthEnabled ? (
           <>
@@ -55,6 +85,7 @@ function Navigator() {
           <>
             {!user ? (
               <>
+                {/* Legacy screens - kept for compatibility */}
                 <Stack.Screen name="Login" component={LoginScreen} options={{ headerShown: false }} />
                 <Stack.Screen name="Register" component={RegisterScreen} options={{ headerShown: false }} />
                 <Stack.Screen name="Reset" component={ResetPasswordScreen} options={{ headerShown: false }} />
@@ -75,9 +106,16 @@ function Navigator() {
 
 function AppContent() {
   const { theme } = usePreferences();
+  const { isAuthEnabled } = useAuth();
+  
   return (
     <ThemedView>
-      <StatusBar style={theme === 'dark' ? 'light' : 'dark'} />
+      {/* Hide status bar for WebView screens */}
+      <StatusBar 
+        style={theme === 'dark' ? 'light' : 'dark'} 
+        hidden={isAuthEnabled}
+        translucent={isAuthEnabled}
+      />
       <Navigator />
     </ThemedView>
   );

@@ -1,7 +1,22 @@
 import { RouteStop, AppMessage } from '@/types/domain';
+import Constants from 'expo-constants';
+
+/**
+ * Get backend API base URL from config or use default
+ * 
+ * This is the URL for backend services (NextAuth, API endpoints)
+ * Separate from the web mobile app URL (localhost:3001)
+ */
+const getApiBaseUrl = (): string => {
+  const apiUrl = Constants.expoConfig?.extra?.apiBaseUrl;
+  if (apiUrl) return apiUrl;
+  
+  // Default to the backend services URL (without trailing slash)
+  return 'https://trashed.ngrok.app';
+};
 
 export const APP_CONFIG = {
-  enableAuth: false,
+  apiBaseUrl: getApiBaseUrl(),
 };
 
 export const COLORS = {

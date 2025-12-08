@@ -5,17 +5,34 @@
   },
   "build": {
     "development": {
-      "distribution": "internal"
+      "distribution": "internal",
+      "env": {
+        "API_BASE_URL": "https://trashed.ngrok.app",
+        "WEB_APP_URL": "https://trashed-app-driver.vercel.app/"
+      }
     },
     "preview": {
-      "distribution": "internal"
+      "distribution": "internal",
+      "env": {
+        "API_BASE_URL": "https://trashed-staging.vercel.app",
+        "WEB_APP_URL": "https://trashed-app-driver.vercel.app/"
+      }
     },
     "production": {
       "autoIncrement": true,
-      "distribution": "store"
+      "distribution": "store",
+      "env": {
+        "API_BASE_URL": "https://trashed.app",
+        "WEB_APP_URL": "https://trashed-app-driver.vercel.app/"
+      }
     }
   },
   "submit": {
-    "production": {}
+    "production": {
+      "env": {
+        "API_BASE_URL": "https://trashed.app",
+        "WEB_APP_URL": "https://trashed-app-driver.vercel.app/"
+      }
+    }
   }
 }

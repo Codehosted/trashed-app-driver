@@ -1,17 +1,26 @@
 import React, { useState } from 'react';
 import { View, Text, StyleSheet, FlatList, Dimensions, Pressable } from 'react-native';
+import { useNavigation } from '@react-navigation/native';
+import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { designSchema } from '@/data/designSchema';
 import { usePreferences } from '@/context/PreferencesContext';
 import { useAuth } from '@/context/AuthContext';
+import { RootStackParamList } from '@/types/navigation';
 
 const { width } = Dimensions.get('window');
 
 export const WalkthroughScreen: React.FC = () => {
+  const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const slides = designSchema.walkthrough;
   const { theme } = usePreferences();
   const { completeWalkthrough } = useAuth();
   const palette = designSchema.theme[theme];
   const [index, setIndex] = useState(0);
+
+  const handleComplete = async () => {
+    await completeWalkthrough();
+    navigation.replace('DashboardWebView');
+  };
 
   const onViewableItemsChanged = React.useRef(({ viewableItems }: any) => {
     if (viewableItems?.length > 0) {
@@ -49,7 +58,7 @@ export const WalkthroughScreen: React.FC = () => {
           />
         ))}
       </View>
-      <Pressable style={[styles.button, { backgroundColor: palette.accent }]} onPress={completeWalkthrough}>
+      <Pressable style={[styles.button, { backgroundColor: palette.accent }]} onPress={handleComplete}>
         <Text style={styles.buttonText}>{index === slides.length - 1 ? 'Start driving' : 'Next'}</Text>
       </Pressable>
     </View>
