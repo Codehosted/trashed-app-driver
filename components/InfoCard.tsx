@@ -163,6 +163,7 @@ export const InfoCard: React.FC<InfoCardProps> = ({ stop, index, theme, onUpdate
                     <div className="flex items-center justify-center gap-3 mt-1.5">
                         {/* Photos Icon Button */}
                         <button
+                            data-native-action="openPhotoPicker"
                             onClick={() => setShowPhotosPopup(true)}
                             className={`relative p-2.5 rounded-full border backdrop-blur transition-all ${
                                 isDark 
@@ -182,6 +183,7 @@ export const InfoCard: React.FC<InfoCardProps> = ({ stop, index, theme, onUpdate
 
                         {/* Notes Icon Button */}
                         <button
+                            data-native-action="openNotesEditor"
                             onClick={handleOpenNotes}
                             className={`relative p-2.5 rounded-full border backdrop-blur transition-all ${
                                 isDark 

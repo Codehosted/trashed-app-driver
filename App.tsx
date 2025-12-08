@@ -42,6 +42,15 @@ export default function App() {
   const [theme, setTheme] = useState<Theme>('dark');
   const [zoom, setZoom] = useState(MAP_CONFIG.defaultZoom);
   
+  // Initialize theme from URL query params
+  useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search);
+    const themeParam = urlParams.get('theme') || urlParams.get('mode');
+    if (themeParam === 'dark' || themeParam === 'light') {
+      setTheme(themeParam);
+    }
+  }, []);
+  
   // Real-time Geolocation State
   const [userLocation, setUserLocation] = useState<{lat: number, lng: number} | null>(null);
   
@@ -286,6 +295,7 @@ export default function App() {
         {/* Profile & List Group */}
         <div className="flex flex-col gap-2">
             <button 
+                data-native-action="openProfile"
                 onClick={() => setCurrentView('profile')}
                 className={`w-9 h-9 backdrop-blur border rounded-full shadow-lg flex items-center justify-center transition-colors overflow-hidden ${
                     theme === 'dark' 
