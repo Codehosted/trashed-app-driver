@@ -1,4 +1,7 @@
 import type { ExpoConfig } from 'expo/config';
+import { existsSync } from 'fs';
+import { resolve } from 'path';
+
 const firebaseConfig = {
   apiKey: "AIzaSyCupPwEn9r0APIZUnTtHP0pdscyLGtd3Lc",
   authDomain: "trashed-app.firebaseapp.com",
@@ -8,6 +11,13 @@ const firebaseConfig = {
   appId: "1:151975222689:web:5790cbfd70a060e1a9bfe0",
   measurementId: "G-3YFJ783W78"
 };
+
+// Check if Google Services files exist
+const iosGoogleServicesFile = './GoogleService-Info.plist';
+const androidGoogleServicesFile = './google-services.json';
+const iosGoogleServicesExists = existsSync(resolve(__dirname, iosGoogleServicesFile));
+const androidGoogleServicesExists = existsSync(resolve(__dirname, androidGoogleServicesFile));
+
 const config: ExpoConfig = {
   name: 'Trashed Driver',
   slug: 'trashed-driver',
@@ -28,7 +38,7 @@ const config: ExpoConfig = {
     },
     supportsTablet: true,
     bundleIdentifier: 'com.trashed.driver',
-    googleServicesFile: './GoogleService-Info.plist'
+    ...(iosGoogleServicesExists && { googleServicesFile: iosGoogleServicesFile })
   },
   android: {
     package: 'com.trashed.driver',
@@ -36,7 +46,7 @@ const config: ExpoConfig = {
       foregroundImage: './assets/adaptive-icon.png',
       backgroundColor: '#0b172a'
     },
-    googleServicesFile: './google-services.json'
+    ...(androidGoogleServicesExists && { googleServicesFile: androidGoogleServicesFile })
   },
   web: {
     bundler: 'metro',

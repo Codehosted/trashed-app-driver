@@ -5,6 +5,7 @@ import { View } from 'react-native';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
 import { RootStackParamList } from '@/types/navigation';
+import { WebViewScreen } from '@/screens/WebViewScreen';
 import { LoginScreen } from '@/screens/LoginScreen';
 import { RegisterScreen } from '@/screens/RegisterScreen';
 import { ResetPasswordScreen } from '@/screens/ResetPasswordScreen';
@@ -39,34 +40,32 @@ function Navigator() {
     return <View style={{ flex: 1 }} />;
   }
 
-  // If auth is disabled, go directly to the dashboard (skip walkthrough too)
-  if (!isAuthEnabled) {
-    return (
-      <NavigationContainer onReady={onReady}>
-        <Stack.Navigator>
-          <Stack.Screen name="Home" component={MapDashboard} options={{ headerShown: false }} />
-          <Stack.Screen name="Profile" component={ProfileScreen} options={{ headerShown: false }} />
-        </Stack.Navigator>
-      </NavigationContainer>
-    );
-  }
-
-  // Auth enabled - use normal flow
+  // WebView is now the default view
   return (
     <NavigationContainer onReady={onReady}>
-      <Stack.Navigator initialRouteName={user ? (needsWalkthrough ? 'Walkthrough' : 'Home') : 'Login'}>
-        {!user ? (
-          <>
-            <Stack.Screen name="Login" component={LoginScreen} options={{ headerShown: false }} />
-            <Stack.Screen name="Register" component={RegisterScreen} options={{ headerShown: false }} />
-            <Stack.Screen name="Reset" component={ResetPasswordScreen} options={{ headerShown: false }} />
-          </>
-        ) : needsWalkthrough ? (
-          <Stack.Screen name="Walkthrough" component={WalkthroughScreen} options={{ headerShown: false }} />
-        ) : (
+      <Stack.Navigator initialRouteName="WebView">
+        <Stack.Screen name="WebView" component={WebViewScreen} options={{ headerShown: false }} />
+        {/* Keep all existing screens available for navigation */}
+        {!isAuthEnabled ? (
           <>
             <Stack.Screen name="Home" component={MapDashboard} options={{ headerShown: false }} />
             <Stack.Screen name="Profile" component={ProfileScreen} options={{ headerShown: false }} />
+          </>
+        ) : (
+          <>
+            {!user ? (
+              <>
+                <Stack.Screen name="Login" component={LoginScreen} options={{ headerShown: false }} />
+                <Stack.Screen name="Register" component={RegisterScreen} options={{ headerShown: false }} />
+                <Stack.Screen name="Reset" component={ResetPasswordScreen} options={{ headerShown: false }} />
+              </>
+            ) : (
+              <>
+                <Stack.Screen name="Walkthrough" component={WalkthroughScreen} options={{ headerShown: false }} />
+                <Stack.Screen name="Home" component={MapDashboard} options={{ headerShown: false }} />
+                <Stack.Screen name="Profile" component={ProfileScreen} options={{ headerShown: false }} />
+              </>
+            )}
           </>
         )}
       </Stack.Navigator>

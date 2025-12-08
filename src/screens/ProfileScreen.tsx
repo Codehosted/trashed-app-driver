@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
   View,
   Text,
@@ -8,9 +8,9 @@ import {
   TextInput,
   Switch,
   Image,
-  ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import Animated, { SlideInRight, SlideOutRight } from 'react-native-reanimated';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import { useAuth } from '@/context/AuthContext';
@@ -34,13 +34,14 @@ export const ProfileScreen: React.FC = () => {
   const palette = designSchema.theme[theme];
   const isDark = theme === 'dark';
 
-  const [loading, setLoading] = useState(false);
   const [driverData, setDriverData] = useState<DriverProfile>({
     vehicleModel: '',
     licensePlate: '',
     phoneNumber: '',
   });
-  const [message, setMessage] = useState('');
+  const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
+  const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const isInitialLoadRef = useRef(true);
 
   // Load profile data
   useEffect(() => {
@@ -57,29 +58,68 @@ export const ProfileScreen: React.FC = () => {
         }
       } catch (err) {
         console.error('Error loading profile:', err);
+      } finally {
+        isInitialLoadRef.current = false;
       }
     };
     loadProfile();
   }, []);
 
-  const handleSave = async () => {
-    setLoading(true);
-    try {
-      await AsyncStorage.setItem(PROFILE_STORAGE_KEY, JSON.stringify(driverData));
-      setMessage('Settings saved successfully!');
-      setTimeout(() => setMessage(''), 3000);
-    } catch (err) {
-      console.error('Error saving profile:', err);
-      setMessage('Failed to save settings.');
+  // Auto-save function with debouncing
+  const autoSave = useCallback(async (data: DriverProfile) => {
+    // Clear existing timeout
+    if (saveTimeoutRef.current) {
+      clearTimeout(saveTimeoutRef.current);
     }
-    setLoading(false);
-  };
+
+    // Don't save on initial load
+    if (isInitialLoadRef.current) {
+      return;
+    }
+
+    // Debounce save operation
+    saveTimeoutRef.current = setTimeout(async () => {
+      try {
+        await AsyncStorage.setItem(PROFILE_STORAGE_KEY, JSON.stringify(data));
+        setToast({ message: 'Settings saved', type: 'success' });
+        setTimeout(() => setToast(null), 3000);
+      } catch (err) {
+        console.error('Error saving profile:', err);
+        setToast({ message: 'Failed to save settings', type: 'error' });
+        setTimeout(() => setToast(null), 3000);
+      }
+    }, 500);
+  }, []);
+
+  // Cleanup timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (saveTimeoutRef.current) {
+        clearTimeout(saveTimeoutRef.current);
+      }
+    };
+  }, []);
 
   const togglePref = (key: keyof NotificationPreferences) => {
-    updateNotificationPreferences({
+    const newPrefs = {
       ...notificationPreferences,
       [key]: !notificationPreferences[key],
-    });
+    };
+    updateNotificationPreferences(newPrefs);
+    // Auto-save notification preferences
+    autoSave(driverData);
+  };
+
+  const handleThemeToggle = () => {
+    updateTheme(theme === 'dark' ? 'light' : 'dark');
+    // Auto-save when theme changes
+    autoSave(driverData);
+  };
+
+  const handleDriverDataChange = (updates: Partial<DriverProfile>) => {
+    const newData = { ...driverData, ...updates };
+    setDriverData(newData);
+    autoSave(newData);
   };
 
   return (
@@ -182,7 +222,7 @@ export const ProfileScreen: React.FC = () => {
                     },
                   ]}
                   value={driverData.vehicleModel}
-                  onChangeText={(text) => setDriverData({ ...driverData, vehicleModel: text })}
+                  onChangeText={(text) => handleDriverDataChange({ vehicleModel: text })}
                   placeholder="e.g. Ford Transit 2022"
                   placeholderTextColor={palette.subtleText}
                 />
@@ -199,7 +239,7 @@ export const ProfileScreen: React.FC = () => {
                     },
                   ]}
                   value={driverData.licensePlate}
-                  onChangeText={(text) => setDriverData({ ...driverData, licensePlate: text })}
+                  onChangeText={(text) => handleDriverDataChange({ licensePlate: text })}
                   placeholder="e.g. ABC-1234"
                   placeholderTextColor={palette.subtleText}
                 />
@@ -208,21 +248,21 @@ export const ProfileScreen: React.FC = () => {
 
             <View style={styles.inputContainer}>
               <Text style={[styles.label, { color: palette.subtleText }]}>Phone Number</Text>
-              <TextInput
-                style={[
-                  styles.input,
-                  {
-                    backgroundColor: isDark ? 'rgba(15, 23, 42, 0.5)' : 'rgba(248, 250, 252, 1)',
-                    color: palette.text,
-                    borderColor: isDark ? 'rgba(51, 65, 85, 0.7)' : 'rgba(203, 213, 225, 1)',
-                  },
-                ]}
-                value={driverData.phoneNumber}
-                onChangeText={(text) => setDriverData({ ...driverData, phoneNumber: text })}
-                placeholder="+1 (555) 000-0000"
-                placeholderTextColor={palette.subtleText}
-                keyboardType="phone-pad"
-              />
+                <TextInput
+                  style={[
+                    styles.input,
+                    {
+                      backgroundColor: isDark ? 'rgba(15, 23, 42, 0.5)' : 'rgba(248, 250, 252, 1)',
+                      color: palette.text,
+                      borderColor: isDark ? 'rgba(51, 65, 85, 0.7)' : 'rgba(203, 213, 225, 1)',
+                    },
+                  ]}
+                  value={driverData.phoneNumber}
+                  onChangeText={(text) => handleDriverDataChange({ phoneNumber: text })}
+                  placeholder="+1 (555) 000-0000"
+                  placeholderTextColor={palette.subtleText}
+                  keyboardType="phone-pad"
+                />
             </View>
           </View>
 
@@ -233,7 +273,14 @@ export const ProfileScreen: React.FC = () => {
               <Text style={[styles.sectionTitle, { color: palette.text }]}>Notification Settings</Text>
             </View>
 
-            <View style={styles.preferenceItem}>
+            <View
+              style={[
+                styles.preferenceItem,
+                {
+                  backgroundColor: isDark ? 'rgba(51, 65, 85, 0.3)' : 'rgba(248, 250, 252, 1)',
+                },
+              ]}
+            >
               <View style={styles.preferenceInfo}>
                 <Text style={[styles.preferenceLabel, { color: palette.text }]}>Route Alerts</Text>
                 <Text style={[styles.preferenceDescription, { color: palette.subtleText }]}>
@@ -248,7 +295,14 @@ export const ProfileScreen: React.FC = () => {
               />
             </View>
 
-            <View style={styles.preferenceItem}>
+            <View
+              style={[
+                styles.preferenceItem,
+                {
+                  backgroundColor: isDark ? 'rgba(51, 65, 85, 0.3)' : 'rgba(248, 250, 252, 1)',
+                },
+              ]}
+            >
               <View style={styles.preferenceInfo}>
                 <Text style={[styles.preferenceLabel, { color: palette.text }]}>Beta Features</Text>
                 <Text style={[styles.preferenceDescription, { color: palette.subtleText }]}>
@@ -275,7 +329,14 @@ export const ProfileScreen: React.FC = () => {
               <Text style={[styles.sectionTitle, { color: palette.text }]}>Appearance</Text>
             </View>
 
-            <View style={styles.preferenceItem}>
+            <View
+              style={[
+                styles.preferenceItem,
+                {
+                  backgroundColor: isDark ? 'rgba(51, 65, 85, 0.3)' : 'rgba(248, 250, 252, 1)',
+                },
+              ]}
+            >
               <View style={styles.preferenceInfo}>
                 <Text style={[styles.preferenceLabel, { color: palette.text }]}>Theme</Text>
                 <Text style={[styles.preferenceDescription, { color: palette.subtleText }]}>
@@ -284,62 +345,16 @@ export const ProfileScreen: React.FC = () => {
               </View>
               <Switch
                 value={theme === 'dark'}
-                onValueChange={() => updateTheme(theme === 'dark' ? 'light' : 'dark')}
+                onValueChange={handleThemeToggle}
                 thumbColor={theme === 'dark' ? palette.accent : '#94a3b8'}
                 trackColor={{ false: '#cbd5e1', true: `${palette.accent}40` }}
               />
             </View>
           </View>
 
-          {/* Message */}
-          {message && (
-            <View
-              style={[
-                styles.message,
-                {
-                  backgroundColor: message.includes('success')
-                    ? 'rgba(16, 185, 129, 0.1)'
-                    : 'rgba(239, 68, 68, 0.1)',
-                },
-              ]}
-            >
-              <Text
-                style={[
-                  styles.messageText,
-                  {
-                    color: message.includes('success') ? '#10b981' : '#ef4444',
-                  },
-                ]}
-              >
-                {message}
-              </Text>
-            </View>
-          )}
-
-          {/* Action Buttons */}
-          <View style={styles.actions}>
-            <Pressable
-              style={[
-                styles.saveButton,
-                {
-                  backgroundColor: palette.accent,
-                  opacity: loading ? 0.5 : 1,
-                },
-              ]}
-              onPress={handleSave}
-              disabled={loading}
-            >
-              {loading ? (
-                <ActivityIndicator color="#ffffff" />
-              ) : (
-                <>
-                  <Ionicons name="save" size={18} color="#ffffff" />
-                  <Text style={styles.saveButtonText}>Save Changes</Text>
-                </>
-              )}
-            </Pressable>
-
-            {user && (
+          {/* Sign Out Button */}
+          {user && (
+            <View style={styles.actions}>
               <Pressable
                 style={[
                   styles.signOutButton,
@@ -351,10 +366,65 @@ export const ProfileScreen: React.FC = () => {
               >
                 <Text style={[styles.signOutText, { color: palette.text }]}>Sign Out</Text>
               </Pressable>
-            )}
-          </View>
+            </View>
+          )}
         </View>
       </ScrollView>
+
+      {/* Toast Notification */}
+      {toast && (
+        <Animated.View
+          entering={SlideInRight}
+          exiting={SlideOutRight}
+          style={styles.toastContainer}
+          pointerEvents="box-none"
+        >
+          <View
+            style={[
+              styles.toast,
+              {
+                backgroundColor: isDark ? 'rgba(15, 23, 42, 0.95)' : 'rgba(255, 255, 255, 0.95)',
+                borderColor: isDark ? 'rgba(51, 65, 85, 0.7)' : 'rgba(203, 213, 225, 1)',
+              },
+            ]}
+          >
+            <View
+              style={[
+                styles.toastIcon,
+                {
+                  backgroundColor:
+                    toast.type === 'success'
+                      ? `${palette.success}20`
+                      : `${palette.danger}20`,
+                },
+              ]}
+            >
+              <Ionicons
+                name={toast.type === 'success' ? 'checkmark-circle' : 'alert-circle'}
+                size={20}
+                color={toast.type === 'success' ? palette.success : palette.danger}
+              />
+            </View>
+            <Text
+              style={[
+                styles.toastText,
+                {
+                  color: toast.type === 'success' ? palette.success : palette.danger,
+                },
+              ]}
+            >
+              {toast.message}
+            </Text>
+            <Pressable
+              onPress={() => setToast(null)}
+              style={styles.toastClose}
+              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+            >
+              <Ionicons name="close" size={16} color={palette.subtleText} />
+            </Pressable>
+          </View>
+        </Animated.View>
+      )}
     </SafeAreaView>
   );
 };
@@ -479,7 +549,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     padding: 16,
     borderRadius: 12,
-    backgroundColor: 'rgba(15, 23, 42, 0.3)',
     marginBottom: 8,
   },
   preferenceInfo: {
@@ -493,31 +562,9 @@ const styles = StyleSheet.create({
   preferenceDescription: {
     fontSize: 11,
   },
-  message: {
-    padding: 12,
-    borderRadius: 12,
-    marginTop: 8,
-  },
-  messageText: {
-    fontSize: 12,
-    fontWeight: '600',
-  },
   actions: {
     gap: 12,
     marginTop: 8,
-  },
-  saveButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    padding: 16,
-    borderRadius: 12,
-  },
-  saveButtonText: {
-    color: '#ffffff',
-    fontSize: 16,
-    fontWeight: 'bold',
   },
   signOutButton: {
     padding: 16,
@@ -528,6 +575,44 @@ const styles = StyleSheet.create({
   signOutText: {
     fontSize: 16,
     fontWeight: '600',
+  },
+  toastContainer: {
+    position: 'absolute',
+    bottom: 24,
+    left: 0,
+    right: 0,
+    alignItems: 'flex-start',
+    zIndex: 1000,
+    paddingHorizontal: 16,
+  },
+  toast: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    width: '100%',
+    maxWidth: 400,
+    padding: 14,
+    borderRadius: 12,
+    borderWidth: 1,
+    shadowOffset: { width: 0, height: 4 },
+    shadowRadius: 12,
+    shadowOpacity: 0.2,
+    elevation: 8,
+  },
+  toastIcon: {
+    width: 32,
+    height: 32,
+    borderRadius: 8,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  toastText: {
+    flex: 1,
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  toastClose: {
+    padding: 4,
   },
 });
 

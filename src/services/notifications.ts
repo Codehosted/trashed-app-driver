@@ -50,11 +50,30 @@ export async function registerForPushNotificationsAsync(): Promise<PushRegistrat
   return { status: 'ready', pushToken: token };
 }
 
-export async function scheduleLocalNotification(title: string, body: string) {
+/**
+ * Displays a system-level notification immediately.
+ * 
+ * This creates a SYSTEM notification (appears in notification tray, lock screen, etc.)
+ * - Works even when app is in background or closed
+ * - Requires notification permissions
+ * - Called "local" because it's triggered by the app itself (not pushed from a server)
+ * 
+ * Note: Despite using scheduleNotificationAsync, trigger: null means it shows immediately, not scheduled.
+ * 
+ * For in-app-only notifications (UI components), use NotificationPanel component instead.
+ */
+export async function showLocalNotification(title: string, body: string) {
   await Notifications.scheduleNotificationAsync({
     content: { title, body },
-    trigger: null,
+    trigger: null, // null trigger = show immediately
   });
+}
+
+/**
+ * @deprecated Use showLocalNotification instead. This function doesn't actually schedule anything.
+ */
+export async function scheduleLocalNotification(title: string, body: string) {
+  return showLocalNotification(title, body);
 }
 
 export type NotificationPayload = {
@@ -64,13 +83,46 @@ export type NotificationPayload = {
   category?: 'info' | 'warning' | 'urgent';
 };
 
+/**
+ * Sets up listeners for external push notifications (sent from server).
+ * 
+ * External push notifications are the 3rd type of notification:
+ * 1. Local notifications - triggered by app itself
+ * 2. In-app notifications - UI components
+ * 3. External/Push notifications - sent from server using push token
+ * 
+ * @param onNotificationReceived - Callback when notification arrives (app in foreground)
+ * @param onNotificationTapped - Callback when user taps notification (app in background/closed)
+ * @returns Cleanup function to remove listeners
+ */
+export function setupPushNotificationListeners(
+  onNotificationReceived?: (notification: Notifications.Notification) => void,
+  onNotificationTapped?: (response: Notifications.NotificationResponse) => void
+): () => void {
+  // Listener for notifications received while app is in foreground
+  const receivedSubscription = Notifications.addNotificationReceivedListener((notification) => {
+    onNotificationReceived?.(notification);
+  });
+
+  // Listener for when user taps on a notification (app was in background or closed)
+  const responseSubscription = Notifications.addNotificationResponseReceivedListener((response) => {
+    onNotificationTapped?.(response);
+  });
+
+  // Return cleanup function
+  return () => {
+    receivedSubscription.remove();
+    responseSubscription.remove();
+  };
+}
+
 export async function fetchAndDisplayNotification(endpoint: string): Promise<NotificationPayload | null> {
   try {
     const response = await fetch(endpoint);
     if (!response.ok) return null;
     const payload: NotificationPayload = await response.json();
     if (payload?.title && payload?.body) {
-      await scheduleLocalNotification(payload.title, payload.body);
+      await showLocalNotification(payload.title, payload.body);
       return payload;
     }
   } catch (error) {

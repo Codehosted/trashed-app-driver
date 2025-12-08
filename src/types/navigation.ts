@@ -1,4 +1,5 @@
 export type RootStackParamList = {
+  WebView: undefined;
   Login: undefined;
   Register: undefined;
   Reset: undefined;
