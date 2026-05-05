@@ -1,39 +1,90 @@
+/**
+ * Domain types — inlined from @trashed/shared-types
+ */
+
+// --- Theme ---
+
 export type ThemeMode = 'light' | 'dark';
-export type Theme = 'light' | 'dark'; // Alias for compatibility
+export type Theme = ThemeMode;
+
+// --- Route types ---
+
+export type RouteStatus = "scheduled" | "assigned" | "in_progress" | "complete" | "paused";
+
+export type RouteStopType = "yard" | "pickup" | "dropoff" | "swap" | "service" | "stop";
+
+export type RouteStopStatus =
+  | "pending"
+  | "en_route"
+  | "in-transit"
+  | "arrived"
+  | "completed"
+  | "skipped"
+  | "cancelled"
+  | "issue";
+
+export type StopStatus = RouteStopStatus;
 
 export type MarkerType = 'idea' | 'time' | 'email' | 'chart' | 'star' | 'rocket';
-export type StopStatus = 'pending' | 'in-transit' | 'arrived' | 'completed' | 'skipped' | 'en_route';
+
 export type TaskType = 'drop-off' | 'pick-up' | 'swap' | 'service';
 
-export interface DriverProfile {
-  uuid: string;
-  name: string;
-  email: string;
-  phone: string;
-  preferredTheme: ThemeMode;
-  notificationPreferences: NotificationPreferences;
+export interface RouteStopAddress {
+  line1: string;
+  line2?: string;
+  city?: string;
+  state?: string;
+  postalCode?: string;
 }
 
 export interface RouteStop {
-  uuid: string;
-  id?: string; // Legacy support
-  name: string;
-  title?: string; // Legacy support
+  id: string;
+  uuid?: string;
+  name?: string;
+  title?: string;
   description?: string;
   address: string;
-  status: StopStatus;
-  scheduledAt: string;
-  time?: string; // Legacy support
-  etaMinutes: number;
+  status: RouteStopStatus;
+  scheduledAt?: string;
+  time?: string;
+  etaMinutes?: number;
+  eta?: string;
+  scheduledWindowStart?: string;
+  scheduledWindowEnd?: string;
   type?: MarkerType;
-  color?: string;
   taskType?: TaskType;
+  sequence?: number;
+  label?: string;
+  color?: string;
   notes?: string;
   photos?: string[];
   coordinates: {
     lat: number;
     lng: number;
   };
+  addressDetails?: RouteStopAddress;
+  dumpsterSize?: string;
+  dumpsterType?: string;
+  dumpsterDescription?: string;
+  travelDistanceMeters?: number;
+  travelDurationSeconds?: number;
+  remainingDistanceMeters?: number;
+  remainingDurationSeconds?: number;
+  routeDistanceMeters?: number;
+  routeDurationSeconds?: number;
+}
+
+export interface RouteOverview {
+  distanceMeters?: number;
+  durationSeconds?: number;
+  encodedPolyline?: string;
+}
+
+export interface RouteLegSummary {
+  fromStopId: string;
+  toStopId: string;
+  distanceMeters?: number;
+  durationSeconds?: number;
 }
 
 export interface RouteAssignment {
@@ -43,28 +94,6 @@ export interface RouteAssignment {
   stops: RouteStop[];
   dispatcherNote?: string;
 }
-
-export interface NotificationPreferences {
-  routeAlerts: boolean;
-  marketing: boolean;
-  betaFeatures: boolean;
-  newAssignments?: boolean; // Legacy support
-  routeChanges?: boolean; // Legacy support
-  etaAlerts?: boolean; // Legacy support
-}
-
-export interface DriverState {
-  driver: DriverProfile | null;
-  currentRoute: RouteAssignment | null;
-}
-
-export type WalkthroughSlide = {
-  id: string;
-  title: string;
-  subtitle: string;
-  description: string;
-  illustration: 'map' | 'alert' | 'checklist';
-};
 
 export interface RoadmapDimensions {
   stopSpacing: number;
@@ -78,4 +107,35 @@ export interface AppMessage {
   title: string;
   content: string;
   time: string;
+}
+
+// --- Walkthrough ---
+
+export interface WalkthroughSlide {
+  id: string;
+  title: string;
+  subtitle: string;
+  description: string;
+  illustration: string;
+}
+
+// --- Driver ---
+
+export interface DriverProfile {
+  name: string;
+  email: string;
+  phone?: string;
+  vehicleId?: string;
+}
+
+export interface NotificationPreferences {
+  routeAlerts: boolean;
+  marketing: boolean;
+  betaFeatures: boolean;
+}
+
+export interface DriverState {
+  profile: DriverProfile;
+  currentRoute?: RouteAssignment;
+  isOnDuty: boolean;
 }

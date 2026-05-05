@@ -14,6 +14,7 @@ import { NotesEditorModal } from '@/components/NotesEditorModal';
 import { createApiInterceptionScript } from '@/scripts/api-interception';
 import { injectedJavaScript as webviewInjectedScript } from '@/scripts/webview-injected';
 import Constants from 'expo-constants';
+import { APP_CONFIG } from '@/constants';
 
 const SESSION_COOKIE_KEY = 'nextauth_session_cookie';
 const CSRF_TOKEN_KEY = 'nextauth_csrf_token';
@@ -24,15 +25,6 @@ interface ApiWebViewProps {
   onApiResponse?: (endpoint: string, response: any, status: number) => void;
   onNavigationChange?: (url: string) => void;
 }
-
-/**
- * Get backend API base URL from config or use default
- */
-const getApiBaseUrl = (): string => {
-  const apiUrl = Constants.expoConfig?.extra?.apiBaseUrl;
-  if (apiUrl) return apiUrl;
-  return 'https://trashed.ngrok.app';
-};
 
 /**
  * Get web app URL from config or use default
@@ -62,7 +54,7 @@ export const ApiWebView: React.FC<ApiWebViewProps> = ({
   const [notes, setNotes] = useState('');
   const isDark = theme === 'dark';
 
-  const API_BASE_URL = getApiBaseUrl();
+  const API_BASE_URL = APP_CONFIG.apiBaseUrl;
   const WEB_APP_URL = getWebAppUrl();
   
   // Always use webAppUrl for the WebView (since we handle auth screens natively)

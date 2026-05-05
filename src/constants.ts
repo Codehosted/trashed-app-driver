@@ -1,24 +1,6 @@
 import { RouteStop, AppMessage } from '@/types/domain';
 import Constants from 'expo-constants';
 
-/**
- * Get backend API base URL from config or use default
- * 
- * This is the URL for backend services (NextAuth, API endpoints)
- * Separate from the web mobile app URL (localhost:3001)
- */
-const getApiBaseUrl = (): string => {
-  const apiUrl = Constants.expoConfig?.extra?.apiBaseUrl;
-  if (apiUrl) return apiUrl;
-  
-  // Default to the backend services URL (without trailing slash)
-  return 'https://trashed.ngrok.app';
-};
-
-export const APP_CONFIG = {
-  apiBaseUrl: getApiBaseUrl(),
-};
-
 export const COLORS = {
   red: '#ef4444',
   blue: '#3b82f6',
@@ -29,11 +11,23 @@ export const COLORS = {
   indigo: '#6366f1',
   pink: '#ec4899',
   green: '#10b981',
-};
+} as const;
 
 export const MAP_CONFIG = {
   defaultZoom: 13,
-  tilt: 55, // degrees for 3D effect
+  defaultZoomWebview: 15,
+  tilt: 55,
+  tileSize: 256,
+} as const;
+
+const getApiBaseUrl = (): string => {
+  const apiUrl = Constants.expoConfig?.extra?.apiBaseUrl;
+  if (apiUrl) return apiUrl;
+  return 'https://trashed.ngrok.app';
+};
+
+export const APP_CONFIG = {
+  apiBaseUrl: getApiBaseUrl(),
 };
 
 // Detroit Center approx: 42.3314° N, 83.0458° W
@@ -135,4 +129,3 @@ export const INITIAL_MESSAGES: AppMessage[] = [
     time: '1 hour ago'
   }
 ];
-

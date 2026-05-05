@@ -12,6 +12,9 @@ export type RootStackParamList = {
   Register: undefined;
   Reset: undefined;
   Walkthrough: undefined;
+  RoutesHome: undefined;
+  RouteDetail: { route: import('./domain').RouteAssignment };
+  OrderDetail: { stop: import('./domain').RouteStop; routeUuid: string };
   Home: { route?: import('./domain').RouteAssignment } | undefined;
   Profile: undefined;
 };

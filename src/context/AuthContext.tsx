@@ -15,6 +15,7 @@ export interface User {
   uuid?: string;
   roles?: string[];
   vendor?: any;
+  vendorPermissions?: any;
   emailVerified?: Date | null;
   phone?: string | null;
   [key: string]: any;
@@ -33,6 +34,7 @@ function nextAuthUserToUser(nextAuthUser: NextAuthUser): User {
     uuid: nextAuthUser.uuid,
     roles: nextAuthUser.roles,
     vendor: nextAuthUser.vendor,
+    vendorPermissions: nextAuthUser.vendorPermissions,
     emailVerified: nextAuthUser.emailVerified,
     phone: nextAuthUser.phone,
   };

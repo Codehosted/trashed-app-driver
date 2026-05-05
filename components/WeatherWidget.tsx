@@ -1,6 +1,6 @@
 import React from 'react';
 import { CloudSun, Wind, Droplets } from 'lucide-react';
-import { Theme } from '../web/types';
+import { Theme } from "@/types/domain";
 
 interface WeatherWidgetProps {
   theme: Theme;

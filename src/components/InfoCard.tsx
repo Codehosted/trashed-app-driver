@@ -12,12 +12,18 @@ import {
 import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
 import { Ionicons } from '@expo/vector-icons';
 import { RouteStop, StopStatus } from '@/types/domain';
+import * as ImagePicker from 'expo-image-picker';
 
 interface InfoCardProps {
   stop: RouteStop;
   index: number;
   theme: 'dark' | 'light';
   onUpdateStop: (id: string, updates: Partial<RouteStop>) => void;
+  onUploadPhoto?: (
+    stop: RouteStop,
+    category: 'job_site_photo' | 'landfill_receipt',
+    imageUri: string
+  ) => Promise<string[]>;
   distance?: string;
   driveTime?: string;
 }
@@ -27,6 +33,7 @@ export const InfoCard: React.FC<InfoCardProps> = ({
   index,
   theme,
   onUpdateStop,
+  onUploadPhoto,
   distance,
   driveTime,
 }) => {
@@ -37,25 +44,39 @@ export const InfoCard: React.FC<InfoCardProps> = ({
 
   // Use PNG format for React Native compatibility (SVG not directly supported)
   const avatarUrl = `https://api.dicebear.com/9.x/avataaars/png?seed=${stop.uuid}`;
-  const isActive = stop.status === 'in-transit' || stop.status === 'arrived';
+  const isActive = stop.status === 'in-transit' || stop.status === 'en_route' || stop.status === 'arrived';
   const isCompleted = stop.status === 'completed';
 
   const handleStatusChange = () => {
     let nextStatus: StopStatus = 'pending';
-    if (stop.status === 'pending') nextStatus = 'in-transit';
-    else if (stop.status === 'in-transit') nextStatus = 'arrived';
+    if (stop.status === 'pending') nextStatus = 'en_route';
+    else if (stop.status === 'in-transit' || stop.status === 'en_route') nextStatus = 'arrived';
     else if (stop.status === 'arrived') nextStatus = 'completed';
 
     onUpdateStop(stop.uuid, { status: nextStatus });
   };
 
-  const handleAddPhoto = () => {
-    const newPhoto = `https://picsum.photos/seed/${Date.now()}/200`;
-    onUpdateStop(stop.uuid, { photos: [...(stop.photos || []), newPhoto] });
+  const handleAddPhoto = async (category: 'job_site_photo' | 'landfill_receipt' = 'job_site_photo') => {
+    const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (!permission.granted) return;
+
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      quality: 0.85,
+    });
+    if (result.canceled || !result.assets[0]?.uri) return;
+
+    if (onUploadPhoto) {
+      const uploaded = await onUploadPhoto(stop, category, result.assets[0].uri);
+      onUpdateStop(stop.uuid, { photos: [...(stop.photos || []), ...uploaded] });
+      return;
+    }
+
+    onUpdateStop(stop.uuid, { photos: [...(stop.photos || []), result.assets[0].uri] });
   };
 
   const handleDeletePhoto = (photoIndex: number) => {
-    const updatedPhotos = stop.photos?.filter((_, i) => i !== photoIndex) || [];
+    const updatedPhotos = stop.photos?.filter((_: string, i: number) => i !== photoIndex) || [];
     onUpdateStop(stop.uuid, { photos: updatedPhotos });
   };
 
@@ -69,6 +90,7 @@ export const InfoCard: React.FC<InfoCardProps> = ({
       case 'completed':
         return '#10b981';
       case 'in-transit':
+      case 'en_route':
         return '#3b82f6';
       case 'arrived':
         return '#f59e0b';
@@ -82,6 +104,7 @@ export const InfoCard: React.FC<InfoCardProps> = ({
       case 'completed':
         return 'checkmark-circle';
       case 'in-transit':
+      case 'en_route':
         return 'navigate';
       case 'arrived':
         return 'location';
@@ -288,7 +311,7 @@ export const InfoCard: React.FC<InfoCardProps> = ({
                   backgroundColor:
                     stop.status === 'pending'
                       ? '#4f46e5'
-                      : stop.status === 'in-transit'
+                      : stop.status === 'in-transit' || stop.status === 'en_route'
                       ? '#f59e0b'
                       : '#10b981',
                 },
@@ -296,14 +319,14 @@ export const InfoCard: React.FC<InfoCardProps> = ({
             >
               <Text style={styles.actionButtonText}>
                 {stop.status === 'pending' && 'Start Route'}
-                {stop.status === 'in-transit' && 'Arrived at Site'}
+                {(stop.status === 'in-transit' || stop.status === 'en_route') && 'Arrived at Site'}
                 {stop.status === 'arrived' && 'Complete Job'}
               </Text>
               <Ionicons
                 name={
                   stop.status === 'pending'
                     ? 'navigate'
-                    : stop.status === 'in-transit'
+                    : stop.status === 'in-transit' || stop.status === 'en_route'
                     ? 'location'
                     : 'checkmark-circle'
                 }
@@ -411,7 +434,7 @@ export const InfoCard: React.FC<InfoCardProps> = ({
             <ScrollView style={styles.photosGrid}>
               {stop.photos && stop.photos.length > 0 ? (
                 <View style={styles.photosRow}>
-                  {stop.photos.map((photo, i) => (
+                  {stop.photos.map((photo: string, i: number) => (
                     <View key={i} style={styles.photoContainer}>
                       <Image source={{ uri: photo }} style={styles.photo} />
                       <Pressable
@@ -443,7 +466,7 @@ export const InfoCard: React.FC<InfoCardProps> = ({
                     borderColor: isDark ? 'rgba(99, 102, 241, 0.3)' : '#c7d2fe',
                   },
                 ]}
-                onPress={handleAddPhoto}
+                onPress={() => handleAddPhoto('job_site_photo')}
               >
                 <Ionicons
                   name="add"
@@ -459,6 +482,32 @@ export const InfoCard: React.FC<InfoCardProps> = ({
                   ]}
                 >
                   Add Photo
+                </Text>
+              </Pressable>
+              <Pressable
+                style={[
+                  styles.addPhotoButton,
+                  {
+                    backgroundColor: isDark ? 'rgba(16, 185, 129, 0.1)' : '#ecfdf5',
+                    borderColor: isDark ? 'rgba(16, 185, 129, 0.3)' : '#a7f3d0',
+                  },
+                ]}
+                onPress={() => handleAddPhoto('landfill_receipt')}
+              >
+                <Ionicons
+                  name="receipt-outline"
+                  size={24}
+                  color={isDark ? '#34d399' : '#059669'}
+                />
+                <Text
+                  style={[
+                    styles.addPhotoText,
+                    {
+                      color: isDark ? '#34d399' : '#059669',
+                    },
+                  ]}
+                >
+                  Landfill Receipt
                 </Text>
               </Pressable>
             </ScrollView>
@@ -819,4 +868,3 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
   },
 });
-

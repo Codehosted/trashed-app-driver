@@ -19,7 +19,7 @@ export const WalkthroughScreen: React.FC = () => {
 
   const handleComplete = async () => {
     await completeWalkthrough();
-    navigation.replace('DashboardWebView');
+    navigation.replace('RoutesHome');
   };
 
   const onViewableItemsChanged = React.useRef(({ viewableItems }: any) => {

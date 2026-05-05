@@ -1,23 +1,9 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import Constants from 'expo-constants';
-
-/**
- * Get backend API base URL from config or use default
- * 
- * This is the URL for the backend services (NextAuth, API endpoints)
- * Separate from the web mobile app URL (localhost:3001)
- */
-const getApiBaseUrl = (): string => {
-  const apiUrl = Constants.expoConfig?.extra?.apiBaseUrl;
-  if (apiUrl) return apiUrl;
-  
-  // Default to the backend services URL (without trailing slash)
-  return 'https://trashed.ngrok.app';
-};
-
-const API_BASE_URL = getApiBaseUrl();
+import { APP_CONFIG } from '@/constants';
+const API_BASE_URL = APP_CONFIG.apiBaseUrl;
 const SESSION_COOKIE_KEY = 'nextauth_session_cookie';
 const CSRF_TOKEN_KEY = 'nextauth_csrf_token';
+const JWT_TOKEN_KEY = 'nextauth_jwt_token';
 
 export interface NextAuthUser {
   id: string;
@@ -29,6 +15,7 @@ export interface NextAuthUser {
   vendor?: any;
   emailVerified?: Date | null;
   phone?: string | null;
+  vendorPermissions?: any;
 }
 
 export interface NextAuthSession {
@@ -119,7 +106,7 @@ async function storeSessionCookie(setCookieHeader: string | null): Promise<void>
 /**
  * Get stored session cookie
  */
-async function getSessionCookie(): Promise<string | null> {
+export async function getSessionCookie(): Promise<string | null> {
   return await AsyncStorage.getItem(SESSION_COOKIE_KEY);
 }
 
@@ -131,22 +118,36 @@ async function getStoredCsrfToken(): Promise<string | null> {
 }
 
 /**
- * Build headers for authenticated requests
+ * Get stored JWT token
  */
-async function buildAuthHeaders(includeContentType: boolean = true): Promise<HeadersInit> {
+export async function getJwtToken(): Promise<string | null> {
+  return await AsyncStorage.getItem(JWT_TOKEN_KEY);
+}
+
+/**
+ * Build headers for authenticated requests.
+ * Prefers JWT Bearer token (reliable on iOS) over Cookie header.
+ */
+export async function buildAuthHeaders(includeContentType: boolean = true): Promise<HeadersInit> {
   const headers: HeadersInit = {};
-  
+
   if (includeContentType) {
     headers['Content-Type'] = 'application/json';
   }
-  
+
+  // Prefer JWT token — iOS fetch doesn't reliably handle Set-Cookie
+  const jwtToken = await AsyncStorage.getItem(JWT_TOKEN_KEY);
+  if (jwtToken) {
+    headers['Authorization'] = `Bearer ${jwtToken}`;
+    return headers;
+  }
+
+  // Fallback to cookie if no JWT stored (legacy sessions)
   const sessionCookie = await getSessionCookie();
-  
   if (sessionCookie) {
-    // Send the cookie in the Cookie header
     headers['Cookie'] = sessionCookie;
   }
-  
+
   return headers;
 }
 
@@ -168,20 +169,18 @@ export async function login(email: string, password: string): Promise<AuthRespon
       }),
     });
 
-    console.log('Mobile login response status:', response.status);
-    console.log('Mobile login response content-type:', response.headers.get('content-type'));
-
-    // Extract and store session cookie from response
+    // Extract and store session cookie from response (fallback)
     const setCookieHeader = response.headers.get('set-cookie');
-    console.log('Set-Cookie header:', setCookieHeader ? 'Present' : 'Missing');
     await storeSessionCookie(setCookieHeader);
 
     // Parse JSON response
     const data = await response.json();
-    console.log('Mobile login response:', { success: data.success, hasUser: !!data.user });
 
     if (response.ok && data.success && data.user) {
-      // Success - session cookie is already stored
+      // Store JWT token from response body (primary auth method)
+      if (data.token) {
+        await AsyncStorage.setItem(JWT_TOKEN_KEY, data.token);
+      }
       return { success: true, user: data.user };
     } else {
       // Error response
@@ -275,7 +274,7 @@ export async function logout(): Promise<void> {
  * Clear stored session tokens
  */
 async function clearSession(): Promise<void> {
-  await AsyncStorage.multiRemove([SESSION_COOKIE_KEY, CSRF_TOKEN_KEY]);
+  await AsyncStorage.multiRemove([SESSION_COOKIE_KEY, CSRF_TOKEN_KEY, JWT_TOKEN_KEY]);
 }
 
 /**
@@ -303,4 +302,3 @@ export async function requestPasswordReset(email: string): Promise<AuthResponse>
     return { success: false, error: error instanceof Error ? error.message : 'Network error' };
   }
 }
-

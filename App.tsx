@@ -19,6 +19,9 @@ import { NativeRegisterScreen } from '@/screens/NativeRegisterScreen';
 import { NativeResetPasswordScreen } from '@/screens/NativeResetPasswordScreen';
 import { WalkthroughScreen } from '@/screens/WalkthroughScreen';
 import { ProfileScreen } from '@/screens/ProfileScreen';
+import { RoutesScreen } from '@/screens/RoutesScreen';
+import { RouteDetailScreen } from '@/screens/RouteDetailScreen';
+import { OrderDetailScreen } from '@/screens/OrderDetailScreen';
 import { MapDashboard } from '@/components/MapDashboard';
 import { AuthProvider, useAuth } from '@/context/AuthContext';
 import { PreferencesProvider, usePreferences } from '@/context/PreferencesContext';
@@ -78,6 +81,9 @@ function Navigator() {
         {/* Keep all existing screens available for navigation */}
         {!isAuthEnabled ? (
           <>
+            <Stack.Screen name="RoutesHome" component={RoutesScreen} options={{ headerShown: false }} />
+            <Stack.Screen name="RouteDetail" component={RouteDetailScreen} options={{ headerShown: false }} />
+            <Stack.Screen name="OrderDetail" component={OrderDetailScreen} options={{ headerShown: false }} />
             <Stack.Screen name="Home" component={MapDashboard} options={{ headerShown: false }} />
             <Stack.Screen name="Profile" component={ProfileScreen} options={{ headerShown: false }} />
           </>
@@ -93,6 +99,9 @@ function Navigator() {
             ) : (
               <>
                 <Stack.Screen name="Walkthrough" component={WalkthroughScreen} options={{ headerShown: false }} />
+                <Stack.Screen name="RoutesHome" component={RoutesScreen} options={{ headerShown: false }} />
+                <Stack.Screen name="RouteDetail" component={RouteDetailScreen} options={{ headerShown: false }} />
+                <Stack.Screen name="OrderDetail" component={OrderDetailScreen} options={{ headerShown: false }} />
                 <Stack.Screen name="Home" component={MapDashboard} options={{ headerShown: false }} />
                 <Stack.Screen name="Profile" component={ProfileScreen} options={{ headerShown: false }} />
               </>

@@ -9,24 +9,13 @@ import { useAuth } from '@/context/AuthContext';
 import { usePreferences } from '@/context/PreferencesContext';
 import { designSchema } from '@/data/designSchema';
 import { handleApiResponse } from '@/services/api-response-handler';
-import Constants from 'expo-constants';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { parseTailwindClasses } from '@/utils/tailwind-to-rn';
-
+import { APP_CONFIG } from '@/constants';
 interface HtmlContentViewProps {
   route: string; // e.g., 'login', 'dashboard', 'vendor/dashboard'
   onNavigationChange?: (url: string) => void;
 }
-
-/**
- * Get backend API base URL from config or use default
- */
-const getApiBaseUrl = (): string => {
-  const apiUrl = Constants.expoConfig?.extra?.apiBaseUrl;
-  if (apiUrl) return apiUrl;
-  return 'https://trashed.ngrok.app';
-};
-
 /**
  * Extract body content from full HTML document
  */
@@ -67,7 +56,7 @@ export const HtmlContentView: React.FC<HtmlContentViewProps> = ({
   const formRefs = useRef<Record<string, TextInput>>({});
   const isDark = theme === 'dark';
 
-  const API_BASE_URL = getApiBaseUrl();
+  const API_BASE_URL = APP_CONFIG.apiBaseUrl;
 
   // Get session cookie helper (memoized to avoid recreating on each render)
   const getSessionCookie = useMemo(() => {

@@ -12,17 +12,9 @@ import {
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useAuth } from '@/context/AuthContext';
 import { SpotlightBackground } from '@/components/SpotlightBackground';
 import { RootStackParamList } from '@/types/navigation';
-import * as authService from '@/services/auth';
-
-/**
- * Native Login Screen that matches the web app design
- * Mirrors the design from app/login/page.tsx and ProductionLoginForm
- */
-const WALKTHROUGH_KEY = 'driver_walkthrough_complete';
 
 export const NativeLoginScreen: React.FC = () => {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
@@ -45,23 +37,8 @@ export const NativeLoginScreen: React.FC = () => {
       // Use the context login function which updates user state
       await contextLogin(email.trim(), password);
       
-      // Check walkthrough status directly from AsyncStorage
-      // Get the current session to check user UUID
-      const sessionResponse = await authService.getSession();
-      if (sessionResponse.success && sessionResponse.user) {
-        const userUid = sessionResponse.user.uuid;
-        const walkthroughSeen = await AsyncStorage.getItem(`${WALKTHROUGH_KEY}:${userUid}`);
-        
-        // Navigate to appropriate screen after successful login
-        if (!walkthroughSeen) {
-          navigation.replace('Walkthrough');
-        } else {
-          navigation.replace('DashboardWebView');
-        }
-      } else {
-        // Fallback navigation to dashboard
-        navigation.replace('DashboardWebView');
-      }
+      // Navigate to routes list after successful login
+      navigation.replace('RoutesHome');
     } catch (err) {
       console.error('Login error:', err);
       setError(err instanceof Error ? err.message : 'An unexpected error occurred. Please try again.');
