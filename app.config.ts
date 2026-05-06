@@ -12,7 +12,7 @@ const config: ExpoConfig = {
   splash: {
     image: './assets/splash.png',
     resizeMode: 'contain',
-    backgroundColor: '#0b172a'
+    backgroundColor: '#f4f7fb'
   },
   ios: {
     "infoPlist": {
@@ -27,7 +27,7 @@ const config: ExpoConfig = {
     package: 'com.trashed.driver',
     adaptiveIcon: {
       foregroundImage: './assets/adaptive-icon.png',
-      backgroundColor: '#0b172a'
+      backgroundColor: '#f4f7fb'
     }
   },
   web: {

@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect, useCallback, useRef } from 'react';
-import { View, Text, StyleSheet, Pressable, Dimensions, Platform } from 'react-native';
+import { View, Text, StyleSheet, Pressable, ImageBackground } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { GestureHandlerRootView, GestureDetector, Gesture } from 'react-native-gesture-handler';
 import { runOnJS } from 'react-native-reanimated';
@@ -7,28 +7,72 @@ import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '@/types/navigation';
 import { useAuth } from '@/context/AuthContext';
+import { useDriverLocation } from '@/context/DriverLocationContext';
 import { usePreferences } from '@/context/PreferencesContext';
 import { designSchema } from '@/data/designSchema';
 import { RouteStop, RouteAssignment, AppMessage } from '@/types/domain';
 import { MAP_CONFIG } from '@/constants';
-import * as Location from 'expo-location';
 import { Ionicons } from '@expo/vector-icons';
 import * as dispatchService from '@/services/dispatch';
 import { registerForPushNotificationsAsync } from '@/services/notifications';
-import { useDispatchLive } from '@/hooks/useDispatchLive';
+import { useDispatchLive, type LiveDispatchEvent } from '@/hooks/useDispatchLive';
 
 // Components
 import { RoadMap } from './RoadMap';
 import { InfoCard } from './InfoCard';
 import { WeatherWidget } from './WeatherWidget';
-import { MessageCarousel } from './MessageCarousel';
 import { ListView } from './ListView';
 import { NotificationToast } from './NotificationToast';
+import { BrandLogo } from './BrandLogo';
 
-const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
+const serviceHeroImage = require('../../assets/visuals/dumpster-service-hero.jpg');
+const LIVE_EVENT_TYPES = new Set(['route_assigned', 'route_updated', 'route_status', 'route_reordered']);
 
 interface MapDashboardProps {
-  route?: RouteAssignment;
+  route?: RouteAssignment | { params?: { route?: RouteAssignment } };
+}
+
+function getProvidedRoute(routeProp?: MapDashboardProps['route']): RouteAssignment | undefined {
+  if (!routeProp) return undefined;
+  if ('stops' in routeProp) return routeProp;
+  return routeProp.params?.route;
+}
+
+function formatEventTitle(eventType: string): string {
+  switch (eventType) {
+    case 'route_assigned':
+      return 'New Route Assigned';
+    case 'route_updated':
+      return 'Route Updated';
+    case 'route_status':
+      return 'Route Status Updated';
+    case 'route_reordered':
+      return 'Route Order Updated';
+    default:
+      return 'Dispatch Update';
+  }
+}
+
+function mapLiveEventToMessage(event: LiveDispatchEvent): AppMessage | null {
+  if (!LIVE_EVENT_TYPES.has(event.eventType)) return null;
+
+  return {
+    id: event.eventId,
+    type: event.eventType === 'route_status' ? 'warning' : 'info',
+    title: formatEventTitle(event.eventType),
+    content: event.message || 'Dispatch updated your route.',
+    time: event.recordedAt,
+  };
+}
+
+function formatRouteStatus(status?: string): string {
+  if (!status) return 'Live route';
+  return status.replace(/[_-]/g, ' ');
+}
+
+function formatTaskLabel(stop: RouteStop): string {
+  if (stop.taskType) return stop.taskType.replace(/[_-]/g, ' ');
+  return 'Stop';
 }
 
 // Haversine distance calculation
@@ -55,24 +99,20 @@ export const MapDashboard: React.FC<MapDashboardProps> = ({ route: propRoute }) 
   const navigation = useNavigation<NavigationProp>();
   const [dispatchRoute, setDispatchRoute] = useState<RouteAssignment | null>(null);
   const [vendorId, setVendorId] = useState<number | null>(null);
-  const previousSpeedRef = useRef<number | null>(null);
-  const locationRouteUuidRef = useRef<string | null>(null);
+  const { currentLocation, setActiveRouteUuid } = useDriverLocation();
 
   // SpacetimeDB realtime subscription
   const { locations: liveLocations, events: liveEvents, connected: liveConnected } = useDispatchLive(vendorId);
-
-  // Get the route — no mock fallbacks
-  const getRoute = () => {
-    if (propRoute?.stops && propRoute.stops.length > 0) {
-      return propRoute;
+  const suppliedRoute = getProvidedRoute(propRoute);
+  const route = useMemo(() => {
+    if (suppliedRoute?.stops && suppliedRoute.stops.length > 0) {
+      return suppliedRoute;
     }
     if (dispatchRoute?.stops && dispatchRoute.stops.length > 0) {
       return dispatchRoute;
     }
     return null;
-  };
-
-  const route = getRoute();
+  }, [dispatchRoute, suppliedRoute]);
 
   // Initialize stops from route
   const [stops, setStops] = useState<RouteStop[]>(() => {
@@ -81,11 +121,10 @@ export const MapDashboard: React.FC<MapDashboardProps> = ({ route: propRoute }) 
 
   // Update stops when propRoute or dispatchRoute changes
   useEffect(() => {
-    const newRoute = getRoute();
-    if (newRoute?.stops && newRoute.stops.length > 0) {
-      setStops(newRoute.stops);
+    if (route?.stops && route.stops.length > 0) {
+      setStops(route.stops);
     }
-  }, [propRoute, dispatchRoute]);
+  }, [route]);
 
   // Apply realtime dispatch events to stop statuses
   useEffect(() => {
@@ -105,16 +144,19 @@ export const MapDashboard: React.FC<MapDashboardProps> = ({ route: propRoute }) 
 
   const [activeIndex, setActiveIndex] = useState(0);
   const [isListViewOpen, setIsListViewOpen] = useState(false);
-  const [zoom, setZoom] = useState(MAP_CONFIG.defaultZoom);
-  const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null);
-  const [messages, setMessages] = useState<AppMessage[]>([]);
+  const [zoom, setZoom] = useState<number>(MAP_CONFIG.defaultZoom);
+  const userLocation = currentLocation
+    ? { lat: currentLocation.lat, lng: currentLocation.lng }
+    : null;
   const [activeNotification, setActiveNotification] = useState<{
     title: string;
     body: string;
   } | null>(null);
+  const liveStartedAtRef = useRef(Date.now());
+  const seenLiveEventIdsRef = useRef(new Set<string>());
 
   useEffect(() => {
-    if (propRoute || (isAuthEnabled && !user)) return;
+    if (suppliedRoute || (isAuthEnabled && !user)) return;
 
     let cancelled = false;
     dispatchService
@@ -123,13 +165,9 @@ export const MapDashboard: React.FC<MapDashboardProps> = ({ route: propRoute }) 
         if (cancelled) return;
         if (data.activeRoute) {
           setDispatchRoute(data.activeRoute);
-          locationRouteUuidRef.current = data.activeRoute.uuid;
         }
         if (data.user.vendorId) {
           setVendorId(data.user.vendorId);
-        }
-        if (data.messages.length > 0) {
-          setMessages(data.messages);
         }
       })
       .catch((error) => {
@@ -139,7 +177,7 @@ export const MapDashboard: React.FC<MapDashboardProps> = ({ route: propRoute }) 
     return () => {
       cancelled = true;
     };
-  }, [propRoute, isAuthEnabled, user]);
+  }, [suppliedRoute, isAuthEnabled, user]);
 
   useEffect(() => {
     if (isAuthEnabled && !user) return;
@@ -155,84 +193,56 @@ export const MapDashboard: React.FC<MapDashboardProps> = ({ route: propRoute }) 
   }, [isAuthEnabled, user]);
 
   useEffect(() => {
-    locationRouteUuidRef.current = route?.uuid ?? null;
-  }, [route?.uuid]);
+    liveStartedAtRef.current = Date.now();
+    seenLiveEventIdsRef.current.clear();
+  }, [vendorId]);
 
-  // Request location permissions and track location
   useEffect(() => {
-    let subscription: Location.LocationSubscription | null = null;
+    if (!vendorId || liveEvents.length === 0) return;
 
-    (async () => {
-      try {
-        if (Platform.OS !== 'web') {
-          const { status } = await Location.requestForegroundPermissionsAsync();
-          if (status !== 'granted') {
-            console.warn('Location permission denied');
-            return;
-          }
+    const nextMessages: AppMessage[] = [];
+    for (const event of liveEvents) {
+      if (seenLiveEventIdsRef.current.has(event.eventId)) continue;
+      seenLiveEventIdsRef.current.add(event.eventId);
 
-          subscription = await Location.watchPositionAsync(
-            {
-              accuracy: Location.Accuracy.High,
-              timeInterval: 3000,
-              distanceInterval: 5,
-            },
-            (location) => {
-              const speedMps =
-                typeof location.coords.speed === 'number' && Number.isFinite(location.coords.speed)
-                  ? location.coords.speed
-                  : null;
-              setUserLocation({
-                lat: location.coords.latitude,
-                lng: location.coords.longitude,
-              });
-              void dispatchService.sendDriverLocation({
-                routeUuid: locationRouteUuidRef.current ?? undefined,
-                latitude: location.coords.latitude,
-                longitude: location.coords.longitude,
-                speedMps,
-                previousSpeedMps: previousSpeedRef.current,
-                heading:
-                  typeof location.coords.heading === 'number' && Number.isFinite(location.coords.heading)
-                    ? location.coords.heading
-                    : null,
-                accuracyMeters:
-                  typeof location.coords.accuracy === 'number' && Number.isFinite(location.coords.accuracy)
-                    ? location.coords.accuracy
-                    : null,
-                recordedAt: new Date(location.timestamp).toISOString(),
-              });
-              previousSpeedRef.current = speedMps;
-            }
-          );
-        } else {
-          // Web fallback
-          if ('geolocation' in navigator) {
-            navigator.geolocation.watchPosition(
-              (position) => {
-                setUserLocation({
-                  lat: position.coords.latitude,
-                  lng: position.coords.longitude,
-                });
-              },
-              (error) => {
-                console.warn('Location permission denied or unavailable', error);
-              },
-              { enableHighAccuracy: true, maximumAge: 10000, timeout: 5000 }
-            );
-          }
-        }
-      } catch (error) {
-        console.warn('Location permission denied or unavailable', error);
+      const recordedAt = Date.parse(event.recordedAt);
+      if (Number.isFinite(recordedAt) && recordedAt < liveStartedAtRef.current - 1000) {
+        continue;
       }
-    })();
 
+      const message = mapLiveEventToMessage(event);
+      if (message) {
+        nextMessages.push(message);
+      }
+    }
+
+    if (nextMessages.length === 0) return;
+
+    setActiveNotification({
+      title: nextMessages[0].title,
+      body: nextMessages[0].content,
+    });
+
+    if (!suppliedRoute) {
+      dispatchService
+        .fetchMobileDispatch()
+        .then((data) => {
+          if (data.activeRoute) {
+            setDispatchRoute(data.activeRoute);
+          }
+        })
+        .catch((error) => {
+          console.warn('Failed to refresh dispatch route after live event', error);
+        });
+    }
+  }, [liveEvents, suppliedRoute, vendorId]);
+
+  useEffect(() => {
+    setActiveRouteUuid(route?.uuid ?? null);
     return () => {
-      if (subscription) {
-        subscription.remove();
-      }
+      setActiveRouteUuid(null);
     };
-  }, []);
+  }, [route?.uuid, setActiveRouteUuid]);
 
   // Calculate travel metrics
   const travelStats = useMemo(() => {
@@ -244,6 +254,7 @@ export const MapDashboard: React.FC<MapDashboardProps> = ({ route: propRoute }) 
     if (!origin || !target.coordinates) return { distance: undefined, driveTime: undefined };
 
     const km = getDistance(origin.lat, origin.lng, target.coordinates.lat, target.coordinates.lng);
+    if (km > 160) return { distance: undefined, driveTime: undefined };
     const speed = km > 10 ? 50 : 25; // km/h
     const mins = Math.round((km / speed) * 60);
     const hours = Math.floor(mins / 60);
@@ -328,27 +339,45 @@ export const MapDashboard: React.FC<MapDashboardProps> = ({ route: propRoute }) 
     imageUri: string
   ) => {
     if (!route) return [];
-    return dispatchService.uploadStopImage(route.uuid, stop.uuid, imageUri, category);
-  };
-
-  const triggerTestNotification = () => {
-    setActiveNotification({
-      title: 'New Assignment Received',
-      body: 'A new priority stop has been added to your route.',
-    });
+    return dispatchService.uploadStopImage(route.uuid, stop.uuid || stop.id, imageUri, category);
   };
 
   // Safety check - ensure we have stops
   if (!stops || stops.length === 0) {
     return (
-      <View
-        style={[
-          styles.container,
-          { backgroundColor: palette.background, justifyContent: 'center', alignItems: 'center' },
-        ]}
-      >
-        <Text style={{ color: palette.text }}>No route data available</Text>
-      </View>
+      <SafeAreaView style={[styles.emptyDashboard, { backgroundColor: palette.background }]} edges={['top', 'bottom']}>
+        <View style={styles.emptyHeader}>
+          <BrandLogo
+            textColor={palette.text}
+            accentColor={palette.accent}
+            mutedColor={palette.subtleText}
+            subtitle="DRIVER PORTAL"
+          />
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Open profile settings"
+            style={[styles.emptyIconButton, { borderColor: theme === 'dark' ? '#262a33' : '#dbe3ee' }]}
+            onPress={() => navigation.navigate('Profile')}
+          >
+            <Ionicons name="person" size={18} color={palette.subtleText} />
+          </Pressable>
+        </View>
+        <ImageBackground
+          source={serviceHeroImage}
+          resizeMode="cover"
+          style={styles.emptyImage}
+          imageStyle={styles.emptyImageRadius}
+        >
+          <View style={styles.emptyImageScrim} />
+        </ImageBackground>
+        <View style={styles.emptyCopy}>
+          <Ionicons name="checkmark-circle-outline" size={44} color={palette.success} />
+          <Text style={[styles.emptyTitle, { color: palette.text }]}>No active route</Text>
+          <Text style={[styles.emptyText, { color: palette.subtleText }]}>
+            Your dashboard will update when dispatch assigns a route.
+          </Text>
+        </View>
+      </SafeAreaView>
     );
   }
 
@@ -366,6 +395,16 @@ export const MapDashboard: React.FC<MapDashboardProps> = ({ route: propRoute }) 
     );
   }
 
+  const completedStops = stops.filter((stop) => stop.status === 'completed').length;
+  const routeProgress = `${completedStops}/${stops.length}`;
+  const liveDriverCount = Object.keys(liveLocations).length;
+  const activeTaskLabel = formatTaskLabel(activeStop);
+  const routeStatusLabel = formatRouteStatus(route?.status);
+  const liveDriverLabel = liveDriverCount > 0
+    ? `${liveDriverCount} driver${liveDriverCount === 1 ? '' : 's'} live`
+    : liveConnected ? 'Live sync' : 'Offline sync';
+  const activeStopTitle = activeStop.name || activeStop.title || 'Current stop';
+
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: palette.background }]} edges={['top', 'bottom']}>
       <GestureHandlerRootView style={styles.container}>
@@ -375,40 +414,69 @@ export const MapDashboard: React.FC<MapDashboardProps> = ({ route: propRoute }) 
           onClose={() => setActiveNotification(null)}
         />
 
-        {/* Top Overlay Gradient */}
-        <View
-          style={[
-            styles.topGradient,
-            {
-              backgroundColor: theme === 'dark' ? 'rgba(15, 23, 42, 0.8)' : 'rgba(248, 250, 252, 0.8)',
-            },
-          ]}
-          pointerEvents="none"
-        />
-
-        {/* Branding */}
-        <View style={styles.branding} pointerEvents="none">
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-            <Text style={[styles.brandTitle, { color: palette.text }]}>
-              trash<Text style={{ color: palette.accent }}>ed</Text>
-            </Text>
-            <View
-              style={{
-                width: 6,
-                height: 6,
-                borderRadius: 3,
-                backgroundColor: liveConnected ? '#10b981' : '#64748b',
-                marginTop: 4,
-              }}
+        <ImageBackground
+          source={serviceHeroImage}
+          resizeMode="cover"
+          style={styles.dashboardHero}
+          imageStyle={styles.dashboardHeroImage}
+        >
+          <View style={styles.dashboardHeroScrim} />
+          <View style={styles.dashboardHeader}>
+            <BrandLogo
+              textColor="#ffffff"
+              accentColor="#60a5fa"
+              mutedColor="#a6adbb"
+              subtitle={route?.label ? route.label.toUpperCase() : 'DRIVER PORTAL'}
+              size="sm"
             />
+            <View style={styles.dashboardHeaderActions}>
+              <View style={styles.dashboardLivePill}>
+                <View style={[styles.dashboardLiveDot, { backgroundColor: liveConnected ? '#22c55e' : '#64748b' }]} />
+                <Text style={styles.dashboardLiveText}>{liveConnected ? 'LIVE' : 'SYNC'}</Text>
+              </View>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="Open route list"
+                style={styles.dashboardIconButton}
+                onPress={() => setIsListViewOpen(true)}
+              >
+                <Ionicons name="list" size={17} color="#ffffff" />
+              </Pressable>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="Open profile settings"
+                style={styles.dashboardIconButton}
+                onPress={() => navigation.navigate('Profile')}
+              >
+                <Ionicons name="person" size={17} color="#ffffff" />
+              </Pressable>
+            </View>
           </View>
-          <Text style={[styles.brandSubtitle, { color: palette.subtleText }]}>DRIVER PORTAL</Text>
-        </View>
 
-        {/* Weather Widget - Top Right */}
-        <View style={styles.weatherWidget} pointerEvents="none">
-          <WeatherWidget theme={theme} />
-        </View>
+          <View style={styles.dashboardRouteRow}>
+            <View style={styles.dashboardRouteCopy}>
+              <Text style={styles.dashboardEyebrow}>{routeStatusLabel}</Text>
+              <Text style={styles.dashboardTitle} numberOfLines={2}>
+                {activeStopTitle}
+              </Text>
+              <Text style={styles.dashboardMeta} numberOfLines={1}>
+                {activeTaskLabel} / stop {activeIndex + 1} of {stops.length}
+              </Text>
+            </View>
+            <View style={styles.dashboardProgress}>
+              <Text style={styles.dashboardProgressValue}>{routeProgress}</Text>
+              <Text style={styles.dashboardProgressLabel}>done</Text>
+            </View>
+          </View>
+
+          <View style={styles.dashboardFooterRow}>
+            <View style={styles.dashboardMiniStat}>
+              <Ionicons name="location" size={14} color="#60a5fa" />
+              <Text style={styles.dashboardMiniText}>{liveDriverLabel}</Text>
+            </View>
+            <WeatherWidget theme="dark" />
+          </View>
+        </ImageBackground>
 
         {/* Main 3D Map View Area - Full Screen Background */}
         <View style={styles.mapContainer}>
@@ -479,48 +547,8 @@ export const MapDashboard: React.FC<MapDashboardProps> = ({ route: propRoute }) 
           onUploadPhoto={handleUploadPhoto}
         />
 
-      {/* Message Carousel - Bottom Center */}
-      <MessageCarousel messages={messages} theme={theme} />
-
       {/* Right Side Controls Stack */}
       <View style={styles.rightControls}>
-        {/* Profile & List Group */}
-        <View style={styles.controlGroup}>
-          <Pressable
-            style={[
-              styles.controlButton,
-              {
-                backgroundColor: theme === 'dark' ? 'rgba(15, 23, 42, 0.8)' : 'rgba(255, 255, 255, 0.8)',
-                borderColor: theme === 'dark' ? 'rgba(51, 65, 85, 0.7)' : 'rgba(203, 213, 225, 1)',
-              },
-            ]}
-            onPress={() => navigation.navigate('Profile')}
-          >
-            {user?.photoURL ? (
-              <Text style={styles.profileText}>P</Text>
-            ) : (
-              <Ionicons
-                name="person"
-                size={16}
-                color={theme === 'dark' ? '#ffffff' : '#475569'}
-              />
-            )}
-          </Pressable>
-
-          <Pressable
-            style={[
-              styles.controlButton,
-              {
-                backgroundColor: theme === 'dark' ? 'rgba(15, 23, 42, 0.8)' : 'rgba(255, 255, 255, 0.8)',
-                borderColor: theme === 'dark' ? 'rgba(51, 65, 85, 0.7)' : 'rgba(203, 213, 225, 1)',
-              },
-            ]}
-            onPress={() => setIsListViewOpen(true)}
-          >
-            <Ionicons name="list" size={16} color={theme === 'dark' ? '#ffffff' : '#475569'} />
-          </Pressable>
-        </View>
-
         {/* Zoom Controls */}
         <View
           style={[
@@ -558,22 +586,6 @@ export const MapDashboard: React.FC<MapDashboardProps> = ({ route: propRoute }) 
           </Pressable>
         </View>
 
-        {/* Alerts Icon */}
-        <Pressable
-          style={[
-            styles.controlButton,
-            styles.alertButton,
-            {
-              backgroundColor: theme === 'dark' ? 'rgba(15, 23, 42, 0.8)' : 'rgba(255, 255, 255, 0.8)',
-              borderColor: theme === 'dark' ? 'rgba(51, 65, 85, 0.7)' : 'rgba(203, 213, 225, 1)',
-            },
-          ]}
-          onPress={triggerTestNotification}
-        >
-          <Ionicons name="notifications" size={16} color={theme === 'dark' ? '#ffffff' : '#475569'} />
-          <View style={styles.alertDot} />
-        </Pressable>
-
       </View>
 
         {/* List View Overlay */}
@@ -599,6 +611,201 @@ const styles = StyleSheet.create({
     flex: 1,
     position: 'relative',
   },
+  emptyDashboard: {
+    flex: 1,
+    paddingHorizontal: 18,
+  },
+  emptyHeader: {
+    paddingTop: 10,
+    paddingBottom: 16,
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    justifyContent: 'space-between',
+  },
+  emptyIconButton: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    borderWidth: 1,
+    backgroundColor: '#ffffff',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  emptyImage: {
+    height: 238,
+    borderRadius: 28,
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: '#dbe3ee',
+  },
+  emptyImageRadius: {
+    borderRadius: 28,
+  },
+  emptyImageScrim: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(7, 11, 47, 0.12)',
+  },
+  emptyCopy: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 10,
+    paddingHorizontal: 18,
+  },
+  emptyTitle: {
+    fontSize: 22,
+    fontWeight: '900',
+  },
+  emptyText: {
+    fontSize: 14,
+    lineHeight: 20,
+    textAlign: 'center',
+  },
+  dashboardHero: {
+    position: 'absolute',
+    top: 10,
+    left: 14,
+    right: 14,
+    height: 188,
+    borderRadius: 28,
+    overflow: 'hidden',
+    zIndex: 35,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.42)',
+    shadowColor: '#070b2f',
+    shadowOffset: { width: 0, height: 12 },
+    shadowOpacity: 0.16,
+    shadowRadius: 22,
+    elevation: 10,
+  },
+  dashboardHeroImage: {
+    borderRadius: 28,
+  },
+  dashboardHeroScrim: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(7, 11, 47, 0.48)',
+  },
+  dashboardHeader: {
+    paddingHorizontal: 18,
+    paddingTop: 16,
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    justifyContent: 'space-between',
+    gap: 12,
+  },
+  dashboardHeaderActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  dashboardLivePill: {
+    minHeight: 34,
+    borderRadius: 17,
+    paddingHorizontal: 12,
+    backgroundColor: 'rgba(255, 255, 255, 0.14)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.18)',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 7,
+  },
+  dashboardLiveDot: {
+    width: 7,
+    height: 7,
+    borderRadius: 3.5,
+  },
+  dashboardLiveText: {
+    color: '#ffffff',
+    fontSize: 11,
+    fontWeight: '900',
+    letterSpacing: 0.8,
+  },
+  dashboardIconButton: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    backgroundColor: 'rgba(255, 255, 255, 0.14)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.18)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  dashboardRouteRow: {
+    paddingHorizontal: 18,
+    paddingTop: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 14,
+  },
+  dashboardRouteCopy: {
+    flex: 1,
+    minWidth: 0,
+  },
+  dashboardEyebrow: {
+    color: '#dbeafe',
+    fontSize: 10,
+    fontWeight: '900',
+    letterSpacing: 1.6,
+    textTransform: 'uppercase',
+  },
+  dashboardTitle: {
+    marginTop: 5,
+    color: '#ffffff',
+    fontSize: 22,
+    lineHeight: 25,
+    fontWeight: '900',
+    letterSpacing: 0,
+  },
+  dashboardMeta: {
+    marginTop: 4,
+    color: '#dbeafe',
+    fontSize: 13,
+    fontWeight: '800',
+  },
+  dashboardProgress: {
+    width: 66,
+    height: 66,
+    borderRadius: 22,
+    backgroundColor: '#ffffff',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  dashboardProgressValue: {
+    color: '#070b2f',
+    fontSize: 21,
+    fontWeight: '900',
+  },
+  dashboardProgressLabel: {
+    color: '#526071',
+    fontSize: 10,
+    fontWeight: '900',
+    textTransform: 'uppercase',
+  },
+  dashboardFooterRow: {
+    paddingHorizontal: 18,
+    paddingTop: 10,
+    paddingBottom: 14,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  dashboardMiniStat: {
+    minHeight: 34,
+    borderRadius: 17,
+    paddingHorizontal: 12,
+    backgroundColor: 'rgba(255, 255, 255, 0.12)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.16)',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 7,
+  },
+  dashboardMiniText: {
+    color: '#ffffff',
+    fontSize: 12,
+    fontWeight: '800',
+  },
   topGradient: {
     position: 'absolute',
     top: 0,
@@ -616,7 +823,7 @@ const styles = StyleSheet.create({
   brandTitle: {
     fontSize: 24,
     fontWeight: '900',
-    letterSpacing: -1,
+    letterSpacing: 0,
     lineHeight: 28,
   },
   brandSubtitle: {
@@ -634,7 +841,7 @@ const styles = StyleSheet.create({
   },
   mapContainer: {
     position: 'absolute',
-    top: 0,
+    top: 188,
     left: 0,
     right: 0,
     bottom: 0,
@@ -665,14 +872,10 @@ const styles = StyleSheet.create({
   },
   rightControls: {
     position: 'absolute',
-    top: 100,
+    top: 214,
     right: 12,
     zIndex: 30,
     alignItems: 'flex-end',
-    gap: 8,
-  },
-  controlGroup: {
-    flexDirection: 'column',
     gap: 8,
   },
   controlButton: {
@@ -686,11 +889,6 @@ const styles = StyleSheet.create({
     shadowRadius: 8,
     shadowOpacity: 0.1,
     elevation: 3,
-  },
-  profileText: {
-    fontSize: 12,
-    fontWeight: 'bold',
-    color: '#ffffff',
   },
   zoomControls: {
     borderRadius: 18,
@@ -707,20 +905,5 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     borderBottomWidth: 1,
-  },
-  alertButton: {
-    position: 'relative',
-    marginTop: 8,
-  },
-  alertDot: {
-    position: 'absolute',
-    top: 6,
-    right: 6,
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    backgroundColor: '#ef4444',
-    borderWidth: 1,
-    borderColor: '#0f172a',
   },
 });

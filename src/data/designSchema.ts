@@ -1,4 +1,4 @@
-import { ThemeMode, WalkthroughSlide, RouteAssignment } from '@/types/domain';
+import { ThemeMode, WalkthroughSlide } from '@/types/domain';
 
 type Palette = {
   background: string;
@@ -34,29 +34,28 @@ export interface DesignSchema {
   theme: Record<ThemeMode, Palette>;
   screens: ScreenSchema[];
   walkthrough: WalkthroughSlide[];
-  sampleRoute: RouteAssignment;
 }
 
 export const designSchema: DesignSchema = {
   theme: {
     light: {
-      background: '#f8fafc',
+      background: '#f4f7fb',
       surface: '#ffffff',
-      card: '#e2e8f0',
-      text: '#0f172a',
-      subtleText: '#475569',
+      card: '#dbe3ee',
+      text: '#111827',
+      subtleText: '#526071',
       accent: '#3b82f6',
       success: '#22c55e',
       warning: '#f59e0b',
       danger: '#ef4444',
     },
     dark: {
-      background: '#0b172a',
-      surface: '#111827',
-      card: '#1f2937',
-      text: '#e5e7eb',
-      subtleText: '#94a3b8',
-      accent: '#38bdf8',
+      background: '#101114',
+      surface: '#181a20',
+      card: '#262a33',
+      text: '#f4f6fb',
+      subtleText: '#a6adbb',
+      accent: '#60a5fa',
       success: '#34d399',
       warning: '#fbbf24',
       danger: '#f87171',
@@ -128,39 +127,4 @@ export const designSchema: DesignSchema = {
       illustration: 'checklist',
     },
   ],
-  sampleRoute: {
-    uuid: 'route-demo-001',
-    label: 'Detroit Loop',
-    status: 'in_progress',
-    dispatcherNote: 'Start at yard, confirm equipment swap, and capture site notes.',
-    stops: [
-      {
-        uuid: 'stop-1',
-        name: 'Yard / HQ',
-        address: '1200 Industrial Ave',
-        status: 'arrived',
-        scheduledAt: '07:00 AM',
-        etaMinutes: 0,
-        coordinates: { lat: 42.3314, lng: -83.0458 },
-      },
-      {
-        uuid: 'stop-2',
-        name: 'Commercial Park',
-        address: '2200 Michigan Ave',
-        status: 'en_route',
-        scheduledAt: '01:00 PM',
-        etaMinutes: 14,
-        coordinates: { lat: 42.3292, lng: -83.0782 },
-      },
-      {
-        uuid: 'stop-3',
-        name: 'Residential Reno',
-        address: '789 Woodward Ave',
-        status: 'pending',
-        scheduledAt: '03:30 PM',
-        etaMinutes: 42,
-        coordinates: { lat: 42.3620, lng: -83.0725 },
-      },
-    ],
-  },
 };

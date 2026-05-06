@@ -1,4 +1,4 @@
-import { RouteStop, AppMessage } from '@/types/domain';
+import { RouteStop } from '@/types/domain';
 import Constants from 'expo-constants';
 
 export const COLORS = {
@@ -104,28 +104,4 @@ export const INITIAL_STOPS: RouteStop[] = [
     etaMinutes: 120,
     coordinates: { lat: 42.3292, lng: -83.0782 }
   },
-];
-
-export const INITIAL_MESSAGES: AppMessage[] = [
-  {
-    id: 'm1',
-    type: 'urgent',
-    title: 'Traffic Alert',
-    content: 'Heavy congestion on I-75 South. Expect delays.',
-    time: '10 min ago'
-  },
-  {
-    id: 'm2',
-    type: 'info',
-    title: 'Dispatcher',
-    content: 'Customer at Stop #3 requested call ahead.',
-    time: '25 min ago'
-  },
-  {
-    id: 'm3',
-    type: 'warning',
-    title: 'Maintenance',
-    content: 'Schedule oil change by EOW.',
-    time: '1 hour ago'
-  }
 ];

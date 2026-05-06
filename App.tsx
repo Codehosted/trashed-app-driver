@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
-import { View } from 'react-native';
+import { Platform, View } from 'react-native';
 import * as ExpoSplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
 import { RootStackParamList } from '@/types/navigation';
@@ -24,9 +24,13 @@ import { RouteDetailScreen } from '@/screens/RouteDetailScreen';
 import { OrderDetailScreen } from '@/screens/OrderDetailScreen';
 import { MapDashboard } from '@/components/MapDashboard';
 import { AuthProvider, useAuth } from '@/context/AuthContext';
+import { DriverLocationProvider } from '@/context/DriverLocationContext';
 import { PreferencesProvider, usePreferences } from '@/context/PreferencesContext';
 import { ThemedView } from '@/components/ThemedView';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
+import { usePushNotifications } from '@/hooks/usePushNotifications';
+import { usePushRegistration } from '@/hooks/usePushRegistration';
+import * as dispatchService from '@/services/dispatch';
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
 ExpoSplashScreen.preventAutoHideAsync();
@@ -114,8 +118,23 @@ function Navigator() {
 }
 
 function AppContent() {
-  const { theme } = usePreferences();
-  const { isAuthEnabled } = useAuth();
+  const { theme, notificationPreferences } = usePreferences();
+  const { user, isAuthEnabled } = useAuth();
+  const pushRegistration = usePushRegistration(Boolean(user) && notificationPreferences.routeAlerts);
+
+  usePushNotifications();
+
+  useEffect(() => {
+    if (!user || !pushRegistration.pushToken || !notificationPreferences.routeAlerts) {
+      return;
+    }
+
+    dispatchService
+      .registerPushToken(pushRegistration.pushToken, notificationPreferences, Platform.OS)
+      .catch((error) => {
+        console.warn('Failed to register push token', error);
+      });
+  }, [notificationPreferences, pushRegistration.pushToken, user]);
   
   return (
     <ThemedView>
@@ -135,7 +154,9 @@ export default function App() {
     <ErrorBoundary>
       <PreferencesProvider>
         <AuthProvider>
-          <AppContent />
+          <DriverLocationProvider>
+            <AppContent />
+          </DriverLocationProvider>
         </AuthProvider>
       </PreferencesProvider>
     </ErrorBoundary>

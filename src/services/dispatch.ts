@@ -1,6 +1,6 @@
 import { APP_CONFIG } from '@/constants';
 import { buildAuthHeaders } from '@/services/auth';
-import type { RouteAssignment, RouteStop, AppMessage } from '@/types/domain';
+import type { AppMessage, NotificationPreferences, RouteAssignment, RouteStop } from '@/types/domain';
 
 const API_BASE_URL = APP_CONFIG.apiBaseUrl;
 
@@ -122,11 +122,45 @@ export async function uploadStopImage(
     : [];
 }
 
-export async function registerPushToken(pushToken: string) {
+export async function sendCustomerMessage(
+  routeUuid: string,
+  stopUuid: string,
+  message: string
+) {
   const headers = await buildAuthHeaders();
-  await fetch(`${API_BASE_URL}/api/mobile/dispatch/push`, {
+  const response = await fetch(
+    `${API_BASE_URL}/api/mobile/dispatch/routes/${routeUuid}/stops/${stopUuid}/message`,
+    {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({ message }),
+    }
+  );
+
+  if (!response.ok) {
+    const body = await response.json().catch(() => ({}));
+    throw new Error(body.error || 'Failed to send message');
+  }
+
+  return response.json();
+}
+
+export async function registerPushToken(
+  pushToken: string,
+  preferences?: NotificationPreferences,
+  platform?: string
+) {
+  const headers = await buildAuthHeaders();
+  const response = await fetch(`${API_BASE_URL}/api/mobile/dispatch/push`, {
     method: 'POST',
     headers,
-    body: JSON.stringify({ pushToken }),
+    body: JSON.stringify({ pushToken, preferences, platform }),
   });
+
+  if (!response.ok) {
+    const body = await response.json().catch(() => ({}));
+    throw new Error(body.error || 'Failed to register push token');
+  }
+
+  return response.json();
 }

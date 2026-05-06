@@ -2,11 +2,9 @@ import React from 'react';
 import { ApiWebView } from '@/components/ApiWebView';
 import { handleApiResponse } from '@/services/api-response-handler';
 import { useNavigation } from '@react-navigation/native';
-import { useAuth } from '@/context/AuthContext';
 
 export const DashboardWebViewScreen: React.FC = () => {
   const navigation = useNavigation();
-  const { user } = useAuth();
 
   const handleApiResponseCallback = async (
     endpoint: string,
@@ -31,10 +29,9 @@ export const DashboardWebViewScreen: React.FC = () => {
 
   return (
     <ApiWebView
-      route=""
+      route="vendor/dashboard"
       onApiResponse={handleApiResponseCallback}
       onNavigationChange={handleNavigationChange}
     />
   );
 };
-

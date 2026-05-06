@@ -45,8 +45,8 @@ interface AuthContextValue {
   loading: boolean;
   needsWalkthrough: boolean;
   isAuthEnabled: boolean;
-  register: (email: string, password: string) => Promise<void>;
-  login: (email: string, password: string) => Promise<void>;
+  register: (email: string, password: string) => Promise<User>;
+  login: (email: string, password: string) => Promise<User>;
   resetPassword: (email: string) => Promise<void>;
   logout: () => Promise<void>;
   completeWalkthrough: () => Promise<void>;
@@ -145,6 +145,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     await AsyncStorage.setItem(USER_STORAGE_KEY, JSON.stringify(user));
     await AsyncStorage.removeItem(`${WALKTHROUGH_KEY}:${user.uid}`);
     setNeedsWalkthrough(true);
+    return user;
   };
 
   const login = async (email: string, password: string) => {
@@ -162,6 +163,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     await AsyncStorage.setItem(USER_STORAGE_KEY, JSON.stringify(user));
     const seen = await AsyncStorage.getItem(`${WALKTHROUGH_KEY}:${user.uid}`);
     setNeedsWalkthrough(!seen);
+    return user;
   };
 
   const resetPassword = async (email: string) => {

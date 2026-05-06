@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, StyleSheet, Text, Pressable, Modal, Image } from 'react-native';
+import { View, StyleSheet, Text, Pressable, Modal, Image, ScrollView } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import { Alert } from 'react-native';
@@ -117,7 +117,7 @@ export const PhotoPickerModal: React.FC<PhotoPickerModalProps> = ({
             </Pressable>
           </View>
 
-          <View style={styles.photosContainer}>
+          <ScrollView style={styles.photosContainer} contentContainerStyle={styles.photosContent}>
             {selectedPhotos.length > 0 ? (
               <View style={styles.photosGrid}>
                 {selectedPhotos.map((uri, index) => (
@@ -141,14 +141,36 @@ export const PhotoPickerModal: React.FC<PhotoPickerModalProps> = ({
               </View>
             )}
 
+            <View style={styles.photoActions}>
+              <Pressable
+                style={[styles.addPhotoButton, { backgroundColor: '#4f46e5' }]}
+                onPress={handlePickImage}
+              >
+                <Ionicons name="images-outline" size={16} color="#ffffff" />
+                <Text style={styles.addPhotoButtonText}>Select Photos</Text>
+              </Pressable>
+              <Pressable
+                style={[styles.addPhotoButton, { backgroundColor: '#0f172a' }]}
+                onPress={handleTakePhoto}
+              >
+                <Ionicons name="camera-outline" size={16} color="#ffffff" />
+                <Text style={styles.addPhotoButtonText}>Take Photo</Text>
+              </Pressable>
+            </View>
             <Pressable
-              style={[styles.addPhotoButton, { backgroundColor: '#4f46e5' }]}
-              onPress={handlePickImage}
+              style={[
+                styles.savePhotosButton,
+                { backgroundColor: '#2563eb' },
+              ]}
+              onPress={handleSave}
             >
-              <Ionicons name="camera" size={16} color="#ffffff" />
-              <Text style={styles.addPhotoButtonText}>Add Photo</Text>
+              <Text style={styles.addPhotoButtonText}>
+                {selectedPhotos.length > 0
+                  ? `Save ${selectedPhotos.length} ${selectedPhotos.length === 1 ? 'Photo' : 'Photos'}`
+                  : 'Done'}
+              </Text>
             </Pressable>
-          </View>
+          </ScrollView>
         </Pressable>
       </Pressable>
     </Modal>
@@ -187,6 +209,9 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   photosContainer: {
+    maxHeight: 420,
+  },
+  photosContent: {
     padding: 16,
   },
   photosGrid: {
@@ -221,13 +246,25 @@ const styles = StyleSheet.create({
     marginTop: 8,
   },
   addPhotoButton: {
+    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 8,
-    width: '100%',
     paddingVertical: 10,
     borderRadius: 12,
+  },
+  photoActions: {
+    flexDirection: 'row',
+    gap: 10,
+  },
+  savePhotosButton: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    width: '100%',
+    paddingVertical: 11,
+    borderRadius: 12,
+    marginTop: 10,
   },
   addPhotoButtonText: {
     color: '#ffffff',
@@ -235,4 +272,3 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
 });
-

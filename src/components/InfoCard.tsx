@@ -41,9 +41,8 @@ export const InfoCard: React.FC<InfoCardProps> = ({
   const [showPhotosPopup, setShowPhotosPopup] = useState(false);
   const [showNotesPopup, setShowNotesPopup] = useState(false);
   const [tempNotes, setTempNotes] = useState(stop.notes || '');
+  const stopId = stop.uuid || stop.id;
 
-  // Use PNG format for React Native compatibility (SVG not directly supported)
-  const avatarUrl = `https://api.dicebear.com/9.x/avataaars/png?seed=${stop.uuid}`;
   const isActive = stop.status === 'in-transit' || stop.status === 'en_route' || stop.status === 'arrived';
   const isCompleted = stop.status === 'completed';
 
@@ -53,7 +52,7 @@ export const InfoCard: React.FC<InfoCardProps> = ({
     else if (stop.status === 'in-transit' || stop.status === 'en_route') nextStatus = 'arrived';
     else if (stop.status === 'arrived') nextStatus = 'completed';
 
-    onUpdateStop(stop.uuid, { status: nextStatus });
+    onUpdateStop(stopId, { status: nextStatus });
   };
 
   const handleAddPhoto = async (category: 'job_site_photo' | 'landfill_receipt' = 'job_site_photo') => {
@@ -68,49 +67,21 @@ export const InfoCard: React.FC<InfoCardProps> = ({
 
     if (onUploadPhoto) {
       const uploaded = await onUploadPhoto(stop, category, result.assets[0].uri);
-      onUpdateStop(stop.uuid, { photos: [...(stop.photos || []), ...uploaded] });
+      onUpdateStop(stopId, { photos: [...(stop.photos || []), ...uploaded] });
       return;
     }
 
-    onUpdateStop(stop.uuid, { photos: [...(stop.photos || []), result.assets[0].uri] });
+    onUpdateStop(stopId, { photos: [...(stop.photos || []), result.assets[0].uri] });
   };
 
   const handleDeletePhoto = (photoIndex: number) => {
     const updatedPhotos = stop.photos?.filter((_: string, i: number) => i !== photoIndex) || [];
-    onUpdateStop(stop.uuid, { photos: updatedPhotos });
+    onUpdateStop(stopId, { photos: updatedPhotos });
   };
 
   const saveNotes = () => {
-    onUpdateStop(stop.uuid, { notes: tempNotes });
+    onUpdateStop(stopId, { notes: tempNotes });
     setShowNotesPopup(false);
-  };
-
-  const getStatusColor = () => {
-    switch (stop.status) {
-      case 'completed':
-        return '#10b981';
-      case 'in-transit':
-      case 'en_route':
-        return '#3b82f6';
-      case 'arrived':
-        return '#f59e0b';
-      default:
-        return '#64748b';
-    }
-  };
-
-  const getStatusIcon = () => {
-    switch (stop.status) {
-      case 'completed':
-        return 'checkmark-circle';
-      case 'in-transit':
-      case 'en_route':
-        return 'navigate';
-      case 'arrived':
-        return 'location';
-      default:
-        return null;
-    }
   };
 
   return (
@@ -133,37 +104,7 @@ export const InfoCard: React.FC<InfoCardProps> = ({
             shadowRadius: isActive ? 50 : 10,
           },
         ]}
-        pointerEvents="box-none"
       >
-        {/* Centered Avatar */}
-        <View style={styles.avatarContainer}>
-          <View
-            style={[
-              styles.avatar,
-              {
-                borderColor: isDark ? '#0f172a' : '#ffffff',
-              },
-            ]}
-          >
-            <Image source={{ uri: avatarUrl }} style={StyleSheet.absoluteFill} />
-          </View>
-
-          {/* Status Pip */}
-          <View
-            style={[
-              styles.statusPip,
-              {
-                backgroundColor: getStatusColor(),
-                borderColor: isDark ? '#0f172a' : '#ffffff',
-              },
-            ]}
-          >
-            {getStatusIcon() && (
-              <Ionicons name={getStatusIcon() as any} size={8} color="#fff" />
-            )}
-          </View>
-        </View>
-
         {/* Content Body */}
         <ScrollView
           style={styles.content}
@@ -599,45 +540,16 @@ export const InfoCard: React.FC<InfoCardProps> = ({
 const styles = StyleSheet.create({
   container: {
     position: 'absolute',
-    top: '50%',
-    left: '50%',
-    marginLeft: -140,
-    marginTop: -160,
-    width: 280,
-    maxHeight: '55%',
-    borderRadius: 16,
-    paddingTop: 48,
+    left: 16,
+    right: 16,
+    bottom: 24,
+    maxHeight: '42%',
+    borderRadius: 24,
     padding: 16,
     shadowOffset: { width: 0, height: 10 },
     shadowRadius: 20,
     elevation: 10,
     zIndex: 40,
-  },
-  avatarContainer: {
-    position: 'absolute',
-    top: -40,
-    left: '50%',
-    marginLeft: -32,
-    zIndex: 10,
-  },
-  avatar: {
-    width: 64,
-    height: 64,
-    borderRadius: 32,
-    borderWidth: 4,
-    overflow: 'hidden',
-    backgroundColor: '#f1f5f9',
-  },
-  statusPip: {
-    position: 'absolute',
-    bottom: 2,
-    right: 2,
-    width: 20,
-    height: 20,
-    borderRadius: 10,
-    borderWidth: 2,
-    justifyContent: 'center',
-    alignItems: 'center',
   },
   content: {
     flex: 1,
@@ -679,8 +591,9 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   title: {
-    fontSize: 20,
-    fontWeight: 'bold',
+    fontSize: 22,
+    lineHeight: 27,
+    fontWeight: '900',
     marginBottom: 4,
   },
   addressRow: {
@@ -700,8 +613,9 @@ const styles = StyleSheet.create({
     letterSpacing: 0.5,
   },
   address: {
-    fontSize: 10,
-    fontWeight: '500',
+    fontSize: 12,
+    lineHeight: 16,
+    fontWeight: '600',
   },
   description: {
     fontSize: 12,
@@ -729,8 +643,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: 6,
-    paddingVertical: 10,
-    borderRadius: 12,
+    minHeight: 50,
+    paddingVertical: 12,
+    borderRadius: 18,
     marginBottom: 6,
   },
   actionButtonText: {

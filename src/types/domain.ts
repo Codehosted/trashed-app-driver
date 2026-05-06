@@ -56,6 +56,10 @@ export interface RouteStop {
   sequence?: number;
   label?: string;
   color?: string;
+  customerName?: string;
+  customerPhone?: string;
+  confirmationCode?: string;
+  specialInstructions?: string;
   notes?: string;
   photos?: string[];
   coordinates: {

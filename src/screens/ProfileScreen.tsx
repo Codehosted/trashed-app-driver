@@ -18,6 +18,7 @@ import { usePreferences } from '@/context/PreferencesContext';
 import { designSchema } from '@/data/designSchema';
 import { NotificationPreferences } from '@/types/domain';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { BrandLogo } from '@/components/BrandLogo';
 
 const PROFILE_STORAGE_KEY = 'driver_profile';
 
@@ -129,7 +130,6 @@ export const ProfileScreen: React.FC = () => {
         contentContainerStyle={styles.contentContainer}
         showsVerticalScrollIndicator={false}
       >
-        {/* Header */}
         <View style={styles.header}>
           <Pressable
             onPress={() => navigation.goBack()}
@@ -142,9 +142,18 @@ export const ProfileScreen: React.FC = () => {
           >
             <Ionicons name="arrow-back" size={20} color={palette.text} />
           </Pressable>
-          <Text style={[styles.headerTitle, { color: palette.text }]}>
-            {user ? 'Driver Profile' : 'App Settings'}
-          </Text>
+          <View style={styles.headerCopy}>
+            <BrandLogo
+              textColor={palette.text}
+              accentColor={palette.accent}
+              mutedColor={palette.subtleText}
+              size="sm"
+              subtitle="SETTINGS"
+            />
+            <Text style={[styles.headerTitle, { color: palette.text }]}>
+              {user ? 'Profile & preferences' : 'App settings'}
+            </Text>
+          </View>
         </View>
 
         {/* Profile Card */}
@@ -442,26 +451,30 @@ const styles = StyleSheet.create({
   },
   header: {
     flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 24,
+    alignItems: 'flex-start',
+    marginBottom: 18,
     gap: 12,
   },
   backButton: {
     width: 40,
     height: 40,
-    borderRadius: 12,
+    borderRadius: 20,
     justifyContent: 'center',
     alignItems: 'center',
   },
+  headerCopy: {
+    flex: 1,
+    gap: 8,
+  },
   headerTitle: {
-    fontSize: 24,
-    fontWeight: 'bold',
+    fontSize: 20,
+    fontWeight: '800',
   },
   card: {
-    borderRadius: 24,
-    padding: 24,
+    borderRadius: 20,
+    padding: 18,
     borderWidth: 1,
-    gap: 24,
+    gap: 20,
   },
   userSection: {
     flexDirection: 'row',
@@ -499,7 +512,7 @@ const styles = StyleSheet.create({
     alignSelf: 'flex-start',
     paddingHorizontal: 8,
     paddingVertical: 4,
-    borderRadius: 4,
+    borderRadius: 10,
     marginTop: 4,
   },
   userIdText: {
@@ -526,7 +539,7 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   inputRow: {
-    flexDirection: 'row',
+    flexDirection: 'column',
     gap: 12,
   },
   inputContainer: {
@@ -547,8 +560,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    padding: 16,
-    borderRadius: 12,
+    padding: 14,
+    borderRadius: 16,
     marginBottom: 8,
   },
   preferenceInfo: {
@@ -567,8 +580,8 @@ const styles = StyleSheet.create({
     marginTop: 8,
   },
   signOutButton: {
-    padding: 16,
-    borderRadius: 12,
+    padding: 15,
+    borderRadius: 16,
     borderWidth: 1,
     alignItems: 'center',
   },
@@ -615,4 +628,3 @@ const styles = StyleSheet.create({
     padding: 4,
   },
 });
-

@@ -135,8 +135,10 @@ export function useDispatchLive(vendorId: number | null | undefined) {
               setError('Dispatch subscription failed');
             })
             .subscribe(
-              dispatchTables.driverLocation.where((row) => row.vendorId.eq(vendorId)),
-              dispatchTables.dispatchEvent.where((row) => row.vendorId.eq(vendorId))
+              [
+                dispatchTables.driverLocation.where((row) => row.vendorId.eq(vendorId)),
+                dispatchTables.dispatchEvent.where((row) => row.vendorId.eq(vendorId)),
+              ]
             );
         })
         .onConnectError(() => {
