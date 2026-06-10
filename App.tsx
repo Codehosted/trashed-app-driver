@@ -1,6 +1,6 @@
-import React, { useState, useMemo, useEffect } from 'react';
-import { AnimatePresence, motion, useDragControls, PanInfo } from 'framer-motion';
-import { ChevronLeft, ChevronRight, List, Sparkles, Map, Plus, Minus, User as UserIcon, Settings, Play, Truck, Bell, Navigation, Car } from 'lucide-react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
+import { AnimatePresence, motion, PanInfo } from 'framer-motion';
+import { ChevronLeft, ChevronRight, List, Plus, Minus, User as UserIcon, Settings, Truck, Bell, LayoutDashboard, Route as RouteIcon } from 'lucide-react';
 import { INITIAL_STOPS, INITIAL_MESSAGES, MAP_CONFIG, APP_CONFIG } from './constants';
 import { RouteStop, Theme } from './types';
 import { RoadMap } from './components/RoadMap';
@@ -15,6 +15,9 @@ import { auth, requestNotificationPermission, onMessageListener, onAuthStateChan
 import { User } from 'firebase/auth'; // Keep type import
 import { Login } from './components/Login';
 import { Profile } from './components/Profile';
+import { VendorExperienceWebView } from './components/VendorExperienceWebView';
+import { getDefaultDriverRouteUuid } from './services/appConfig';
+import { sendDriverPositionBeacon } from './services/driverTracking';
 
 // Haversine Distance Helper
 function getDistance(lat1: number, lon1: number, lat2: number, lon2: number) {
@@ -32,7 +35,7 @@ export default function App() {
   // Auth State
   const [user, setUser] = useState<User | null>(null);
   const [authLoading, setAuthLoading] = useState(true);
-  const [currentView, setCurrentView] = useState<'map' | 'profile'>('map');
+  const [currentView, setCurrentView] = useState<'driverMap' | 'profile' | 'vendorDashboard' | 'vendorDispatch'>('driverMap');
 
   // App State
   const [stops, setStops] = useState<RouteStop[]>(INITIAL_STOPS);
@@ -41,19 +44,22 @@ export default function App() {
   const [isRouteActive, setIsRouteActive] = useState(false); // Track route status
   const [theme, setTheme] = useState<Theme>('dark');
   const [zoom, setZoom] = useState(MAP_CONFIG.defaultZoom);
-  
-  // Initialize theme from URL query params
+
+  // Initialize theme and route context from URL query params
   useEffect(() => {
     const urlParams = new URLSearchParams(window.location.search);
     const themeParam = urlParams.get('theme') || urlParams.get('mode');
     if (themeParam === 'dark' || themeParam === 'light') {
       setTheme(themeParam);
     }
+    activeRouteUuidRef.current = getDefaultDriverRouteUuid();
   }, []);
-  
+
   // Real-time Geolocation State
   const [userLocation, setUserLocation] = useState<{lat: number, lng: number} | null>(null);
-  
+  const lastBeaconAtRef = useRef(0);
+  const activeRouteUuidRef = useRef<string | null>(null);
+
   // Notification State
   const [activeNotification, setActiveNotification] = useState<{title: string, body: string} | null>(null);
 
@@ -62,7 +68,7 @@ export default function App() {
     const unsubscribe = onAuthStateChanged(auth, (currentUser: any) => {
       setUser(currentUser);
       setAuthLoading(false);
-      
+
       // Request notifications on login
       if (currentUser) {
         requestNotificationPermission().catch(console.error);
@@ -94,8 +100,26 @@ export default function App() {
     if ("geolocation" in navigator) {
       const id = navigator.geolocation.watchPosition(
         (position) => {
-          const { latitude, longitude } = position.coords;
+          const { latitude, longitude, accuracy, heading, speed } = position.coords;
           setUserLocation({ lat: latitude, lng: longitude });
+
+          const now = Date.now();
+          const shouldSendBeacon = now - lastBeaconAtRef.current > 10000;
+          if (shouldSendBeacon) {
+            lastBeaconAtRef.current = now;
+            void sendDriverPositionBeacon({
+              routeUuid: activeRouteUuidRef.current,
+              lat: latitude,
+              lng: longitude,
+              accuracy,
+              heading,
+              speed,
+            }).then((result) => {
+              if (!result.ok) {
+                console.log('Driver position beacon failed:', result.error || result.status);
+              }
+            });
+          }
         },
         (error) => {
           console.log("Geolocation blocked or failed:", error);
@@ -109,18 +133,18 @@ export default function App() {
   // Derived Travel Metrics (ETA)
   const travelStats = useMemo(() => {
     if (activeIndex === 0 && !userLocation) return { distance: undefined, driveTime: undefined };
-    
+
     // Target is always the active index
     const target = stops[activeIndex];
-    
+
     // Origin is User Location (if available) OR Previous Stop
     const origin = userLocation || (activeIndex > 0 ? stops[activeIndex - 1].coordinates : null);
-    
+
     if (!origin) return { distance: undefined, driveTime: undefined };
 
     const km = getDistance(origin.lat, origin.lng, target.coordinates.lat, target.coordinates.lng);
     // Rough estimate: 50km/h avg speed for city driving + truck factor
-    const speed = km > 10 ? 50 : 25; 
+    const speed = km > 10 ? 50 : 25;
     const mins = Math.round((km / speed) * 60);
     const hours = Math.floor(mins / 60);
     const remainingMins = mins % 60;
@@ -161,7 +185,7 @@ export default function App() {
 
   const handleUpdateStop = (id: string, updates: Partial<RouteStop>) => {
     setStops(prev => prev.map(stop => stop.id === id ? { ...stop, ...updates } : stop));
-    
+
     // If setting to in-transit, assume route started
     if (updates.status === 'in-transit') {
         setIsRouteActive(true);
@@ -170,7 +194,7 @@ export default function App() {
 
   const handleSignOut = async () => {
     await signOut(auth);
-    setCurrentView('map');
+    setCurrentView('driverMap');
   };
 
   const triggerTestNotification = () => {
@@ -192,10 +216,10 @@ export default function App() {
 
   if (currentView === 'profile') {
     return (
-        <Profile 
-            user={user} 
-            onBack={() => setCurrentView('map')} 
-            onSignOut={handleSignOut} 
+        <Profile
+            user={user}
+            onBack={() => setCurrentView('driverMap')}
+            onSignOut={handleSignOut}
             onTestNotification={triggerTestNotification}
             theme={theme}
             onToggleTheme={toggleTheme}
@@ -203,15 +227,25 @@ export default function App() {
     );
   }
 
+  if (currentView === 'vendorDashboard' || currentView === 'vendorDispatch') {
+    return (
+      <VendorExperienceWebView
+        initialTarget={currentView === 'vendorDispatch' ? 'dispatch' : 'dashboard'}
+        theme={theme}
+        onBackToDriverMap={() => setCurrentView('driverMap')}
+      />
+    );
+  }
+
   // --- Main Map Dashboard ---
 
   return (
     <div className={`relative w-full h-screen overflow-hidden font-sans selection:bg-indigo-500/30 ${theme === 'dark' ? 'bg-slate-900' : 'bg-slate-50'}`}>
-      
+
       {/* Notifications Overlay */}
-      <NotificationToast 
-        notification={activeNotification} 
-        onClose={() => setActiveNotification(null)} 
+      <NotificationToast
+        notification={activeNotification}
+        onClose={() => setActiveNotification(null)}
       />
 
       {/* Top Overlay Gradient */}
@@ -235,17 +269,17 @@ export default function App() {
       </div>
 
       {/* Main 3D Map View Area */}
-      <motion.div 
+      <motion.div
         className="w-full h-full cursor-grab active:cursor-grabbing"
         drag="x"
         dragConstraints={{ left: 0, right: 0 }}
         dragElastic={0.2}
         onDragEnd={onDragEnd}
       >
-        <RoadMap 
-            stops={stops} 
-            activeIndex={activeIndex} 
-            onStopClick={setActiveIndex} 
+        <RoadMap
+            stops={stops}
+            activeIndex={activeIndex}
+            onStopClick={setActiveIndex}
             theme={theme}
             zoom={zoom}
             userLocation={userLocation}
@@ -255,7 +289,7 @@ export default function App() {
       {/* Navigation Hints (Side Chevrons) */}
       <AnimatePresence>
         {activeIndex > 0 && (
-            <motion.div 
+            <motion.div
                 initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0 }}
                 className="absolute left-4 top-1/2 -translate-y-1/2 z-20 pointer-events-none"
             >
@@ -265,7 +299,7 @@ export default function App() {
             </motion.div>
         )}
         {activeIndex < stops.length - 1 && (
-            <motion.div 
+            <motion.div
                 initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0 }}
                 className="absolute right-4 top-1/2 -translate-y-1/2 z-20 pointer-events-none"
             >
@@ -277,9 +311,9 @@ export default function App() {
       </AnimatePresence>
 
       {/* Center Info Card */}
-      <InfoCard 
-        stop={stops[activeIndex]} 
-        index={activeIndex} 
+      <InfoCard
+        stop={stops[activeIndex]}
+        index={activeIndex}
         theme={theme}
         distance={travelStats.distance}
         driveTime={travelStats.driveTime}
@@ -291,15 +325,15 @@ export default function App() {
 
       {/* Right Side Controls Stack */}
       <div className="absolute top-6 right-6 z-30 flex flex-col items-end gap-2">
-        
+
         {/* Profile & List Group */}
         <div className="flex flex-col gap-2">
-            <button 
+            <button
                 data-native-action="openProfile"
                 onClick={() => setCurrentView('profile')}
                 className={`w-9 h-9 backdrop-blur border rounded-full shadow-lg flex items-center justify-center transition-colors overflow-hidden ${
-                    theme === 'dark' 
-                    ? 'bg-slate-800/80 border-slate-700 text-white hover:bg-slate-700' 
+                    theme === 'dark'
+                    ? 'bg-slate-800/80 border-slate-700 text-white hover:bg-slate-700'
                     : 'bg-white/80 border-slate-200 text-slate-700 hover:bg-slate-50'
                 }`}
             >
@@ -314,25 +348,51 @@ export default function App() {
                 )}
             </button>
 
-            <button 
+            <button
                 onClick={() => setIsListViewOpen(true)}
                 className={`w-9 h-9 backdrop-blur border rounded-full shadow-lg flex items-center justify-center transition-colors ${
-                    theme === 'dark' 
-                    ? 'bg-slate-800/80 border-slate-700 text-white hover:bg-slate-700' 
+                    theme === 'dark'
+                    ? 'bg-slate-800/80 border-slate-700 text-white hover:bg-slate-700'
                     : 'bg-white/80 border-slate-200 text-slate-700 hover:bg-slate-50'
                 }`}
             >
                 <List size={16} />
             </button>
+
+            <button
+                data-native-action="openVendorDashboard"
+                onClick={() => setCurrentView('vendorDashboard')}
+                className={`w-9 h-9 backdrop-blur border rounded-full shadow-lg flex items-center justify-center transition-colors ${
+                    theme === 'dark'
+                    ? 'bg-slate-800/80 border-slate-700 text-white hover:bg-slate-700'
+                    : 'bg-white/80 border-slate-200 text-slate-700 hover:bg-slate-50'
+                }`}
+                aria-label="Open vendor dashboard"
+            >
+                <LayoutDashboard size={16} />
+            </button>
+
+            <button
+                data-native-action="openVendorDispatch"
+                onClick={() => setCurrentView('vendorDispatch')}
+                className={`w-9 h-9 backdrop-blur border rounded-full shadow-lg flex items-center justify-center transition-colors ${
+                    theme === 'dark'
+                    ? 'bg-slate-800/80 border-slate-700 text-white hover:bg-slate-700'
+                    : 'bg-white/80 border-slate-200 text-slate-700 hover:bg-slate-50'
+                }`}
+                aria-label="Open vendor dispatch"
+            >
+                <RouteIcon size={16} />
+            </button>
         </div>
 
         {/* Zoom Controls */}
         <div className={`flex flex-col rounded-full shadow-lg border backdrop-blur mt-2 overflow-hidden ${
-             theme === 'dark' 
-             ? 'bg-slate-800/80 border-slate-700' 
+             theme === 'dark'
+             ? 'bg-slate-800/80 border-slate-700'
              : 'bg-white/80 border-slate-200'
         }`}>
-            <button 
+            <button
                 onClick={() => setZoom(z => Math.min(z + 1, 18))}
                 className={`w-9 h-9 flex items-center justify-center transition-colors border-b ${
                     theme === 'dark' ? 'text-white hover:bg-slate-700 border-slate-700' : 'text-slate-700 hover:bg-slate-50 border-slate-200'
@@ -340,7 +400,7 @@ export default function App() {
             >
                 <Plus size={14} />
             </button>
-            <button 
+            <button
                 onClick={() => setZoom(z => Math.max(z - 1, 10))}
                 className={`w-9 h-9 flex items-center justify-center transition-colors ${
                     theme === 'dark' ? 'text-white hover:bg-slate-700' : 'text-slate-700 hover:bg-slate-50'
@@ -351,10 +411,10 @@ export default function App() {
         </div>
 
         {/* Alerts Icon */}
-        <button 
+        <button
             className={`w-9 h-9 rounded-full shadow-lg border backdrop-blur flex items-center justify-center transition-all mt-2 relative ${
-                theme === 'dark' 
-                ? 'bg-slate-800/80 border-slate-700 text-white hover:bg-slate-700' 
+                theme === 'dark'
+                ? 'bg-slate-800/80 border-slate-700 text-white hover:bg-slate-700'
                 : 'bg-white/80 border-slate-200 text-slate-800 hover:bg-slate-50'
             }`}
         >
@@ -368,14 +428,14 @@ export default function App() {
       <AnimatePresence>
         {isListViewOpen && (
             <>
-                <motion.div 
+                <motion.div
                     initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
                     className="absolute inset-0 bg-black/60 z-40 backdrop-blur-sm"
                     onClick={() => setIsListViewOpen(false)}
                 />
-                <ListView 
-                    stops={stops} 
-                    activeIndex={activeIndex} 
+                <ListView
+                    stops={stops}
+                    activeIndex={activeIndex}
                     onSelect={(i) => { setActiveIndex(i); setIsListViewOpen(false); }}
                     onClose={() => setIsListViewOpen(false)}
                     theme={theme}
