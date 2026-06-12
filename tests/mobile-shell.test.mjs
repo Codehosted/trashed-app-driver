@@ -44,4 +44,45 @@ describe('mobile WebView shell contract', () => {
     assert.match(tracking, /sendDriverPositionBeacon/, 'tracking service should export sendDriverPositionBeacon');
     assert.match(tracking, /routeUuid/, 'tracking beacon payload should include routeUuid');
   });
+
+  it('uses a native background location watcher for active routes', () => {
+    assert.ok(
+      dependencies['@capacitor-community/background-geolocation'],
+      'missing @capacitor-community/background-geolocation dependency'
+    );
+    assert.ok(existsSync(join(root, 'services/backgroundLocationTracking.ts')), 'missing background location tracking service');
+
+    const backgroundTracking = read('services/backgroundLocationTracking.ts');
+    assert.match(backgroundTracking, /registerPlugin(?:<[^>]+>)?\(['"]BackgroundGeolocation['"]\)/, 'service should register the native BackgroundGeolocation plugin');
+    assert.match(backgroundTracking, /backgroundMessage/, 'service should configure foreground-service background notification copy');
+    assert.match(backgroundTracking, /distanceFilter/, 'service should configure a native distance filter');
+    assert.match(backgroundTracking, /sendDriverPositionBeacon/, 'background watcher should send driver tracking beacons');
+
+    const app = read('App.tsx');
+    assert.match(app, /startBackgroundDriverTracking/, 'App should start background tracking for driver routes');
+    assert.match(app, /stopBackgroundDriverTracking/, 'App should stop background tracking on cleanup');
+
+    const manifest = read('android/app/src/main/AndroidManifest.xml');
+    assert.match(manifest, /ACCESS_BACKGROUND_LOCATION/, 'Android manifest should declare background location permission');
+    assert.match(manifest, /FOREGROUND_SERVICE_LOCATION/, 'Android manifest should declare foreground service location permission');
+  });
+
+  it('keeps Google geocoding behind Trashed web API routes, not mobile credentials', () => {
+    const appConfig = read('services/appConfig.ts');
+    assert.match(appConfig, /\/api\/address\/reverse-geocode/, 'mobile app should call Trashed reverse-geocode API route');
+    assert.doesNotMatch(appConfig, /GOOGLE(_MAPS)?_API_KEY|maps\.googleapis\.com/, 'mobile app config must not reference Google API credentials directly');
+
+    const allMobileSources = [
+      'App.tsx',
+      'services/appConfig.ts',
+      'services/driverTracking.ts',
+      existsSync(join(root, 'services/backgroundLocationTracking.ts')) ? 'services/backgroundLocationTracking.ts' : null,
+    ].filter(Boolean).map(read).join('\n');
+
+    assert.doesNotMatch(
+      allMobileSources,
+      /GOOGLE(_MAPS)?_API_KEY|maps\.googleapis\.com|AIza[0-9A-Za-z_-]+/,
+      'driver mobile source must not ship Google API credentials or call Google APIs directly'
+    );
+  });
 });

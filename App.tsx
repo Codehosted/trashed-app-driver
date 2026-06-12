@@ -17,7 +17,7 @@ import { Login } from './components/Login';
 import { Profile } from './components/Profile';
 import { VendorExperienceWebView } from './components/VendorExperienceWebView';
 import { getDefaultDriverRouteUuid } from './services/appConfig';
-import { sendDriverPositionBeacon } from './services/driverTracking';
+import { startBackgroundDriverTracking, stopBackgroundDriverTracking, type BackgroundDriverTrackingController } from './services/backgroundLocationTracking';
 
 // Haversine Distance Helper
 function getDistance(lat1: number, lon1: number, lat2: number, lon2: number) {
@@ -57,7 +57,6 @@ export default function App() {
 
   // Real-time Geolocation State
   const [userLocation, setUserLocation] = useState<{lat: number, lng: number} | null>(null);
-  const lastBeaconAtRef = useRef(0);
   const activeRouteUuidRef = useRef<string | null>(null);
 
   // Notification State
@@ -95,40 +94,40 @@ export default function App() {
     return () => unsubscribe();
   }, []);
 
-  // Real-time Location Tracking
+  // Background-capable driver location tracking.
+  // Native builds use a foreground-service watcher so active routes keep sending beacons
+  // when the app is backgrounded; browser preview falls back to navigator.geolocation.
   useEffect(() => {
-    if ("geolocation" in navigator) {
-      const id = navigator.geolocation.watchPosition(
-        (position) => {
-          const { latitude, longitude, accuracy, heading, speed } = position.coords;
-          setUserLocation({ lat: latitude, lng: longitude });
+    if (!isRouteActive) return;
 
-          const now = Date.now();
-          const shouldSendBeacon = now - lastBeaconAtRef.current > 10000;
-          if (shouldSendBeacon) {
-            lastBeaconAtRef.current = now;
-            void sendDriverPositionBeacon({
-              routeUuid: activeRouteUuidRef.current,
-              lat: latitude,
-              lng: longitude,
-              accuracy,
-              heading,
-              speed,
-            }).then((result) => {
-              if (!result.ok) {
-                console.log('Driver position beacon failed:', result.error || result.status);
-              }
-            });
-          }
-        },
-        (error) => {
-          console.log("Geolocation blocked or failed:", error);
-        },
-        { enableHighAccuracy: true, maximumAge: 10000, timeout: 5000 }
-      );
-      return () => navigator.geolocation.clearWatch(id);
+    const routeUuid = activeRouteUuidRef.current || getDefaultDriverRouteUuid();
+    if (!routeUuid) {
+      console.log('Driver tracking skipped: route UUID is not available.');
+      return;
     }
-  }, []);
+
+    let cancelled = false;
+    let controller: BackgroundDriverTrackingController | null = null;
+
+    void startBackgroundDriverTracking({
+      routeUuid,
+      onLocation: (location) => setUserLocation({ lat: location.lat, lng: location.lng }),
+      onError: (error) => console.log('Driver background tracking warning:', error.message),
+    }).then((trackingController) => {
+      if (cancelled) {
+        void stopBackgroundDriverTracking(trackingController);
+        return;
+      }
+      controller = trackingController;
+    }).catch((error) => {
+      console.log('Driver background tracking failed to start:', error);
+    });
+
+    return () => {
+      cancelled = true;
+      void stopBackgroundDriverTracking(controller);
+    };
+  }, [isRouteActive]);
 
   // Derived Travel Metrics (ETA)
   const travelStats = useMemo(() => {

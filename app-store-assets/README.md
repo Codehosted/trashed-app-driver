@@ -1,6 +1,6 @@
 # Trashed Driver — App Store / Play Store Submission Packet
 
-Updated: 2026-06-12T02:42:18Z
+Updated: 2026-06-12T03:14:19Z
 
 ## App listing
 
@@ -15,7 +15,7 @@ Trashed Driver gives dumpster rental teams a mobile-first command center for dai
 
 ### Key features
 - Driver map and route action screen.
-- Foreground GPS position beacons for active driver routes.
+- Foreground and background GPS position beacons for active driver routes.
 - Realtime driver tracking fanout through the Trashed web app and SpacetimeDB.
 - Vendor dashboard, dispatch, rentals, inventory, customers, and settings WebView tabs.
 - Capacitor Android shell around the Trashed web app.
@@ -46,15 +46,14 @@ For this local Linux capture pass, no production credentials were used. Vendor W
 ## Privacy and data-safety copy
 
 ### Location permission rationale
-Trashed Driver requests foreground location access so an active driver route can share realtime position beacons with dispatch/vendor map views. Location is used to display route progress and help dispatch coordinate dumpster deliveries, swaps, and pickups.
+Trashed Driver requests foreground and background location access so an active driver route can continue sharing realtime position beacons with dispatch/vendor map views when the driver switches apps, locks the device, or leaves the app in the background. Location is used to display route progress and help dispatch coordinate dumpster deliveries, swaps, and pickups. Background tracking starts only for an active route and uses a persistent Android foreground-service notification while tracking is running.
 
 ### Data collected / processed
-- Approximate and precise foreground location while the driver route screen is open and permission is granted.
+- Approximate and precise foreground/background location while a driver route is active and permission is granted.
 - Driver route identifiers needed to associate a beacon with a route.
 - Device/network data required by the embedded Trashed web experience.
 
 ### Data not intended for this build
-- No background location permission is declared in the Android manifest.
 - No camera permission is declared in the Android manifest.
 - No contacts, microphone, calendar, or health data access is declared.
 
@@ -63,6 +62,9 @@ Trashed Driver requests foreground location access so an active driver route can
 - `android.permission.INTERNET`
 - `android.permission.ACCESS_COARSE_LOCATION`
 - `android.permission.ACCESS_FINE_LOCATION`
+- `android.permission.ACCESS_BACKGROUND_LOCATION`
+- `android.permission.FOREGROUND_SERVICE`
+- `android.permission.FOREGROUND_SERVICE_LOCATION`
 
 ## Realtime verification status
 
@@ -103,6 +105,6 @@ All current screenshots were captured from local Linux browser preview at 1280×
 
 - Regenerate official store screenshots from a real Android emulator/device and, later, iOS simulator/device on the Mac.
 - Capture authenticated vendor WebView pages with test vendor credentials instead of the login gate.
-- Verify Android foreground location permission prompts and GPS beaconing on-device.
+- Verify Android foreground/background location permission prompts, persistent foreground-service notification, and GPS beaconing on-device.
 - Verify the driver map and vendor dispatch map with `NEXT_PUBLIC_GOOGLE_MAPS_API_KEY` configured in the target environment.
-- Background driver tracking is not implemented or permissioned in this build; if required, add a native background-location implementation and stronger store disclosure language.
+- Complete final Android debug/release build once a JDK is installed on this Linux host or when testing from the Mac companion.

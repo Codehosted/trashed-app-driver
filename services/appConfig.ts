@@ -44,3 +44,7 @@ export function buildVendorWebUrl(target: VendorWebTarget): string {
 export function getDriverTrackingEndpoint(): string {
   return `${getTrashedWebBaseUrl()}/api/vendor/driver/tracking`;
 }
+
+export function getReverseGeocodeEndpoint(): string {
+  return `${getTrashedWebBaseUrl()}/api/address/reverse-geocode`;
+}
