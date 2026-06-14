@@ -22,3 +22,12 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Local/generated mobile tooling state
+.expo/
+expo-env.d.ts
+bun.lockb
+
+# Signing material and local backups
+credentials/
+ios.backup.*/

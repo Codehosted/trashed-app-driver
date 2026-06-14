@@ -10,14 +10,18 @@ import { NotificationToast } from './components/NotificationToast';
 import { WeatherWidget } from './components/WeatherWidget';
 import { MessageCarousel } from './components/MessageCarousel';
 
-// Firebase Imports - Updated to use local service shims
-import { auth, requestNotificationPermission, onMessageListener, onAuthStateChanged, signOut } from './services/firebase';
-import { User } from 'firebase/auth'; // Keep type import
 import { Login } from './components/Login';
 import { Profile } from './components/Profile';
 import { VendorExperienceWebView } from './components/VendorExperienceWebView';
 import { getDefaultDriverRouteUuid } from './services/appConfig';
 import { startBackgroundDriverTracking, stopBackgroundDriverTracking, type BackgroundDriverTrackingController } from './services/backgroundLocationTracking';
+
+interface DriverUser {
+  uid: string;
+  email: string | null;
+  displayName: string | null;
+  photoURL: string | null;
+}
 
 // Haversine Distance Helper
 function getDistance(lat1: number, lon1: number, lat2: number, lon2: number) {
@@ -33,9 +37,10 @@ function getDistance(lat1: number, lon1: number, lat2: number, lon2: number) {
 
 export default function App() {
   // Auth State
-  const [user, setUser] = useState<User | null>(null);
-  const [authLoading, setAuthLoading] = useState(true);
-  const [currentView, setCurrentView] = useState<'driverMap' | 'profile' | 'vendorDashboard' | 'vendorDispatch'>('driverMap');
+  const [user, setUser] = useState<DriverUser | null>(null);
+  const [authLoading] = useState(false);
+  const initialView = (import.meta.env.VITE_LOCAL_E2E_INITIAL_VIEW as 'driverMap' | 'profile' | 'vendorDashboard' | 'vendorDispatch' | undefined) || 'driverMap';
+  const [currentView, setCurrentView] = useState<'driverMap' | 'profile' | 'vendorDashboard' | 'vendorDispatch'>(initialView);
 
   // App State
   const [stops, setStops] = useState<RouteStop[]>(INITIAL_STOPS);
@@ -62,37 +67,8 @@ export default function App() {
   // Notification State
   const [activeNotification, setActiveNotification] = useState<{title: string, body: string} | null>(null);
 
-  // Initialize Auth & Notifications
-  useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (currentUser: any) => {
-      setUser(currentUser);
-      setAuthLoading(false);
-
-      // Request notifications on login
-      if (currentUser) {
-        requestNotificationPermission().catch(console.error);
-      }
-    });
-
-    // Listen for foreground messages
-    const listenForMessages = async () => {
-        try {
-            const payload: any = await onMessageListener();
-            if (payload && payload.notification) {
-                console.log('Foreground Message received: ', payload);
-                setActiveNotification({
-                    title: payload.notification.title || 'New Alert',
-                    body: payload.notification.body || 'You have a new update.'
-                });
-            }
-        } catch (err) {
-            console.log('Message listener failed (likely no sw):', err);
-        }
-    };
-    listenForMessages();
-
-    return () => unsubscribe();
-  }, []);
+  // Mobile runtime deliberately avoids Firebase. Driver location flows use
+  // SpacetimeDB/existing Trashed APIs; local alert UI is driven by app state.
 
   // Background-capable driver location tracking.
   // Native builds use a foreground-service watcher so active routes keep sending beacons
@@ -192,7 +168,7 @@ export default function App() {
   };
 
   const handleSignOut = async () => {
-    await signOut(auth);
+    setUser(null);
     setCurrentView('driverMap');
   };
 
