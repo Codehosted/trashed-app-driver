@@ -108,9 +108,11 @@ async function startNativeBackgroundDriverTracking(
 
       const update = normalizeNativeLocation(location);
       options.onLocation?.(update);
-      void maybeSendBeacon(options.routeUuid, update, source, lastBeaconAt).then((sentAt) => {
-        lastBeaconAt = sentAt;
-      }).catch((error) => {
+      const attemptedAt = Date.now();
+      if (attemptedAt - lastBeaconAt < BEACON_INTERVAL_MS) return;
+
+      lastBeaconAt = attemptedAt;
+      void maybeSendBeacon(options.routeUuid, update, source).catch((error) => {
         options.onError?.(toError(error));
       });
     }
@@ -141,9 +143,11 @@ function startWebFallbackDriverTracking(
         recordedAt: new Date(position.timestamp || Date.now()).toISOString(),
       };
       options.onLocation?.(update);
-      void maybeSendBeacon(options.routeUuid, update, 'web', lastBeaconAt).then((sentAt) => {
-        lastBeaconAt = sentAt;
-      }).catch((error) => {
+      const attemptedAt = Date.now();
+      if (attemptedAt - lastBeaconAt < BEACON_INTERVAL_MS) return;
+
+      lastBeaconAt = attemptedAt;
+      void maybeSendBeacon(options.routeUuid, update, 'web').catch((error) => {
         options.onError?.(toError(error));
       });
     },
@@ -160,14 +164,8 @@ function startWebFallbackDriverTracking(
 async function maybeSendBeacon(
   routeUuid: string | null,
   update: DriverLocationUpdate,
-  source: PendingBeacon['source'],
-  lastBeaconAt: number
-): Promise<number> {
-  const now = Date.now();
-  if (now - lastBeaconAt < BEACON_INTERVAL_MS) {
-    return lastBeaconAt;
-  }
-
+  source: PendingBeacon['source']
+): Promise<void> {
   const pendingBeacon: PendingBeacon = { ...update, routeUuid, source };
   const result = await sendDriverPositionBeacon({
     routeUuid,
@@ -186,7 +184,6 @@ async function maybeSendBeacon(
   }
 
   await flushPendingDriverPositionBeacons();
-  return now;
 }
 
 async function flushPendingDriverPositionBeacons(onError?: (error: Error) => void): Promise<void> {

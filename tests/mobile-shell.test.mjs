@@ -55,6 +55,7 @@ describe('mobile WebView shell contract', () => {
 
     const app = read('App.tsx');
     assert.match(app, /driverMap/, 'local preview fallback should still expose the driver map');
+    assert.match(app, /env\(safe-area-inset-top/, 'iOS route overlays should account for the status bar safe area');
   });
 
   it('sends driver position beacons to the Trashed web app API from the WebView shell', () => {
@@ -77,19 +78,26 @@ describe('mobile WebView shell contract', () => {
     assert.match(backgroundTracking, /backgroundMessage/, 'service should configure foreground-service background notification copy');
     assert.match(backgroundTracking, /distanceFilter/, 'service should configure a native distance filter');
     assert.match(backgroundTracking, /sendDriverPositionBeacon/, 'background watcher should send driver tracking beacons');
+    assert.match(backgroundTracking, /const attemptedAt = Date\.now\(\);[\s\S]*lastBeaconAt = attemptedAt;[\s\S]*maybeSendBeacon/, 'background watcher should throttle beacon attempts before awaiting POST completion');
+    assert.doesNotMatch(backgroundTracking, /maybeSendBeacon\([^)]*lastBeaconAt/, 'beacon throttle timestamp must not update only after async POST completion');
 
     const app = read('App.tsx');
     assert.match(app, /startBackgroundDriverTracking/, 'App should start background tracking for driver routes');
     assert.match(app, /stopBackgroundDriverTracking/, 'App should stop background tracking on cleanup');
+    assert.match(app, /const isRouteActive = useMemo\(\(\) => isRouteTrackingActive\(stops\), \[stops\]\)/, 'route activity should be derived from stop statuses');
+    assert.doesNotMatch(app, /setIsRouteActive/, 'route activity should not be a stale one-way boolean');
+    assert.match(app, /stop\.status === 'in-transit' \|\| stop\.status === 'arrived'/, 'route tracking should stop when all stops are completed');
 
     const manifest = read('android/app/src/main/AndroidManifest.xml');
     assert.match(manifest, /ACCESS_BACKGROUND_LOCATION/, 'Android manifest should declare background location permission');
     assert.match(manifest, /FOREGROUND_SERVICE_LOCATION/, 'Android manifest should declare foreground service location permission');
 
     const iosInfo = read('ios/App/App/Info.plist');
+    const iosController = read('ios/App/App/MainViewController.swift');
     assert.match(iosInfo, /NSLocationWhenInUseUsageDescription/, 'iOS must explain foreground location use');
     assert.match(iosInfo, /NSLocationAlwaysAndWhenInUseUsageDescription/, 'iOS must explain background location use');
     assert.match(iosInfo, /UIBackgroundModes[\s\S]*location/, 'iOS must enable background location mode');
+    assert.match(iosController, /driverSafeAreaScript[\s\S]*safe-area-inset-top/, 'iOS WebView should inject safe-area protection for the remote driver page');
   });
 
   it('keeps Google geocoding behind Trashed web API routes, not mobile credentials', () => {

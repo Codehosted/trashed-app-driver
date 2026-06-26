@@ -35,6 +35,10 @@ function getDistance(lat1: number, lon1: number, lat2: number, lon2: number) {
   return R * c; // Distance in km
 }
 
+function isRouteTrackingActive(stops: RouteStop[]) {
+  return stops.some(stop => stop.status === 'in-transit' || stop.status === 'arrived');
+}
+
 export default function App() {
   // Auth State
   const [user, setUser] = useState<DriverUser | null>(null);
@@ -46,7 +50,7 @@ export default function App() {
   const [stops, setStops] = useState<RouteStop[]>(INITIAL_STOPS);
   const [activeIndex, setActiveIndex] = useState(0);
   const [isListViewOpen, setIsListViewOpen] = useState(false);
-  const [isRouteActive, setIsRouteActive] = useState(false); // Track route status
+  const isRouteActive = useMemo(() => isRouteTrackingActive(stops), [stops]);
   const [theme, setTheme] = useState<Theme>('dark');
   const [zoom, setZoom] = useState(MAP_CONFIG.defaultZoom);
 
@@ -160,11 +164,6 @@ export default function App() {
 
   const handleUpdateStop = (id: string, updates: Partial<RouteStop>) => {
     setStops(prev => prev.map(stop => stop.id === id ? { ...stop, ...updates } : stop));
-
-    // If setting to in-transit, assume route started
-    if (updates.status === 'in-transit') {
-        setIsRouteActive(true);
-    }
   };
 
   const handleSignOut = async () => {
@@ -229,7 +228,10 @@ export default function App() {
       }`} />
 
       {/* Branding */}
-      <div className="absolute top-0 left-0 p-3 z-20 pointer-events-none">
+      <div
+        className="absolute left-0 p-3 z-20 pointer-events-none"
+        style={{ top: 'env(safe-area-inset-top, 0px)' }}
+      >
         <div>
             <h1 className={`text-2xl font-black tracking-tighter leading-none transition-colors ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
                 trash<span className="text-indigo-600">ed</span>
@@ -239,7 +241,10 @@ export default function App() {
       </div>
 
       {/* Weather Widget - Top Right */}
-      <div className="absolute top-6 right-16 z-20 pointer-events-none">
+      <div
+        className="absolute right-16 z-20 pointer-events-none"
+        style={{ top: 'calc(env(safe-area-inset-top, 0px) + 1.5rem)' }}
+      >
          <WeatherWidget theme={theme} />
       </div>
 
@@ -299,7 +304,10 @@ export default function App() {
       <MessageCarousel messages={INITIAL_MESSAGES} theme={theme} />
 
       {/* Right Side Controls Stack */}
-      <div className="absolute top-6 right-6 z-30 flex flex-col items-end gap-2">
+      <div
+        className="absolute right-6 z-30 flex flex-col items-end gap-2"
+        style={{ top: 'calc(env(safe-area-inset-top, 0px) + 1.5rem)' }}
+      >
 
         {/* Profile & List Group */}
         <div className="flex flex-col gap-2">
