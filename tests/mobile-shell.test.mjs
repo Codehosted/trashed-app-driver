@@ -39,6 +39,9 @@ describe('mobile WebView shell contract', () => {
     assert.match(controller, /Driver Sign In/, 'native login should mirror the driver sign-in title');
     assert.match(controller, /trashed-logo-mark/, 'native login should use the real Trashed logo asset');
     assert.match(controller, /@Environment\(\\\.colorScheme\)/, 'native login should follow the iOS light or dark appearance');
+    assert.match(controller, /DriverLoginMapBackground\(isLightMode: isLightMode\)/, 'native login should use the same map-style background as the driver shell');
+    assert.match(controller, /Color\(red: 0\.94, green: 0\.96, blue: 0\.97\).*Color\(red: 0\.04, green: 0\.04, blue: 0\.04\)/s, 'native login background should match the driver map light and dark base colors');
+    assert.match(controller, /routePath\(in: size\)[\s\S]*StrokeStyle\(lineWidth: 13, lineCap: \.round, lineJoin: \.round\)/, 'native login background should include the driver map route surface');
     assert.match(controller, /renderingMode\(\.template\)[\s\S]*foregroundColor\(logoColor\)[\s\S]*frame\(width: 104, height: 82\)/, 'native login should render the real logo directly without a badge container');
     assert.match(controller, /components\.path = \"\/app\/login\"/, 'native login should avoid loading /driver before auth');
     assert.doesNotMatch(controller, /Text\(\"T\"\)/, 'native login must not use a fake text-logo placeholder');

@@ -413,23 +413,6 @@ private struct NativeDriverLoginView: View {
         colorScheme == .light
     }
 
-    private var pageGradient: LinearGradient {
-        LinearGradient(
-            gradient: Gradient(colors: isLightMode
-                ? [
-                    Color(red: 0.96, green: 0.98, blue: 1.00),
-                    Color(red: 0.88, green: 0.93, blue: 0.99),
-                ]
-                : [
-                    Color(red: 0.02, green: 0.04, blue: 0.09),
-                    Color(red: 0.06, green: 0.10, blue: 0.20),
-                ]
-            ),
-            startPoint: .topLeading,
-            endPoint: .bottomTrailing
-        )
-    }
-
     private var logoColor: Color {
         isLightMode ? Color(red: 0.05, green: 0.08, blue: 0.13) : .white
     }
@@ -493,7 +476,7 @@ private struct NativeDriverLoginView: View {
 
     var body: some View {
         ZStack {
-            pageGradient.edgesIgnoringSafeArea(.all)
+            DriverLoginMapBackground(isLightMode: isLightMode)
 
             ScrollView {
                 VStack(spacing: 22) {
@@ -664,4 +647,114 @@ private struct NativeDriverLoginView: View {
             errorMessage = message
         }
     }
+}
+
+private struct DriverLoginMapBackground: View {
+    let isLightMode: Bool
+
+    private static let roads = [
+        DriverLoginMapRoad(id: 0, width: 1.45, thickness: 18, x: -0.18, y: -0.32, rotation: -27, opacity: 0.20),
+        DriverLoginMapRoad(id: 1, width: 1.30, thickness: 12, x: 0.28, y: -0.18, rotation: 18, opacity: 0.16),
+        DriverLoginMapRoad(id: 2, width: 1.18, thickness: 14, x: -0.22, y: 0.08, rotation: 31, opacity: 0.14),
+        DriverLoginMapRoad(id: 3, width: 1.50, thickness: 10, x: 0.18, y: 0.30, rotation: -15, opacity: 0.14),
+        DriverLoginMapRoad(id: 4, width: 1.05, thickness: 8, x: -0.28, y: 0.44, rotation: 8, opacity: 0.12),
+    ]
+
+    private var baseColor: Color {
+        isLightMode ? Color(red: 0.94, green: 0.96, blue: 0.97) : Color(red: 0.04, green: 0.04, blue: 0.04)
+    }
+
+    private var tileRoadColor: Color {
+        isLightMode ? Color(red: 0.58, green: 0.64, blue: 0.72) : Color(red: 0.20, green: 0.24, blue: 0.31)
+    }
+
+    private var routeGlowColor: Color {
+        isLightMode ? Color(red: 0.23, green: 0.51, blue: 0.96) : Color(red: 0.31, green: 0.27, blue: 0.90)
+    }
+
+    private var routeSurfaceColor: Color {
+        isLightMode ? Color(red: 0.58, green: 0.64, blue: 0.72) : Color(red: 0.12, green: 0.16, blue: 0.23)
+    }
+
+    private var routeCenterColor: Color {
+        isLightMode ? .white : Color(red: 0.39, green: 0.40, blue: 0.95)
+    }
+
+    var body: some View {
+        GeometryReader { proxy in
+            let size = proxy.size
+
+            ZStack {
+                baseColor
+
+                ForEach(Self.roads) { road in
+                    RoundedRectangle(cornerRadius: road.thickness / 2, style: .continuous)
+                        .fill(tileRoadColor.opacity(road.opacity))
+                        .frame(width: size.width * road.width, height: road.thickness)
+                        .rotationEffect(.degrees(road.rotation))
+                        .offset(x: size.width * road.x, y: size.height * road.y)
+                }
+
+                routePath(in: size)
+                    .stroke(routeGlowColor.opacity(isLightMode ? 0.16 : 0.24), style: StrokeStyle(lineWidth: 28, lineCap: .round, lineJoin: .round))
+                    .blur(radius: 8)
+
+                routePath(in: size)
+                    .stroke(routeSurfaceColor.opacity(isLightMode ? 0.72 : 0.86), style: StrokeStyle(lineWidth: 13, lineCap: .round, lineJoin: .round))
+
+                routePath(in: size)
+                    .stroke(routeCenterColor.opacity(isLightMode ? 0.72 : 0.92), style: StrokeStyle(lineWidth: 2, lineCap: .round, lineJoin: .round, dash: isLightMode ? [8, 8] : []))
+
+                mapFogOverlay
+            }
+        }
+        .edgesIgnoringSafeArea(.all)
+    }
+
+    private var mapFogOverlay: some View {
+        ZStack {
+            VStack(spacing: 0) {
+                LinearGradient(gradient: Gradient(colors: [baseColor, baseColor.opacity(0)]), startPoint: .top, endPoint: .bottom)
+                    .frame(height: 210)
+                Spacer()
+                LinearGradient(gradient: Gradient(colors: [baseColor.opacity(0), baseColor]), startPoint: .top, endPoint: .bottom)
+                    .frame(height: 180)
+            }
+
+            HStack(spacing: 0) {
+                LinearGradient(gradient: Gradient(colors: [baseColor, baseColor.opacity(0)]), startPoint: .leading, endPoint: .trailing)
+                    .frame(width: 96)
+                Spacer()
+                LinearGradient(gradient: Gradient(colors: [baseColor.opacity(0), baseColor]), startPoint: .leading, endPoint: .trailing)
+                    .frame(width: 96)
+            }
+        }
+    }
+
+    private func routePath(in size: CGSize) -> Path {
+        var path = Path()
+        path.move(to: CGPoint(x: -size.width * 0.16, y: size.height * 0.64))
+        path.addCurve(
+            to: CGPoint(x: size.width * 0.30, y: size.height * 0.55),
+            control1: CGPoint(x: size.width * 0.04, y: size.height * 0.58),
+            control2: CGPoint(x: size.width * 0.14, y: size.height * 0.68)
+        )
+        path.addLine(to: CGPoint(x: size.width * 0.56, y: size.height * 0.42))
+        path.addCurve(
+            to: CGPoint(x: size.width * 1.16, y: size.height * 0.32),
+            control1: CGPoint(x: size.width * 0.74, y: size.height * 0.28),
+            control2: CGPoint(x: size.width * 0.92, y: size.height * 0.46)
+        )
+        return path
+    }
+}
+
+private struct DriverLoginMapRoad: Identifiable {
+    let id: Int
+    let width: CGFloat
+    let thickness: CGFloat
+    let x: CGFloat
+    let y: CGFloat
+    let rotation: Double
+    let opacity: Double
 }
