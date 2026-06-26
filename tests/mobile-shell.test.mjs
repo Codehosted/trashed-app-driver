@@ -38,12 +38,22 @@ describe('mobile WebView shell contract', () => {
     assert.match(controller, /NativeDriverLoginView/, 'iOS should render a native SwiftUI driver login screen');
     assert.match(controller, /Driver Sign In/, 'native login should mirror the driver sign-in title');
     assert.match(controller, /trashed-logo-mark/, 'native login should use the real Trashed logo asset');
+    assert.match(controller, /@Environment\(\\\.colorScheme\)/, 'native login should follow the iOS light or dark appearance');
+    assert.match(controller, /DriverLoginMapBackground\(isLightMode: isLightMode\)/, 'native login should use the same map-style background as the driver shell');
+    assert.match(controller, /Color\(red: 0\.94, green: 0\.96, blue: 0\.97\).*Color\(red: 0\.04, green: 0\.04, blue: 0\.04\)/s, 'native login background should match the driver map light and dark base colors');
+    assert.match(controller, /routePath\(in: size\)[\s\S]*StrokeStyle\(lineWidth: 13, lineCap: \.round, lineJoin: \.round\)/, 'native login background should include the driver map route surface');
+    assert.match(controller, /renderingMode\(\.template\)[\s\S]*foregroundColor\(logoColor\)[\s\S]*frame\(width: 104, height: 82\)/, 'native login should render the real logo directly without a badge container');
     assert.match(controller, /components\.path = \"\/app\/login\"/, 'native login should avoid loading /driver before auth');
     assert.doesNotMatch(controller, /Text\(\"T\"\)/, 'native login must not use a fake text-logo placeholder');
     assert.match(controller, /\/api\/auth\/mobile\/login/, 'native login should post credentials to the mobile auth endpoint');
     assert.match(controller, /__Secure-next-auth\.session-token/, 'native login should install secure NextAuth session cookies');
-    assert.match(controller, /\/app\/login\?callbackUrl=%2Fdriver/, 'Google fallback should use the chrome-less app login page without starting driver PWA services');
-    assert.match(controller, /\/driver\?source=trashed-driver-app/, 'successful native login should load the driver shell');
+    assert.match(controller, /components\.path = "\/app\/login"[\s\S]*URLQueryItem\(name: "theme", value: theme\.rawValue\)/, 'Google fallback should use the chrome-less app login page with the native theme');
+    assert.match(controller, /URLQueryItem\(name: "callbackUrl", value: DriverAuthConfig\.driverPath\(theme: theme\)\)/, 'Google fallback should keep driver services behind the login callback');
+    assert.match(controller, /\/driver\?source=trashed-driver-app&theme=\\\(theme\.rawValue\)/, 'successful native login should load the driver shell with native theme context');
+    assert.match(controller, /currentDriverTheme == \.light \? \.darkContent : \.lightContent/, 'status bar contrast should follow the native theme');
+
+    const logoBlock = controller.match(/logoImage[\s\S]*?accessibilityHidden\(true\)/)?.[0] || '';
+    assert.doesNotMatch(logoBlock, /\.background|\.cornerRadius|\.overlay|RoundedRectangle/, 'logo should not sit inside an outlined or tinted container');
   });
 
   it('loads the real Trashed driver page as the native shell', () => {
@@ -55,6 +65,7 @@ describe('mobile WebView shell contract', () => {
 
     const app = read('App.tsx');
     assert.match(app, /driverMap/, 'local preview fallback should still expose the driver map');
+    assert.match(app, /urlParams\.get\('theme'\) \|\| urlParams\.get\('mode'\)/, 'driver shell should accept native theme context from the URL');
     assert.match(app, /env\(safe-area-inset-top/, 'iOS route overlays should account for the status bar safe area');
   });
 

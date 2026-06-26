@@ -10,6 +10,11 @@ private let driverSessionCookieNames = [
     "__Secure-authjs.session-token",
 ]
 
+private enum DriverTheme: String {
+    case dark
+    case light
+}
+
 private struct DriverAuthConfig {
     let origin: URL
 
@@ -17,16 +22,29 @@ private struct DriverAuthConfig {
         origin.host ?? ""
     }
 
-    var driverURL: URL {
-        URL(string: "/driver?source=trashed-driver-app", relativeTo: origin)!.absoluteURL
+    static func driverPath(theme: DriverTheme) -> String {
+        "/driver?source=trashed-driver-app&theme=\(theme.rawValue)"
+    }
+
+    func driverURL(theme: DriverTheme) -> URL {
+        URL(string: Self.driverPath(theme: theme), relativeTo: origin)!.absoluteURL
     }
 
     var loginURL: URL {
         URL(string: "/api/auth/mobile/login", relativeTo: origin)!.absoluteURL
     }
 
-    var webLoginURL: URL {
-        URL(string: "/app/login?callbackUrl=%2Fdriver", relativeTo: origin)!.absoluteURL
+    func webLoginURL(theme: DriverTheme) -> URL {
+        guard var components = URLComponents(url: origin, resolvingAgainstBaseURL: false) else {
+            return URL(string: "/app/login?callbackUrl=%2Fdriver", relativeTo: origin)!.absoluteURL
+        }
+
+        components.path = "/app/login"
+        components.queryItems = [
+            URLQueryItem(name: "theme", value: theme.rawValue),
+            URLQueryItem(name: "callbackUrl", value: Self.driverPath(theme: theme)),
+        ]
+        return components.url ?? URL(string: "/app/login?callbackUrl=%2Fdriver", relativeTo: origin)!.absoluteURL
     }
 }
 
@@ -46,7 +64,7 @@ class MainViewController: CAPBridgeViewController {
     override func instanceDescriptor() -> InstanceDescriptor {
         let descriptor = super.instanceDescriptor()
         let serverURL = descriptor.serverURL ?? bundledServerURLString() ?? "https://trashed.app/driver?source=trashed-driver-app"
-        descriptor.serverURL = appLoginURLString(from: serverURL)
+        descriptor.serverURL = appLoginURLString(from: serverURL, theme: currentDriverTheme)
         return descriptor
     }
 
@@ -64,7 +82,7 @@ class MainViewController: CAPBridgeViewController {
         return serverURL
     }
 
-    private func appLoginURLString(from serverURL: String) -> String {
+    private func appLoginURLString(from serverURL: String, theme: DriverTheme) -> String {
         guard
             let url = URL(string: serverURL),
             var components = URLComponents(url: url, resolvingAgainstBaseURL: false)
@@ -73,7 +91,10 @@ class MainViewController: CAPBridgeViewController {
         }
 
         components.path = "/app/login"
-        components.query = "callbackUrl=%2Fdriver"
+        components.queryItems = [
+            URLQueryItem(name: "theme", value: theme.rawValue),
+            URLQueryItem(name: "callbackUrl", value: DriverAuthConfig.driverPath(theme: theme)),
+        ]
         return components.url?.absoluteString ?? serverURL
     }
 
@@ -91,7 +112,19 @@ class MainViewController: CAPBridgeViewController {
     }
 
     override var preferredStatusBarStyle: UIStatusBarStyle {
-        return .lightContent
+        return currentDriverTheme == .light ? .darkContent : .lightContent
+    }
+
+    override func traitCollectionDidChange(_ previousTraitCollection: UITraitCollection?) {
+        super.traitCollectionDidChange(previousTraitCollection)
+
+        if previousTraitCollection?.userInterfaceStyle != traitCollection.userInterfaceStyle {
+            setNeedsStatusBarAppearanceUpdate()
+        }
+    }
+
+    private var currentDriverTheme: DriverTheme {
+        traitCollection.userInterfaceStyle == .light ? .light : .dark
     }
 
     private func showNativeLoginIfNeeded() {
@@ -99,7 +132,8 @@ class MainViewController: CAPBridgeViewController {
         let config = makeDriverAuthConfig()
 
         webView.stopLoading()
-        webView.loadHTMLString("<html><body style='background:#020617'></body></html>", baseURL: config.origin)
+        let placeholderBackground = currentDriverTheme == .light ? "#f8fafc" : "#020617"
+        webView.loadHTMLString("<html><body style='background:\(placeholderBackground)'></body></html>", baseURL: config.origin)
         presentNativeLogin(config)
 
         webView.configuration.websiteDataStore.httpCookieStore.getAllCookies { [weak self] cookies in
@@ -172,12 +206,12 @@ class MainViewController: CAPBridgeViewController {
     private func openWebSignIn(_ config: DriverAuthConfig) {
         removeNativeLogin()
         webView?.isHidden = false
-        webView?.load(URLRequest(url: config.webLoginURL))
+        webView?.load(URLRequest(url: config.webLoginURL(theme: currentDriverTheme)))
     }
 
     private func loadDriverApp(_ config: DriverAuthConfig) {
         webView?.isHidden = false
-        webView?.load(URLRequest(url: config.driverURL))
+        webView?.load(URLRequest(url: config.driverURL(theme: currentDriverTheme)))
     }
 
     private func signIn(
@@ -365,6 +399,7 @@ private struct NativeDriverLoginView: View {
     let signIn: (_ email: String, _ password: String, _ completion: @escaping (String?) -> Void) -> Void
     let openWebSignIn: () -> Void
 
+    @Environment(\.colorScheme) private var colorScheme
     @State private var email = ""
     @State private var password = ""
     @State private var errorMessage: String?
@@ -372,6 +407,58 @@ private struct NativeDriverLoginView: View {
 
     private var canSubmit: Bool {
         !email.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && !password.isEmpty && !isSubmitting
+    }
+
+    private var isLightMode: Bool {
+        colorScheme == .light
+    }
+
+    private var logoColor: Color {
+        isLightMode ? Color(red: 0.05, green: 0.08, blue: 0.13) : .white
+    }
+
+    private var primaryTextColor: Color {
+        isLightMode ? Color(red: 0.06, green: 0.09, blue: 0.16) : .white
+    }
+
+    private var secondaryTextColor: Color {
+        isLightMode ? Color(red: 0.29, green: 0.35, blue: 0.43) : .white.opacity(0.68)
+    }
+
+    private var mutedTextColor: Color {
+        isLightMode ? Color(red: 0.43, green: 0.49, blue: 0.58) : .white.opacity(0.52)
+    }
+
+    private var labelTextColor: Color {
+        isLightMode ? Color(red: 0.19, green: 0.24, blue: 0.33) : .white.opacity(0.82)
+    }
+
+    private var dividerColor: Color {
+        isLightMode ? Color(red: 0.80, green: 0.84, blue: 0.90) : .white.opacity(0.16)
+    }
+
+    private var disabledButtonColor: Color {
+        isLightMode ? Color(red: 0.71, green: 0.76, blue: 0.84) : .white.opacity(0.16)
+    }
+
+    private var errorTextColor: Color {
+        isLightMode ? Color(red: 0.72, green: 0.11, blue: 0.11) : Color(red: 1.0, green: 0.62, blue: 0.62)
+    }
+
+    private var errorBackgroundColor: Color {
+        isLightMode ? Color(red: 1.0, green: 0.89, blue: 0.89) : Color(red: 0.45, green: 0.06, blue: 0.08).opacity(0.35)
+    }
+
+    private var footnoteTextColor: Color {
+        isLightMode ? Color(red: 0.43, green: 0.49, blue: 0.58) : .white.opacity(0.48)
+    }
+
+    private var cardStrokeColor: Color {
+        isLightMode ? Color(red: 0.82, green: 0.86, blue: 0.91) : .white.opacity(0.12)
+    }
+
+    private var cardShadowColor: Color {
+        isLightMode ? Color(red: 0.15, green: 0.23, blue: 0.35).opacity(0.12) : Color.black.opacity(0.28)
     }
 
     private var logoImage: Image {
@@ -389,45 +476,31 @@ private struct NativeDriverLoginView: View {
 
     var body: some View {
         ZStack {
-            LinearGradient(
-                gradient: Gradient(colors: [
-                    Color(red: 0.02, green: 0.04, blue: 0.09),
-                    Color(red: 0.06, green: 0.10, blue: 0.20),
-                ]),
-                startPoint: .topLeading,
-                endPoint: .bottomTrailing
-            )
-            .edgesIgnoringSafeArea(.all)
+            DriverLoginMapBackground(isLightMode: isLightMode)
 
             ScrollView {
                 VStack(spacing: 22) {
                     VStack(spacing: 10) {
                         logoImage
+                            .renderingMode(.template)
                             .resizable()
                             .scaledToFit()
-                            .frame(width: 88, height: 70)
-                            .padding(.horizontal, 18)
-                            .padding(.vertical, 16)
-                            .background(Color.white.opacity(0.10))
-                            .cornerRadius(24)
-                            .overlay(
-                                RoundedRectangle(cornerRadius: 24)
-                                    .stroke(Color.white.opacity(0.16), lineWidth: 1)
-                            )
+                            .foregroundColor(logoColor)
+                            .frame(width: 104, height: 82)
                             .accessibilityHidden(true)
 
                         Text("Trashed Driver")
                             .font(.system(size: 16, weight: .semibold, design: .rounded))
-                            .foregroundColor(.white.opacity(0.78))
+                            .foregroundColor(secondaryTextColor)
                     }
 
                     VStack(spacing: 8) {
                         Text("Driver Sign In")
                             .font(.system(size: 30, weight: .bold, design: .rounded))
-                            .foregroundColor(.white)
+                            .foregroundColor(primaryTextColor)
                         Text("Sign in to open your route, stops, and dispatch messages.")
                             .font(.system(size: 15, weight: .regular))
-                            .foregroundColor(.white.opacity(0.68))
+                            .foregroundColor(secondaryTextColor)
                             .multilineTextAlignment(.center)
                     }
 
@@ -444,21 +517,22 @@ private struct NativeDriverLoginView: View {
                             .background(Color.white)
                             .foregroundColor(Color(red: 0.08, green: 0.10, blue: 0.16))
                             .cornerRadius(14)
+                            .shadow(color: cardShadowColor, radius: 10, x: 0, y: 6)
                         }
                         .accessibilityIdentifier("native-driver-google-sign-in")
 
                         HStack {
-                            Rectangle().fill(Color.white.opacity(0.16)).frame(height: 1)
+                            Rectangle().fill(dividerColor).frame(height: 1)
                             Text("or sign in with email")
                                 .font(.system(size: 11, weight: .semibold))
-                                .foregroundColor(.white.opacity(0.52))
-                            Rectangle().fill(Color.white.opacity(0.16)).frame(height: 1)
+                                .foregroundColor(mutedTextColor)
+                            Rectangle().fill(dividerColor).frame(height: 1)
                         }
 
                         VStack(alignment: .leading, spacing: 8) {
                             Text("Email Address")
                                 .font(.system(size: 13, weight: .semibold))
-                                .foregroundColor(.white.opacity(0.82))
+                                .foregroundColor(labelTextColor)
                             TextField("name@example.com", text: $email)
                                 .keyboardType(.emailAddress)
                                 .autocapitalization(.none)
@@ -466,29 +540,31 @@ private struct NativeDriverLoginView: View {
                                 .textContentType(.username)
                                 .padding(14)
                                 .background(fieldBackground)
-                                .foregroundColor(.white)
+                                .foregroundColor(primaryTextColor)
+                                .accentColor(Color(red: 0.12, green: 0.74, blue: 0.45))
                                 .accessibilityIdentifier("native-driver-email")
                         }
 
                         VStack(alignment: .leading, spacing: 8) {
                             Text("Password")
                                 .font(.system(size: 13, weight: .semibold))
-                                .foregroundColor(.white.opacity(0.82))
+                                .foregroundColor(labelTextColor)
                             SecureField("Enter your password", text: $password)
                                 .textContentType(.password)
                                 .padding(14)
                                 .background(fieldBackground)
-                                .foregroundColor(.white)
+                                .foregroundColor(primaryTextColor)
+                                .accentColor(Color(red: 0.12, green: 0.74, blue: 0.45))
                                 .accessibilityIdentifier("native-driver-password")
                         }
 
                         if let errorMessage = errorMessage {
                             Text(errorMessage)
                                 .font(.system(size: 13, weight: .semibold))
-                                .foregroundColor(Color(red: 1.0, green: 0.62, blue: 0.62))
+                                .foregroundColor(errorTextColor)
                                 .frame(maxWidth: .infinity, alignment: .leading)
                                 .padding(12)
-                                .background(Color(red: 0.45, green: 0.06, blue: 0.08).opacity(0.35))
+                                .background(errorBackgroundColor)
                                 .cornerRadius(12)
                                 .accessibilityIdentifier("native-driver-login-error")
                         }
@@ -504,7 +580,7 @@ private struct NativeDriverLoginView: View {
                             }
                             .frame(maxWidth: .infinity)
                             .padding(.vertical, 15)
-                            .background(canSubmit ? Color(red: 0.12, green: 0.74, blue: 0.45) : Color.white.opacity(0.16))
+                            .background(canSubmit ? Color(red: 0.12, green: 0.74, blue: 0.45) : disabledButtonColor)
                             .foregroundColor(.white)
                             .cornerRadius(14)
                         }
@@ -516,13 +592,13 @@ private struct NativeDriverLoginView: View {
                     .cornerRadius(28)
                     .overlay(
                         RoundedRectangle(cornerRadius: 28)
-                            .stroke(Color.white.opacity(0.12), lineWidth: 1)
+                            .stroke(cardStrokeColor, lineWidth: 1)
                     )
-                    .shadow(color: Color.black.opacity(0.28), radius: 24, x: 0, y: 18)
+                    .shadow(color: cardShadowColor, radius: 24, x: 0, y: 18)
 
                     Text("Need driver access? Ask your dispatcher or account admin to add you. By signing in, you agree to the Trashed Terms and Privacy Policy.")
                         .font(.system(size: 12))
-                        .foregroundColor(.white.opacity(0.48))
+                        .foregroundColor(footnoteTextColor)
                         .multilineTextAlignment(.center)
                 }
                 .padding(.horizontal, 24)
@@ -534,16 +610,25 @@ private struct NativeDriverLoginView: View {
 
     private var fieldBackground: some View {
         RoundedRectangle(cornerRadius: 14)
-            .fill(Color.white.opacity(0.08))
+            .fill(isLightMode ? Color.white : Color.white.opacity(0.08))
             .overlay(
                 RoundedRectangle(cornerRadius: 14)
-                    .stroke(Color.white.opacity(0.14), lineWidth: 1)
+                    .stroke(isLightMode ? Color(red: 0.79, green: 0.84, blue: 0.91) : Color.white.opacity(0.14), lineWidth: 1)
             )
     }
 
     private var cardBackground: some View {
         LinearGradient(
-            gradient: Gradient(colors: [Color.white.opacity(0.16), Color.white.opacity(0.08)]),
+            gradient: Gradient(colors: isLightMode
+                ? [
+                    Color.white.opacity(0.96),
+                    Color(red: 0.94, green: 0.97, blue: 1.0).opacity(0.92),
+                ]
+                : [
+                    Color.white.opacity(0.16),
+                    Color.white.opacity(0.08),
+                ]
+            ),
             startPoint: .topLeading,
             endPoint: .bottomTrailing
         )
@@ -562,4 +647,114 @@ private struct NativeDriverLoginView: View {
             errorMessage = message
         }
     }
+}
+
+private struct DriverLoginMapBackground: View {
+    let isLightMode: Bool
+
+    private static let roads = [
+        DriverLoginMapRoad(id: 0, width: 1.45, thickness: 18, x: -0.18, y: -0.32, rotation: -27, opacity: 0.20),
+        DriverLoginMapRoad(id: 1, width: 1.30, thickness: 12, x: 0.28, y: -0.18, rotation: 18, opacity: 0.16),
+        DriverLoginMapRoad(id: 2, width: 1.18, thickness: 14, x: -0.22, y: 0.08, rotation: 31, opacity: 0.14),
+        DriverLoginMapRoad(id: 3, width: 1.50, thickness: 10, x: 0.18, y: 0.30, rotation: -15, opacity: 0.14),
+        DriverLoginMapRoad(id: 4, width: 1.05, thickness: 8, x: -0.28, y: 0.44, rotation: 8, opacity: 0.12),
+    ]
+
+    private var baseColor: Color {
+        isLightMode ? Color(red: 0.94, green: 0.96, blue: 0.97) : Color(red: 0.04, green: 0.04, blue: 0.04)
+    }
+
+    private var tileRoadColor: Color {
+        isLightMode ? Color(red: 0.58, green: 0.64, blue: 0.72) : Color(red: 0.20, green: 0.24, blue: 0.31)
+    }
+
+    private var routeGlowColor: Color {
+        isLightMode ? Color(red: 0.23, green: 0.51, blue: 0.96) : Color(red: 0.31, green: 0.27, blue: 0.90)
+    }
+
+    private var routeSurfaceColor: Color {
+        isLightMode ? Color(red: 0.58, green: 0.64, blue: 0.72) : Color(red: 0.12, green: 0.16, blue: 0.23)
+    }
+
+    private var routeCenterColor: Color {
+        isLightMode ? .white : Color(red: 0.39, green: 0.40, blue: 0.95)
+    }
+
+    var body: some View {
+        GeometryReader { proxy in
+            let size = proxy.size
+
+            ZStack {
+                baseColor
+
+                ForEach(Self.roads) { road in
+                    RoundedRectangle(cornerRadius: road.thickness / 2, style: .continuous)
+                        .fill(tileRoadColor.opacity(road.opacity))
+                        .frame(width: size.width * road.width, height: road.thickness)
+                        .rotationEffect(.degrees(road.rotation))
+                        .offset(x: size.width * road.x, y: size.height * road.y)
+                }
+
+                routePath(in: size)
+                    .stroke(routeGlowColor.opacity(isLightMode ? 0.16 : 0.24), style: StrokeStyle(lineWidth: 28, lineCap: .round, lineJoin: .round))
+                    .blur(radius: 8)
+
+                routePath(in: size)
+                    .stroke(routeSurfaceColor.opacity(isLightMode ? 0.72 : 0.86), style: StrokeStyle(lineWidth: 13, lineCap: .round, lineJoin: .round))
+
+                routePath(in: size)
+                    .stroke(routeCenterColor.opacity(isLightMode ? 0.72 : 0.92), style: StrokeStyle(lineWidth: 2, lineCap: .round, lineJoin: .round, dash: isLightMode ? [8, 8] : []))
+
+                mapFogOverlay
+            }
+        }
+        .edgesIgnoringSafeArea(.all)
+    }
+
+    private var mapFogOverlay: some View {
+        ZStack {
+            VStack(spacing: 0) {
+                LinearGradient(gradient: Gradient(colors: [baseColor, baseColor.opacity(0)]), startPoint: .top, endPoint: .bottom)
+                    .frame(height: 210)
+                Spacer()
+                LinearGradient(gradient: Gradient(colors: [baseColor.opacity(0), baseColor]), startPoint: .top, endPoint: .bottom)
+                    .frame(height: 180)
+            }
+
+            HStack(spacing: 0) {
+                LinearGradient(gradient: Gradient(colors: [baseColor, baseColor.opacity(0)]), startPoint: .leading, endPoint: .trailing)
+                    .frame(width: 96)
+                Spacer()
+                LinearGradient(gradient: Gradient(colors: [baseColor.opacity(0), baseColor]), startPoint: .leading, endPoint: .trailing)
+                    .frame(width: 96)
+            }
+        }
+    }
+
+    private func routePath(in size: CGSize) -> Path {
+        var path = Path()
+        path.move(to: CGPoint(x: -size.width * 0.16, y: size.height * 0.64))
+        path.addCurve(
+            to: CGPoint(x: size.width * 0.30, y: size.height * 0.55),
+            control1: CGPoint(x: size.width * 0.04, y: size.height * 0.58),
+            control2: CGPoint(x: size.width * 0.14, y: size.height * 0.68)
+        )
+        path.addLine(to: CGPoint(x: size.width * 0.56, y: size.height * 0.42))
+        path.addCurve(
+            to: CGPoint(x: size.width * 1.16, y: size.height * 0.32),
+            control1: CGPoint(x: size.width * 0.74, y: size.height * 0.28),
+            control2: CGPoint(x: size.width * 0.92, y: size.height * 0.46)
+        )
+        return path
+    }
+}
+
+private struct DriverLoginMapRoad: Identifiable {
+    let id: Int
+    let width: CGFloat
+    let thickness: CGFloat
+    let x: CGFloat
+    let y: CGFloat
+    let rotation: Double
+    let opacity: Double
 }
