@@ -30,6 +30,16 @@ describe('mobile WebView shell contract', () => {
     assert.match(capacitorConfig, /webDir:\s*['"]dist['"]/, 'Capacitor webDir should be dist');
   });
 
+  it('shows a native iOS driver sign-in before falling back to the WebView login', () => {
+    const controller = read('ios/App/App/MainViewController.swift');
+    assert.match(controller, /NativeDriverLoginView/, 'iOS should render a native SwiftUI driver login screen');
+    assert.match(controller, /Driver Sign In/, 'native login should mirror the driver sign-in title');
+    assert.match(controller, /\/api\/auth\/mobile\/login/, 'native login should post credentials to the mobile auth endpoint');
+    assert.match(controller, /__Secure-next-auth\.session-token/, 'native login should install secure NextAuth session cookies');
+    assert.match(controller, /\/app\/login\?callbackUrl=%2Fdriver&source=trashed-driver-app/, 'Google fallback should use the chrome-less app login page');
+    assert.match(controller, /\/driver\?source=trashed-driver-app/, 'successful native login should load the driver shell');
+  });
+
   it('loads the real Trashed driver page as the native shell', () => {
     const capacitorConfig = read('capacitor.config.ts');
     assert.match(capacitorConfig, /https:\/\/trashed\.app/, 'TestFlight default should target production Trashed');
