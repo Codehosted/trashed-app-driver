@@ -33,6 +33,16 @@ private struct DriverAuthConfig {
 class MainViewController: CAPBridgeViewController {
     private var nativeLoginController: UIHostingController<NativeDriverLoginView>?
 
+    override func webViewConfiguration(for instanceConfiguration: InstanceConfiguration) -> WKWebViewConfiguration {
+        let configuration = super.webViewConfiguration(for: instanceConfiguration)
+        configuration.userContentController.addUserScript(WKUserScript(
+            source: Self.driverSafeAreaScript,
+            injectionTime: .atDocumentEnd,
+            forMainFrameOnly: true
+        ))
+        return configuration
+    }
+
     override func instanceDescriptor() -> InstanceDescriptor {
         let descriptor = super.instanceDescriptor()
         let serverURL = descriptor.serverURL ?? bundledServerURLString() ?? "https://trashed.app/driver?source=trashed-driver-app"
@@ -326,6 +336,29 @@ class MainViewController: CAPBridgeViewController {
 
         return message
     }
+
+    private static let driverSafeAreaScript = """
+    (function () {
+      var viewport = document.querySelector('meta[name="viewport"]');
+      if (viewport && viewport.content.indexOf('viewport-fit=cover') === -1) {
+        viewport.content = viewport.content + ', viewport-fit=cover';
+      }
+      if (document.getElementById('trashed-ios-safe-area')) return;
+
+      var style = document.createElement('style');
+      style.id = 'trashed-ios-safe-area';
+      style.textContent = [
+        ':root { --trashed-ios-safe-top: env(safe-area-inset-top, 0px); }',
+        '@supports (top: env(safe-area-inset-top)) {',
+        '  .absolute.top-0, .fixed.top-0, .sticky.top-0 { top: var(--trashed-ios-safe-top) !important; }',
+        '  .absolute.top-3, .fixed.top-3, .sticky.top-3 { top: calc(var(--trashed-ios-safe-top) + 0.75rem) !important; }',
+        '  .absolute.top-4, .fixed.top-4, .sticky.top-4 { top: calc(var(--trashed-ios-safe-top) + 1rem) !important; }',
+        '  .absolute.top-6, .fixed.top-6, .sticky.top-6 { top: calc(var(--trashed-ios-safe-top) + 1.5rem) !important; }',
+        '}'
+      ].join('\\n');
+      document.head.appendChild(style);
+    })();
+    """
 }
 
 private struct NativeDriverLoginView: View {
