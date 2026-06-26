@@ -1,12 +1,16 @@
 import React, { useState, useEffect } from 'react';
-import { User } from 'firebase/auth';
-import { doc, getDoc, setDoc } from '../services/firebase'; // Updated import
-import { db } from '../services/firebase';
 import { UserCircle, Save, ArrowLeft, Truck, Bell, Settings, Sun, Moon } from 'lucide-react';
 import { NotificationPreferences, Theme } from '../types';
 
+interface DriverUser {
+  uid: string;
+  email: string | null;
+  displayName: string | null;
+  photoURL: string | null;
+}
+
 interface ProfileProps {
-  user: User | null;
+  user: DriverUser | null;
   onBack: () => void;
   onSignOut: () => void;
   onTestNotification?: () => void;
@@ -31,44 +35,22 @@ export const Profile: React.FC<ProfileProps> = ({ user, onBack, onSignOut, onTes
 
   // Load Data on Mount
   useEffect(() => {
-    const fetchProfile = async () => {
-      if (user) {
-        // AUTHENTICATED MODE: Fetch from Firebase
-        try {
-          const docRef = doc(db, "drivers", user.uid);
-          const docSnap = await getDoc(docRef);
-          if (docSnap.exists()) {
-            const data = docSnap.data();
-            setDriverData({
-              vehicleModel: data.vehicleModel || '',
-              licensePlate: data.licensePlate || '',
-              phoneNumber: data.phoneNumber || ''
-            });
-            if (data.notificationPreferences) {
-              setNotificationPrefs(data.notificationPreferences);
-            }
+    const fetchProfile = () => {
+      try {
+        const storedSettings = localStorage.getItem('driverSettings');
+        if (storedSettings) {
+          const data = JSON.parse(storedSettings);
+          setDriverData({
+            vehicleModel: data.vehicleModel || '',
+            licensePlate: data.licensePlate || '',
+            phoneNumber: data.phoneNumber || ''
+          });
+          if (data.notificationPreferences) {
+            setNotificationPrefs(data.notificationPreferences);
           }
-        } catch (err) {
-          console.error("Error fetching profile:", err);
         }
-      } else {
-        // GUEST MODE: Fetch from LocalStorage
-        try {
-            const storedSettings = localStorage.getItem('driverSettings');
-            if (storedSettings) {
-                const data = JSON.parse(storedSettings);
-                setDriverData({
-                    vehicleModel: data.vehicleModel || '',
-                    licensePlate: data.licensePlate || '',
-                    phoneNumber: data.phoneNumber || ''
-                });
-                if (data.notificationPreferences) {
-                    setNotificationPrefs(data.notificationPreferences);
-                }
-            }
-        } catch (err) {
-            console.error("Error loading local settings:", err);
-        }
+      } catch (err) {
+        console.error("Error loading local settings:", err);
       }
     };
     fetchProfile();
@@ -78,25 +60,13 @@ export const Profile: React.FC<ProfileProps> = ({ user, onBack, onSignOut, onTes
   const handleSave = async () => {
     setLoading(true);
     try {
-      if (user) {
-        // AUTHENTICATED MODE: Save to Firebase
-        await setDoc(doc(db, "drivers", user.uid), {
-            ...driverData,
-            notificationPreferences: notificationPrefs,
-            email: user.email,
-            displayName: user.displayName,
-            updatedAt: new Date()
-        }, { merge: true });
-      } else {
-        // GUEST MODE: Save to LocalStorage
-        const settingsToSave = {
-            vehicleModel: driverData.vehicleModel,
-            licensePlate: driverData.licensePlate,
-            phoneNumber: driverData.phoneNumber,
-            notificationPreferences: notificationPrefs
-        };
-        localStorage.setItem('driverSettings', JSON.stringify(settingsToSave));
-      }
+      const settingsToSave = {
+        vehicleModel: driverData.vehicleModel,
+        licensePlate: driverData.licensePlate,
+        phoneNumber: driverData.phoneNumber,
+        notificationPreferences: notificationPrefs
+      };
+      localStorage.setItem('driverSettings', JSON.stringify(settingsToSave));
       
       setMessage('Settings saved successfully!');
       setTimeout(() => setMessage(''), 3000);

@@ -6,19 +6,32 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "test": "node --test tests/*.test.mjs",
+    "cap:sync": "npm run build && npx cap sync android",
+    "cap:sync:ios": "npm run build && TRASHED_WEB_URL=${TRASHED_WEB_URL:-https://trashed.app} npx cap sync ios",
+    "cap:sync:ios:dev": "npm run build && TRASHED_WEB_URL=${TRASHED_WEB_URL:-https://preview.trashed.app} npx cap sync ios",
+    "android:open": "npx cap open android",
+    "ios:open": "npx cap open ios"
   },
   "dependencies": {
-    "lucide-react": "^0.555.0",
-    "framer-motion": "^12.23.25",
-    "react": "^19.2.1",
-    "react-dom": "^19.2.1",
+    "@capacitor-community/background-geolocation": "^1.2.26",
+    "@capacitor/android": "^7.4.4",
+    "@capacitor/core": "^7.4.4",
+    "@capacitor/ios": "^7.6.6",
     "@google/genai": "^1.31.0",
-    "firebase": "^12.6.0"
+    "framer-motion": "^12.23.25",
+    "lucide-react": "^0.555.0",
+    "react": "^19.2.1",
+    "react-dom": "^19.2.1"
   },
   "devDependencies": {
+    "@capacitor/cli": "^7.4.4",
     "@types/node": "^22.19.1",
     "@vitejs/plugin-react": "^5.1.1",
+    "autoprefixer": "^10.4.20",
+    "postcss": "^8.4.49",
+    "tailwindcss": "^3.4.17",
     "typescript": "~5.8.3",
     "vite": "^6.4.1"
   }
