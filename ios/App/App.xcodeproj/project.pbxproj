@@ -212,14 +212,16 @@
 			);
 			inputPaths = (
 				"${SRCROOT}/App/Assets.xcassets/AppIcon.appiconset",
+				"${SRCROOT}/App/Assets.xcassets/TrashedLogoMark.imageset",
 			);
-			name = "Copy legacy app icons";
+			name = "Copy bundled images";
 			outputPaths = (
 				"${TARGET_BUILD_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}/AppIcon-iphone-60x60@3x.png",
+				"${TARGET_BUILD_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}/trashed-logo-mark@3x.png",
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
-			shellScript = "set -e\nICON_SRC=\"${SRCROOT}/App/Assets.xcassets/AppIcon.appiconset\"\nDEST=\"${TARGET_BUILD_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}\"\nmkdir -p \"$DEST\"\ncp \"$ICON_SRC\"/*.png \"$DEST\"/\n";
+			shellScript = "set -e\nICON_SRC=\"${SRCROOT}/App/Assets.xcassets/AppIcon.appiconset\"\nLOGO_SRC=\"${SRCROOT}/App/Assets.xcassets/TrashedLogoMark.imageset\"\nDEST=\"${TARGET_BUILD_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}\"\nmkdir -p \"$DEST\"\ncp \"$ICON_SRC\"/*.png \"$DEST\"/\ncp \"$LOGO_SRC\"/trashed-logo-mark*.png \"$DEST\"/\n";
 			showEnvVarsInLog = 0;
 		};
 /* End PBXShellScriptBuildPhase section */

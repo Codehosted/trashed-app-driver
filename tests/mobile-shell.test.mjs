@@ -32,11 +32,17 @@ describe('mobile WebView shell contract', () => {
 
   it('shows a native iOS driver sign-in before falling back to the WebView login', () => {
     const controller = read('ios/App/App/MainViewController.swift');
+    const xcodeProject = read('ios/App/App.xcodeproj/project.pbxproj');
+    assert.ok(existsSync(join(root, 'ios/App/App/Assets.xcassets/TrashedLogoMark.imageset/Contents.json')), 'missing real Trashed logo image set');
+    assert.match(xcodeProject, /trashed-logo-mark\*\.png/, 'real Trashed logo images should be copied into the app bundle');
     assert.match(controller, /NativeDriverLoginView/, 'iOS should render a native SwiftUI driver login screen');
     assert.match(controller, /Driver Sign In/, 'native login should mirror the driver sign-in title');
+    assert.match(controller, /trashed-logo-mark/, 'native login should use the real Trashed logo asset');
+    assert.match(controller, /components\.path = \"\/app\/login\"/, 'native login should avoid loading /driver before auth');
+    assert.doesNotMatch(controller, /Text\(\"T\"\)/, 'native login must not use a fake text-logo placeholder');
     assert.match(controller, /\/api\/auth\/mobile\/login/, 'native login should post credentials to the mobile auth endpoint');
     assert.match(controller, /__Secure-next-auth\.session-token/, 'native login should install secure NextAuth session cookies');
-    assert.match(controller, /\/app\/login\?callbackUrl=%2Fdriver&source=trashed-driver-app/, 'Google fallback should use the chrome-less app login page');
+    assert.match(controller, /\/app\/login\?callbackUrl=%2Fdriver/, 'Google fallback should use the chrome-less app login page without starting driver PWA services');
     assert.match(controller, /\/driver\?source=trashed-driver-app/, 'successful native login should load the driver shell');
   });
 

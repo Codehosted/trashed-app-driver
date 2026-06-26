@@ -26,12 +26,46 @@ private struct DriverAuthConfig {
     }
 
     var webLoginURL: URL {
-        URL(string: "/app/login?callbackUrl=%2Fdriver&source=trashed-driver-app", relativeTo: origin)!.absoluteURL
+        URL(string: "/app/login?callbackUrl=%2Fdriver", relativeTo: origin)!.absoluteURL
     }
 }
 
 class MainViewController: CAPBridgeViewController {
     private var nativeLoginController: UIHostingController<NativeDriverLoginView>?
+
+    override func instanceDescriptor() -> InstanceDescriptor {
+        let descriptor = super.instanceDescriptor()
+        let serverURL = descriptor.serverURL ?? bundledServerURLString() ?? "https://trashed.app/driver?source=trashed-driver-app"
+        descriptor.serverURL = appLoginURLString(from: serverURL)
+        return descriptor
+    }
+
+    private func bundledServerURLString() -> String? {
+        guard
+            let configURL = Bundle.main.url(forResource: "capacitor.config", withExtension: "json"),
+            let data = try? Data(contentsOf: configURL),
+            let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+            let server = json["server"] as? [String: Any],
+            let serverURL = server["url"] as? String
+        else {
+            return nil
+        }
+
+        return serverURL
+    }
+
+    private func appLoginURLString(from serverURL: String) -> String {
+        guard
+            let url = URL(string: serverURL),
+            var components = URLComponents(url: url, resolvingAgainstBaseURL: false)
+        else {
+            return serverURL
+        }
+
+        components.path = "/app/login"
+        components.query = "callbackUrl=%2Fdriver"
+        return components.url?.absoluteString ?? serverURL
+    }
 
     override func viewDidLoad() {
         super.viewDidLoad()
@@ -54,15 +88,17 @@ class MainViewController: CAPBridgeViewController {
         guard let webView = webView else { return }
         let config = makeDriverAuthConfig()
 
+        webView.stopLoading()
+        webView.loadHTMLString("<html><body style='background:#020617'></body></html>", baseURL: config.origin)
+        presentNativeLogin(config)
+
         webView.configuration.websiteDataStore.httpCookieStore.getAllCookies { [weak self] cookies in
             DispatchQueue.main.async {
                 guard let self = self else { return }
                 if self.hasSessionCookie(in: cookies, for: config) {
+                    self.removeNativeLogin()
                     self.loadDriverApp(config)
-                    return
                 }
-
-                self.presentNativeLogin(config)
             }
         }
     }
@@ -86,6 +122,10 @@ class MainViewController: CAPBridgeViewController {
 
     private func presentNativeLogin(_ config: DriverAuthConfig) {
         removeNativeLogin()
+
+        // CAPBridgeViewController's root view is the WKWebView. Hiding the WebView
+        // also hides native child views, so keep it visible and cover it instead.
+        webView?.isHidden = false
 
         let loginView = NativeDriverLoginView(
             signIn: { [weak self] email, password, completion in
@@ -121,10 +161,12 @@ class MainViewController: CAPBridgeViewController {
 
     private func openWebSignIn(_ config: DriverAuthConfig) {
         removeNativeLogin()
+        webView?.isHidden = false
         webView?.load(URLRequest(url: config.webLoginURL))
     }
 
     private func loadDriverApp(_ config: DriverAuthConfig) {
+        webView?.isHidden = false
         webView?.load(URLRequest(url: config.driverURL))
     }
 
@@ -256,8 +298,12 @@ class MainViewController: CAPBridgeViewController {
     }
 
     private func hasSessionCookie(in cookies: [HTTPCookie], for config: DriverAuthConfig) -> Bool {
-        cookies.contains { cookie in
-            driverSessionCookieNames.contains(cookie.name) && cookieMatches(cookie, host: config.host)
+        let now = Date()
+        return cookies.contains { cookie in
+            driverSessionCookieNames.contains(cookie.name)
+                && !cookie.value.isEmpty
+                && (cookie.expiresDate == nil || cookie.expiresDate! > now)
+                && cookieMatches(cookie, host: config.host)
         }
     }
 
@@ -295,6 +341,19 @@ private struct NativeDriverLoginView: View {
         !email.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && !password.isEmpty && !isSubmitting
     }
 
+    private var logoImage: Image {
+        let image = UIImage(named: "trashed-logo-mark") ?? Self.bundledLogoImage()
+        return image.map { Image(uiImage: $0) } ?? Image("trashed-logo-mark")
+    }
+
+    private static func bundledLogoImage() -> UIImage? {
+        guard let path = Bundle.main.path(forResource: "trashed-logo-mark@3x", ofType: "png") else {
+            return nil
+        }
+
+        return UIImage(contentsOfFile: path)
+    }
+
     var body: some View {
         ZStack {
             LinearGradient(
@@ -310,17 +369,19 @@ private struct NativeDriverLoginView: View {
             ScrollView {
                 VStack(spacing: 22) {
                     VStack(spacing: 10) {
-                        ZStack {
-                            Circle()
-                                .fill(Color.white.opacity(0.12))
-                                .frame(width: 64, height: 64)
-                            Text("T")
-                                .font(.system(size: 30, weight: .black, design: .rounded))
-                                .foregroundColor(.white)
-                        }
-                        .overlay(
-                            Circle().stroke(Color.white.opacity(0.18), lineWidth: 1)
-                        )
+                        logoImage
+                            .resizable()
+                            .scaledToFit()
+                            .frame(width: 88, height: 70)
+                            .padding(.horizontal, 18)
+                            .padding(.vertical, 16)
+                            .background(Color.white.opacity(0.10))
+                            .cornerRadius(24)
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 24)
+                                    .stroke(Color.white.opacity(0.16), lineWidth: 1)
+                            )
+                            .accessibilityHidden(true)
 
                         Text("Trashed Driver")
                             .font(.system(size: 16, weight: .semibold, design: .rounded))
