@@ -13,28 +13,32 @@ const dependencies = {
 };
 
 describe('mobile WebView shell contract', () => {
-  it('has Capacitor Android configured for a packaged WebView app', () => {
+  it('has Capacitor configured for the packaged WebView app', () => {
     assert.ok(dependencies['@capacitor/core'], 'missing @capacitor/core');
     assert.ok(dependencies['@capacitor/android'], 'missing @capacitor/android');
+    assert.ok(dependencies['@capacitor/ios'], 'missing @capacitor/ios');
     assert.ok(dependencies['@capacitor/cli'], 'missing @capacitor/cli');
     assert.ok(pkg.scripts?.['cap:sync'], 'missing cap:sync script');
+    assert.ok(pkg.scripts?.['cap:sync:ios'], 'missing cap:sync:ios script');
+    assert.ok(pkg.scripts?.['cap:sync:ios:dev'], 'missing cap:sync:ios:dev script');
     assert.ok(pkg.scripts?.['android:open'], 'missing android:open script');
+    assert.ok(pkg.scripts?.['ios:open'], 'missing ios:open script');
     assert.ok(existsSync(join(root, 'capacitor.config.ts')), 'missing capacitor.config.ts');
 
     const capacitorConfig = read('capacitor.config.ts');
-    assert.match(capacitorConfig, /appId:\s*['"]app\.trashed\.driver['"]/, 'Capacitor appId should be app.trashed.driver');
+    assert.match(capacitorConfig, /appId:\s*['"]com\.trashed\.driver['"]/, 'Capacitor appId should be com.trashed.driver');
     assert.match(capacitorConfig, /webDir:\s*['"]dist['"]/, 'Capacitor webDir should be dist');
   });
 
-  it('exposes a WebView-first vendor experience while keeping the driver map local', () => {
-    assert.ok(existsSync(join(root, 'components/VendorExperienceWebView.tsx')), 'missing VendorExperienceWebView component');
-    assert.ok(existsSync(join(root, 'services/appConfig.ts')), 'missing app config service');
+  it('loads the real Trashed driver page as the native shell', () => {
+    const capacitorConfig = read('capacitor.config.ts');
+    assert.match(capacitorConfig, /https:\/\/trashed\.app/, 'TestFlight default should target production Trashed');
+    assert.match(capacitorConfig, /\/driver\?source=trashed-driver-app/, 'native shell should open the driver page');
+    assert.match(capacitorConfig, /allowNavigation/, 'same-host navigation should stay in the WebView');
+    assert.match(pkg.scripts['cap:sync:ios:dev'], /https:\/\/preview\.trashed\.app/, 'iOS dev sync should target the Cloudflare tunnel');
 
     const app = read('App.tsx');
-    assert.match(app, /VendorExperienceWebView/, 'App must render the vendor web experience component');
-    assert.match(app, /driverMap/, 'App must keep a dedicated driverMap shell view');
-    assert.match(app, /vendorDashboard/, 'App must expose vendor dashboard WebView view');
-    assert.match(app, /vendorDispatch/, 'App must expose vendor dispatch WebView view');
+    assert.match(app, /driverMap/, 'local preview fallback should still expose the driver map');
   });
 
   it('sends driver position beacons to the Trashed web app API from the WebView shell', () => {
@@ -65,6 +69,11 @@ describe('mobile WebView shell contract', () => {
     const manifest = read('android/app/src/main/AndroidManifest.xml');
     assert.match(manifest, /ACCESS_BACKGROUND_LOCATION/, 'Android manifest should declare background location permission');
     assert.match(manifest, /FOREGROUND_SERVICE_LOCATION/, 'Android manifest should declare foreground service location permission');
+
+    const iosInfo = read('ios/App/App/Info.plist');
+    assert.match(iosInfo, /NSLocationWhenInUseUsageDescription/, 'iOS must explain foreground location use');
+    assert.match(iosInfo, /NSLocationAlwaysAndWhenInUseUsageDescription/, 'iOS must explain background location use');
+    assert.match(iosInfo, /UIBackgroundModes[\s\S]*location/, 'iOS must enable background location mode');
   });
 
   it('keeps Google geocoding behind Trashed web API routes, not mobile credentials', () => {
