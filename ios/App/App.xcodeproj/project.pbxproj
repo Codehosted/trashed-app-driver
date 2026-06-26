@@ -108,6 +108,7 @@
 				504EC3001FED79650016851F /* Sources */,
 				504EC3011FED79650016851F /* Frameworks */,
 				504EC3021FED79650016851F /* Resources */,
+				A10000041FED79650016851F /* Select iOS backend */,
 				A10000031FED79650016851F /* Copy legacy app icons */,
 				9592DBEFFC6D2A0C8D5DEB22 /* [CP] Embed Pods Frameworks */,
 			);
@@ -222,6 +223,17 @@
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
 			shellScript = "set -e\nICON_SRC=\"${SRCROOT}/App/Assets.xcassets/AppIcon.appiconset\"\nLOGO_SRC=\"${SRCROOT}/App/Assets.xcassets/TrashedLogoMark.imageset\"\nDEST=\"${TARGET_BUILD_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}\"\nmkdir -p \"$DEST\"\ncp \"$ICON_SRC\"/*.png \"$DEST\"/\ncp \"$LOGO_SRC\"/trashed-logo-mark*.png \"$DEST\"/\n";
+			showEnvVarsInLog = 0;
+		};
+		A10000041FED79650016851F /* Select iOS backend */ = {
+			isa = PBXShellScriptBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			name = "Select iOS backend";
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "set -e\nsh \"${SRCROOT}/../../scripts/select-ios-backend.sh\"\n";
 			showEnvVarsInLog = 0;
 		};
 /* End PBXShellScriptBuildPhase section */

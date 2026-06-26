@@ -1,6 +1,8 @@
 import assert from 'node:assert/strict';
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { spawnSync } from 'node:child_process';
 import { describe, it } from 'node:test';
 
 const root = new URL('..', import.meta.url).pathname;
@@ -10,6 +12,42 @@ const pkg = JSON.parse(read('package.json'));
 const dependencies = {
   ...pkg.dependencies,
   ...pkg.devDependencies,
+};
+
+const runIosBackendSelector = (configuration) => {
+  const tempDir = mkdtempSync(join(tmpdir(), 'trashed-ios-config-'));
+  const configFile = join(tempDir, 'capacitor.config.json');
+  writeFileSync(configFile, JSON.stringify({
+    appId: 'com.trashed.driver',
+    appName: 'Trashed Driver',
+    webDir: 'dist',
+    server: {
+      url: 'https://trashed.app/driver?source=trashed-driver-app',
+      androidScheme: 'https',
+      cleartext: false,
+      allowNavigation: ['trashed.app'],
+    },
+  }, null, 2));
+
+  let parsed;
+  try {
+    const result = spawnSync('sh', [join(root, 'scripts/select-ios-backend.sh')], {
+      cwd: root,
+      env: {
+        ...process.env,
+        CONFIGURATION: configuration,
+        CONFIG_FILE: configFile,
+      },
+      encoding: 'utf8',
+    });
+
+    assert.equal(result.status, 0, result.stderr || result.stdout);
+    parsed = JSON.parse(readFileSync(configFile, 'utf8'));
+  } finally {
+    rmSync(tempDir, { recursive: true, force: true });
+  }
+
+  return parsed;
 };
 
 describe('mobile WebView shell contract', () => {
@@ -42,6 +80,9 @@ describe('mobile WebView shell contract', () => {
     assert.match(controller, /DriverLoginMapBackground\(isLightMode: isLightMode\)/, 'native login should use the same map-style background as the driver shell');
     assert.match(controller, /Color\(red: 0\.94, green: 0\.96, blue: 0\.97\).*Color\(red: 0\.04, green: 0\.04, blue: 0\.04\)/s, 'native login background should match the driver map light and dark base colors');
     assert.match(controller, /routePath\(in: size\)[\s\S]*StrokeStyle\(lineWidth: 13, lineCap: \.round, lineJoin: \.round\)/, 'native login background should include the driver map route surface');
+    assert.match(controller, /loadDriverLoadingScreen\(in: webView, config: config\)/, 'native startup should show a branded loading screen instead of a blank WebView');
+    assert.match(controller, /Opening Trashed Driver[\s\S]*Preparing route map/, 'native startup loading screen should show route-map loading copy');
+    assert.doesNotMatch(controller, /loadHTMLString\("<html><body style='background:/, 'native startup must not flash a blank black placeholder page');
     assert.match(controller, /renderingMode\(\.template\)[\s\S]*foregroundColor\(logoColor\)[\s\S]*frame\(width: 104, height: 82\)/, 'native login should render the real logo directly without a badge container');
     assert.match(controller, /components\.path = \"\/app\/login\"/, 'native login should avoid loading /driver before auth');
     assert.doesNotMatch(controller, /Text\(\"T\"\)/, 'native login must not use a fake text-logo placeholder');
@@ -67,6 +108,31 @@ describe('mobile WebView shell contract', () => {
     assert.match(app, /driverMap/, 'local preview fallback should still expose the driver map');
     assert.match(app, /urlParams\.get\('theme'\) \|\| urlParams\.get\('mode'\)/, 'driver shell should accept native theme context from the URL');
     assert.match(app, /env\(safe-area-inset-top/, 'iOS route overlays should account for the status bar safe area');
+  });
+
+  it('selects preview for iOS Debug builds and production for Release builds', () => {
+    const capacitorConfig = read('capacitor.config.ts');
+    assert.match(capacitorConfig, /process\.env\.TRASHED_WEB_URL \?\? 'https:\/\/trashed\.app'/, 'source Capacitor config default must stay production-safe');
+
+    const xcodeProject = read('ios/App/App.xcodeproj/project.pbxproj');
+    const buildPhases = xcodeProject.match(/buildPhases = \([\s\S]*?\);/)?.[0] || '';
+    assert.match(xcodeProject, /Select iOS backend/, 'Xcode project should include the backend selection phase');
+    assert.match(xcodeProject, /scripts\/select-ios-backend\.sh/, 'Xcode backend phase should call the shared selector script');
+    assert.ok(
+      buildPhases.indexOf('Resources') < buildPhases.indexOf('Select iOS backend') &&
+        buildPhases.indexOf('Select iOS backend') < buildPhases.indexOf('Copy legacy app icons'),
+      'backend selection must run after resources are copied'
+    );
+
+    const debugConfig = runIosBackendSelector('Debug');
+    assert.equal(debugConfig.server.url, 'https://preview.trashed.app/driver?source=trashed-driver-app');
+    assert.deepEqual(debugConfig.server.allowNavigation, ['preview.trashed.app']);
+    assert.equal(debugConfig.server.cleartext, false);
+
+    const releaseConfig = runIosBackendSelector('Release');
+    assert.equal(releaseConfig.server.url, 'https://trashed.app/driver?source=trashed-driver-app');
+    assert.deepEqual(releaseConfig.server.allowNavigation, ['trashed.app']);
+    assert.equal(releaseConfig.server.cleartext, false);
   });
 
   it('sends driver position beacons to the Trashed web app API from the WebView shell', () => {

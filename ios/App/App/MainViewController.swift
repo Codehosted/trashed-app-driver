@@ -132,8 +132,7 @@ class MainViewController: CAPBridgeViewController {
         let config = makeDriverAuthConfig()
 
         webView.stopLoading()
-        let placeholderBackground = currentDriverTheme == .light ? "#f8fafc" : "#020617"
-        webView.loadHTMLString("<html><body style='background:\(placeholderBackground)'></body></html>", baseURL: config.origin)
+        loadDriverLoadingScreen(in: webView, config: config)
         presentNativeLogin(config)
 
         webView.configuration.websiteDataStore.httpCookieStore.getAllCookies { [weak self] cookies in
@@ -145,6 +144,95 @@ class MainViewController: CAPBridgeViewController {
                 }
             }
         }
+    }
+
+    private func loadDriverLoadingScreen(in webView: WKWebView, config: DriverAuthConfig) {
+        let isLight = currentDriverTheme == .light
+        let background = isLight ? "#f8fafc" : "#020617"
+        let foreground = isLight ? "#0f172a" : "#f8fafc"
+        let muted = isLight ? "#64748b" : "#94a3b8"
+        let panel = isLight ? "rgba(255,255,255,0.86)" : "rgba(15,23,42,0.74)"
+        let border = isLight ? "rgba(15,23,42,0.10)" : "rgba(148,163,184,0.18)"
+
+        let html = """
+        <!doctype html>
+        <html>
+        <head>
+          <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+          <style>
+            html, body {
+              width: 100%;
+              height: 100%;
+              margin: 0;
+              background: \(background);
+              color: \(foreground);
+              font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", sans-serif;
+            }
+            body {
+              display: grid;
+              place-items: center;
+              overflow: hidden;
+            }
+            body::before {
+              content: "";
+              position: fixed;
+              inset: -20%;
+              background:
+                linear-gradient(135deg, transparent 0 46%, rgba(99,102,241,0.22) 47% 48%, transparent 49%),
+                linear-gradient(25deg, transparent 0 54%, rgba(34,197,94,0.16) 55% 56%, transparent 57%);
+              background-size: 112px 112px, 148px 148px;
+              opacity: 0.42;
+            }
+            main {
+              position: relative;
+              display: flex;
+              flex-direction: column;
+              align-items: center;
+              gap: 12px;
+              border: 1px solid \(border);
+              border-radius: 28px;
+              background: \(panel);
+              padding: 28px 32px;
+              box-shadow: 0 24px 80px rgba(0,0,0,0.26);
+              backdrop-filter: blur(18px);
+            }
+            .mark {
+              width: 52px;
+              height: 52px;
+              border-radius: 18px;
+              display: grid;
+              place-items: center;
+              background: #10b981;
+              color: #020617;
+              font-size: 24px;
+              font-weight: 900;
+              letter-spacing: -0.08em;
+            }
+            .title {
+              font-size: 17px;
+              font-weight: 800;
+              letter-spacing: -0.02em;
+            }
+            .subtitle {
+              color: \(muted);
+              font-size: 12px;
+              font-weight: 700;
+              text-transform: uppercase;
+              letter-spacing: 0.16em;
+            }
+          </style>
+        </head>
+        <body>
+          <main aria-label="Opening Trashed Driver">
+            <div class="mark">t</div>
+            <div class="title">Opening Trashed Driver</div>
+            <div class="subtitle">Preparing route map</div>
+          </main>
+        </body>
+        </html>
+        """
+
+        webView.loadHTMLString(html, baseURL: config.origin)
     }
 
     private func makeDriverAuthConfig() -> DriverAuthConfig {
