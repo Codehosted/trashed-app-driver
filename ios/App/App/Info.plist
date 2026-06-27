@@ -16,37 +16,8 @@
 	<string>$(PRODUCT_NAME)</string>
 	<key>CFBundlePackageType</key>
 	<string>APPL</string>
-	<key>CFBundleIcons</key>
-	<dict>
-		<key>CFBundlePrimaryIcon</key>
-		<dict>
-			<key>CFBundleIconFiles</key>
-			<array>
-				<string>AppIcon-iphone-20x20</string>
-				<string>AppIcon-iphone-29x29</string>
-				<string>AppIcon-iphone-40x40</string>
-				<string>AppIcon-iphone-60x60</string>
-			</array>
-			<key>UIPrerenderedIcon</key>
-			<false/>
-		</dict>
-	</dict>
-	<key>CFBundleIcons~ipad</key>
-	<dict>
-		<key>CFBundlePrimaryIcon</key>
-		<dict>
-			<key>CFBundleIconFiles</key>
-			<array>
-				<string>AppIcon-ipad-20x20</string>
-				<string>AppIcon-ipad-29x29</string>
-				<string>AppIcon-ipad-40x40</string>
-				<string>AppIcon-ipad-76x76</string>
-				<string>AppIcon-ipad-83_5x83_5</string>
-			</array>
-			<key>UIPrerenderedIcon</key>
-			<false/>
-		</dict>
-	</dict>
+	<key>CFBundleIconName</key>
+	<string>AppIcon</string>
 	<key>CFBundleShortVersionString</key>
 	<string>$(MARKETING_VERSION)</string>
 	<key>CFBundleVersion</key>
