@@ -43,18 +43,6 @@ private struct DriverAuthConfig {
         URL(string: "/api/auth/mobile/google", relativeTo: origin)!.absoluteURL
     }
 
-    func webLoginURL(theme: DriverTheme) -> URL {
-        guard var components = URLComponents(url: origin, resolvingAgainstBaseURL: false) else {
-            return URL(string: "/app/login?callbackUrl=%2Fdriver", relativeTo: origin)!.absoluteURL
-        }
-
-        components.path = "/app/login"
-        components.queryItems = [
-            URLQueryItem(name: "theme", value: theme.rawValue),
-            URLQueryItem(name: "callbackUrl", value: Self.driverPath(theme: theme)),
-        ]
-        return components.url ?? URL(string: "/app/login?callbackUrl=%2Fdriver", relativeTo: origin)!.absoluteURL
-    }
 }
 
 private struct NativeGoogleConfig: Decodable {
@@ -83,7 +71,7 @@ class MainViewController: CAPBridgeViewController {
     override func instanceDescriptor() -> InstanceDescriptor {
         let descriptor = super.instanceDescriptor()
         let serverURL = descriptor.serverURL ?? bundledServerURLString() ?? "https://trashed.app/driver?source=trashed-driver-app"
-        descriptor.serverURL = appLoginURLString(from: serverURL, theme: currentDriverTheme)
+        descriptor.serverURL = driverURLString(from: serverURL, theme: currentDriverTheme)
         return descriptor
     }
 
@@ -101,7 +89,7 @@ class MainViewController: CAPBridgeViewController {
         return serverURL
     }
 
-    private func appLoginURLString(from serverURL: String, theme: DriverTheme) -> String {
+    private func driverURLString(from serverURL: String, theme: DriverTheme) -> String {
         guard
             let url = URL(string: serverURL),
             var components = URLComponents(url: url, resolvingAgainstBaseURL: false)
@@ -109,10 +97,10 @@ class MainViewController: CAPBridgeViewController {
             return serverURL
         }
 
-        components.path = "/app/login"
+        components.path = "/driver"
         components.queryItems = [
+            URLQueryItem(name: "source", value: "trashed-driver-app"),
             URLQueryItem(name: "theme", value: theme.rawValue),
-            URLQueryItem(name: "callbackUrl", value: DriverAuthConfig.driverPath(theme: theme)),
         ]
         return components.url?.absoluteString ?? serverURL
     }

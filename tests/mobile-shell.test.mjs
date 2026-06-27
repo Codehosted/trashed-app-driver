@@ -43,12 +43,12 @@ describe('mobile WebView shell contract', () => {
     assert.match(controller, /Color\(red: 0\.94, green: 0\.96, blue: 0\.97\).*Color\(red: 0\.04, green: 0\.04, blue: 0\.04\)/s, 'native login background should match the driver map light and dark base colors');
     assert.match(controller, /routePath\(in: size\)[\s\S]*StrokeStyle\(lineWidth: 13, lineCap: \.round, lineJoin: \.round\)/, 'native login background should include the driver map route surface');
     assert.match(controller, /renderingMode\(\.template\)[\s\S]*foregroundColor\(logoColor\)[\s\S]*frame\(width: 104, height: 82\)/, 'native login should render the real logo directly without a badge container');
-    assert.match(controller, /components\.path = \"\/app\/login\"/, 'native login should avoid loading /driver before auth');
+    assert.match(controller, /components\.path = \"\/driver\"/, 'native shell should start on the driver app route, not the marketing site or full web login');
     assert.doesNotMatch(controller, /Text\(\"T\"\)/, 'native login must not use a fake text-logo placeholder');
     assert.match(controller, /\/api\/auth\/mobile\/login/, 'native login should post credentials to the mobile auth endpoint');
     assert.match(controller, /__Secure-next-auth\.session-token/, 'native login should install secure NextAuth session cookies');
-    assert.match(controller, /components\.path = "\/app\/login"[\s\S]*URLQueryItem\(name: "theme", value: theme\.rawValue\)/, 'Google fallback should use the chrome-less app login page with the native theme');
-    assert.match(controller, /URLQueryItem\(name: "callbackUrl", value: DriverAuthConfig\.driverPath\(theme: theme\)\)/, 'Google fallback should keep driver services behind the login callback');
+    assert.match(controller, /signInWithGoogle/, 'Google sign-in should use native Google Sign-In instead of the website OAuth redirect');
+    assert.doesNotMatch(controller, /components\.path = "\/app\/login"/, 'native startup must not point the WebView at website login chrome');
     assert.match(controller, /\/driver\?source=trashed-driver-app&theme=\\\(theme\.rawValue\)/, 'successful native login should load the driver shell with native theme context');
     assert.match(controller, /currentDriverTheme == \.light \? \.darkContent : \.lightContent/, 'status bar contrast should follow the native theme');
 
