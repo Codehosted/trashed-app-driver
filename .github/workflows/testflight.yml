@@ -1,0 +1,61 @@
+name: Upload Driver App to TestFlight
+
+on:
+  workflow_dispatch:
+    inputs:
+      marketing_version:
+        description: App Store marketing version
+        required: false
+        default: "1.0.2"
+      build_number:
+        description: Optional explicit build number. Defaults to UTC timestamp.
+        required: false
+        default: ""
+  push:
+    branches: [main]
+    paths:
+      - "ios/**"
+      - "App.tsx"
+      - "src/**"
+      - "services/**"
+      - "package.json"
+      - "package-lock.json"
+      - "capacitor.config.ts"
+      - "scripts/ci-upload-testflight.sh"
+      - ".github/workflows/testflight.yml"
+
+concurrency:
+  group: testflight-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  upload-testflight:
+    name: Build and upload TestFlight build
+    runs-on: macos-15
+    timeout-minutes: 60
+    permissions:
+      contents: read
+    env:
+      MARKETING_VERSION: ${{ github.event.inputs.marketing_version || '1.0.2' }}
+      BUILD_NUMBER: ${{ github.event.inputs.build_number }}
+      TRASHED_WEB_URL: https://trashed.app
+      DEVELOPMENT_TEAM_ID: 3BYF8CNWS2
+      BUNDLE_ID: com.trashed.driver
+      PROVISIONING_PROFILE_SPECIFIER: "*[expo] com.trashed.driver AppStore 2025-12-07T19:19:09.367Z"
+      APP_STORE_CONNECT_KEY_ID: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
+      APP_STORE_CONNECT_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
+      APP_STORE_CONNECT_API_KEY_P8_BASE64: ${{ secrets.APP_STORE_CONNECT_API_KEY_P8_BASE64 }}
+      GOOGLE_IOS_CLIENT_ID: ${{ secrets.GOOGLE_IOS_CLIENT_ID }}
+      GOOGLE_IOS_REVERSED_CLIENT_ID: ${{ secrets.GOOGLE_IOS_REVERSED_CLIENT_ID }}
+      IOS_DISTRIBUTION_CERTIFICATE_BASE64: ${{ secrets.IOS_DISTRIBUTION_CERTIFICATE_BASE64 }}
+      IOS_DISTRIBUTION_CERTIFICATE_PASSWORD: ${{ secrets.IOS_DISTRIBUTION_CERTIFICATE_PASSWORD }}
+      IOS_APPSTORE_PROFILE_BASE64: ${{ secrets.IOS_APPSTORE_PROFILE_BASE64 }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Select Xcode
+        run: sudo xcode-select -s /Applications/Xcode.app/Contents/Developer
+
+      - name: Upload to TestFlight
+        run: bash scripts/ci-upload-testflight.sh

@@ -2,6 +2,7 @@ import UIKit
 import SwiftUI
 import WebKit
 import Capacitor
+import GoogleSignIn
 
 private let driverSessionCookieNames = [
     "next-auth.session-token",
@@ -34,18 +35,24 @@ private struct DriverAuthConfig {
         URL(string: "/api/auth/mobile/login", relativeTo: origin)!.absoluteURL
     }
 
-    func webLoginURL(theme: DriverTheme) -> URL {
-        guard var components = URLComponents(url: origin, resolvingAgainstBaseURL: false) else {
-            return URL(string: "/app/login?callbackUrl=%2Fdriver", relativeTo: origin)!.absoluteURL
-        }
-
-        components.path = "/app/login"
-        components.queryItems = [
-            URLQueryItem(name: "theme", value: theme.rawValue),
-            URLQueryItem(name: "callbackUrl", value: Self.driverPath(theme: theme)),
-        ]
-        return components.url ?? URL(string: "/app/login?callbackUrl=%2Fdriver", relativeTo: origin)!.absoluteURL
+    var googleConfigURL: URL {
+        URL(string: "/api/auth/mobile/google/config", relativeTo: origin)!.absoluteURL
     }
+
+    var googleLoginURL: URL {
+        URL(string: "/api/auth/mobile/google", relativeTo: origin)!.absoluteURL
+    }
+
+}
+
+private struct NativeGoogleConfig: Decodable {
+    let configured: Bool
+    let clientId: String?
+}
+
+private struct NativeLoginResponse: Decodable {
+    let success: Bool
+    let error: String?
 }
 
 class MainViewController: CAPBridgeViewController {
@@ -64,7 +71,7 @@ class MainViewController: CAPBridgeViewController {
     override func instanceDescriptor() -> InstanceDescriptor {
         let descriptor = super.instanceDescriptor()
         let serverURL = descriptor.serverURL ?? bundledServerURLString() ?? "https://trashed.app/driver?source=trashed-driver-app"
-        descriptor.serverURL = appLoginURLString(from: serverURL, theme: currentDriverTheme)
+        descriptor.serverURL = driverURLString(from: serverURL, theme: currentDriverTheme)
         return descriptor
     }
 
@@ -82,7 +89,7 @@ class MainViewController: CAPBridgeViewController {
         return serverURL
     }
 
-    private func appLoginURLString(from serverURL: String, theme: DriverTheme) -> String {
+    private func driverURLString(from serverURL: String, theme: DriverTheme) -> String {
         guard
             let url = URL(string: serverURL),
             var components = URLComponents(url: url, resolvingAgainstBaseURL: false)
@@ -90,10 +97,10 @@ class MainViewController: CAPBridgeViewController {
             return serverURL
         }
 
-        components.path = "/app/login"
+        components.path = "/driver"
         components.queryItems = [
+            URLQueryItem(name: "source", value: "trashed-driver-app"),
             URLQueryItem(name: "theme", value: theme.rawValue),
-            URLQueryItem(name: "callbackUrl", value: DriverAuthConfig.driverPath(theme: theme)),
         ]
         return components.url?.absoluteString ?? serverURL
     }
@@ -175,8 +182,8 @@ class MainViewController: CAPBridgeViewController {
             signIn: { [weak self] email, password, completion in
                 self?.signIn(email: email, password: password, config: config, completion: completion)
             },
-            openWebSignIn: { [weak self] in
-                self?.openWebSignIn(config)
+            signInWithGoogle: { [weak self] completion in
+                self?.signInWithGoogle(config: config, completion: completion)
             }
         )
         let hostingController = UIHostingController(rootView: loginView)
@@ -201,12 +208,6 @@ class MainViewController: CAPBridgeViewController {
         nativeLoginController.view.removeFromSuperview()
         nativeLoginController.removeFromParent()
         self.nativeLoginController = nil
-    }
-
-    private func openWebSignIn(_ config: DriverAuthConfig) {
-        removeNativeLogin()
-        webView?.isHidden = false
-        webView?.load(URLRequest(url: config.webLoginURL(theme: currentDriverTheme)))
     }
 
     private func loadDriverApp(_ config: DriverAuthConfig) {
@@ -258,6 +259,111 @@ class MainViewController: CAPBridgeViewController {
             }
 
             let responseCookies = self.cookies(from: httpResponse, for: config.loginURL)
+            let sessionCookies = self.expandedSessionCookies(from: responseCookies, for: config)
+            if sessionCookies.isEmpty {
+                finish("The sign-in server did not return a mobile session.")
+                return
+            }
+
+            DispatchQueue.main.async {
+                guard let cookieStore = self.webView?.configuration.websiteDataStore.httpCookieStore else {
+                    completion("The app WebView is not ready.")
+                    return
+                }
+
+                self.installCookies(sessionCookies, in: cookieStore) {
+                    self.removeNativeLogin()
+                    self.loadDriverApp(config)
+                    completion(nil)
+                }
+            }
+        }.resume()
+    }
+
+    private func signInWithGoogle(config: DriverAuthConfig, completion: @escaping (String?) -> Void) {
+        URLSession.shared.dataTask(with: config.googleConfigURL) { [weak self] data, _, error in
+            let finish: (String?) -> Void = { message in
+                DispatchQueue.main.async {
+                    completion(message)
+                }
+            }
+
+            if let error = error {
+                finish(error.localizedDescription)
+                return
+            }
+
+            guard
+                let self = self,
+                let data = data,
+                let googleConfig = try? JSONDecoder().decode(NativeGoogleConfig.self, from: data),
+                googleConfig.configured,
+                let clientId = googleConfig.clientId,
+                !clientId.isEmpty
+            else {
+                finish("Google sign-in is not configured for this app build.")
+                return
+            }
+
+            DispatchQueue.main.async {
+                let gidConfig = GIDConfiguration(clientID: clientId)
+                GIDSignIn.sharedInstance.configuration = gidConfig
+
+                GIDSignIn.sharedInstance.signIn(withPresenting: self) { [weak self] result, error in
+                    if let error = error {
+                        completion(error.localizedDescription)
+                        return
+                    }
+
+                    guard let idToken = result?.user.idToken?.tokenString else {
+                        completion("Google sign-in did not return an ID token.")
+                        return
+                    }
+
+                    self?.finishGoogleSignIn(idToken: idToken, config: config, completion: completion)
+                }
+            }
+        }.resume()
+    }
+
+    private func finishGoogleSignIn(idToken: String, config: DriverAuthConfig, completion: @escaping (String?) -> Void) {
+        var request = URLRequest(url: config.googleLoginURL)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.setValue("application/json", forHTTPHeaderField: "Accept")
+
+        do {
+            request.httpBody = try JSONSerialization.data(withJSONObject: [
+                "idToken": idToken,
+            ])
+        } catch {
+            completion("Could not prepare the Google sign-in request.")
+            return
+        }
+
+        URLSession.shared.dataTask(with: request) { [weak self] data, response, error in
+            let finish: (String?) -> Void = { message in
+                DispatchQueue.main.async {
+                    completion(message)
+                }
+            }
+
+            if let error = error {
+                finish(error.localizedDescription)
+                return
+            }
+
+            guard let self = self, let httpResponse = response as? HTTPURLResponse else {
+                finish("The sign-in server did not respond.")
+                return
+            }
+
+            if !(200..<300).contains(httpResponse.statusCode) {
+                finish(self.mobileLoginError(from: data) ?? "Google sign-in failed.")
+                return
+            }
+
+            let responseCookies = self.cookies(from: httpResponse, for: config.googleLoginURL)
             let sessionCookies = self.expandedSessionCookies(from: responseCookies, for: config)
             if sessionCookies.isEmpty {
                 finish("The sign-in server did not return a mobile session.")
@@ -397,16 +503,17 @@ class MainViewController: CAPBridgeViewController {
 
 private struct NativeDriverLoginView: View {
     let signIn: (_ email: String, _ password: String, _ completion: @escaping (String?) -> Void) -> Void
-    let openWebSignIn: () -> Void
+    let signInWithGoogle: (_ completion: @escaping (String?) -> Void) -> Void
 
     @Environment(\.colorScheme) private var colorScheme
     @State private var email = ""
     @State private var password = ""
     @State private var errorMessage: String?
     @State private var isSubmitting = false
+    @State private var isGoogleSubmitting = false
 
     private var canSubmit: Bool {
-        !email.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && !password.isEmpty && !isSubmitting
+        !email.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && !password.isEmpty && !isSubmitting && !isGoogleSubmitting
     }
 
     private var isLightMode: Bool {
@@ -505,11 +612,15 @@ private struct NativeDriverLoginView: View {
                     }
 
                     VStack(spacing: 16) {
-                        Button(action: openWebSignIn) {
+                        Button(action: submitGoogle) {
                             HStack(spacing: 10) {
+                                if isGoogleSubmitting {
+                                    ProgressView()
+                                        .progressViewStyle(CircularProgressViewStyle(tint: Color(red: 0.08, green: 0.10, blue: 0.16)))
+                                }
                                 Text("G")
                                     .font(.system(size: 17, weight: .bold, design: .rounded))
-                                Text("Continue with Google")
+                                Text(isGoogleSubmitting ? "Signing in with Google..." : "Continue with Google")
                                     .font(.system(size: 15, weight: .semibold))
                             }
                             .frame(maxWidth: .infinity)
@@ -519,6 +630,7 @@ private struct NativeDriverLoginView: View {
                             .cornerRadius(14)
                             .shadow(color: cardShadowColor, radius: 10, x: 0, y: 6)
                         }
+                        .disabled(isSubmitting || isGoogleSubmitting)
                         .accessibilityIdentifier("native-driver-google-sign-in")
 
                         HStack {
@@ -644,6 +756,19 @@ private struct NativeDriverLoginView: View {
 
         signIn(normalizedEmail, password) { message in
             isSubmitting = false
+            errorMessage = message
+        }
+    }
+
+    private func submitGoogle() {
+        guard !isSubmitting && !isGoogleSubmitting else { return }
+
+        errorMessage = nil
+        isGoogleSubmitting = true
+        UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
+
+        signInWithGoogle { message in
+            isGoogleSubmitting = false
             errorMessage = message
         }
     }
