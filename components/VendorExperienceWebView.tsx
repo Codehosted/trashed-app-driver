@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Capacitor } from '@capacitor/core';
-import { ArrowLeft, ExternalLink, LayoutDashboard, Package, Route, Settings, Truck, Users } from 'lucide-react';
+import { ArrowLeft, ExternalLink, LayoutDashboard, Package, Route, Settings, Sparkles, Truck, Users } from 'lucide-react';
 import { buildVendorWebUrl, getTrashedWebBaseUrl, VendorWebTarget } from '../services/appConfig';
 import { Theme } from '../types';
 
@@ -13,6 +13,7 @@ interface VendorExperienceWebViewProps {
 const TARGETS: Array<{ id: VendorWebTarget; label: string; icon: React.ComponentType<{ size?: number }> }> = [
   { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { id: 'dispatch', label: 'Dispatch', icon: Route },
+  { id: 'assistant', label: 'Assistant', icon: Sparkles },
   { id: 'rentals', label: 'Rentals', icon: Truck },
   { id: 'inventory', label: 'Inventory', icon: Package },
   { id: 'customers', label: 'Customers', icon: Users },

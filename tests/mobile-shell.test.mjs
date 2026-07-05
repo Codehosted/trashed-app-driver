@@ -28,6 +28,12 @@ describe('mobile WebView shell contract', () => {
     const capacitorConfig = read('capacitor.config.ts');
     assert.match(capacitorConfig, /appId:\s*['"]com\.trashed\.driver['"]/, 'Capacitor appId should be com.trashed.driver');
     assert.match(capacitorConfig, /webDir:\s*['"]dist['"]/, 'Capacitor webDir should be dist');
+
+    const androidBuild = read('android/app/build.gradle');
+    const androidStrings = read('android/app/src/main/res/values/strings.xml');
+    assert.match(androidBuild, /applicationId \"com\.trashed\.driver\"/, 'Android applicationId should match the Capacitor appId');
+    assert.match(androidBuild, /namespace \"com\.trashed\.driver\"/, 'Android namespace should match the app package');
+    assert.match(androidStrings, /<string name=\"package_name\">com\.trashed\.driver<\/string>/, 'Android package string should match the app package');
   });
 
   it('shows a native iOS driver sign-in before falling back to the WebView login', () => {
@@ -56,6 +62,18 @@ describe('mobile WebView shell contract', () => {
     assert.doesNotMatch(logoBlock, /\.background|\.cornerRadius|\.overlay|RoundedRectangle/, 'logo should not sit inside an outlined or tinted container');
   });
 
+  it('shows a native Android driver sign-in before loading the WebView app', () => {
+    const activity = read('android/app/src/main/java/com/trashed/driver/MainActivity.java');
+    assert.match(activity, /api\/auth\/mobile\/login/, 'Android native login should post credentials to the mobile auth endpoint');
+    assert.match(activity, /CookieManager\.getInstance\(\)/, 'Android native login should install returned session cookies');
+    assert.match(activity, /next-auth\.session-token/, 'Android native login should verify the NextAuth session cookie');
+    assert.match(activity, /getBridge\(\)\.getWebView\(\)\.loadUrl\(authConfig\.driverUrl\)/, 'successful Android native login should load the driver WebView in-app');
+    assert.match(activity, /GoogleSignInOptions/, 'Android Google sign-in should use native Google Sign-In');
+    assert.match(activity, /api\/auth\/mobile\/google/, 'Android Google sign-in should exchange the native ID token with the mobile auth endpoint');
+    assert.match(activity, /platform=android/, 'Android Google sign-in should request Android-specific mobile Google config');
+    assert.doesNotMatch(activity, /accounts\.google\.com|ACTION_VIEW/, 'Android native login must not launch browser OAuth from the WebView shell');
+  });
+
   it('loads the real Trashed driver page as the native shell', () => {
     const capacitorConfig = read('capacitor.config.ts');
     assert.match(capacitorConfig, /https:\/\/trashed\.app/, 'TestFlight default should target production Trashed');
@@ -65,8 +83,14 @@ describe('mobile WebView shell contract', () => {
 
     const app = read('App.tsx');
     assert.match(app, /driverMap/, 'local preview fallback should still expose the driver map');
+    assert.match(app, /urlParams\.get\('view'\)/, 'local preview fallback should support view-specific screenshot and smoke-test entrypoints');
     assert.match(app, /urlParams\.get\('theme'\) \|\| urlParams\.get\('mode'\)/, 'driver shell should accept native theme context from the URL');
     assert.match(app, /env\(safe-area-inset-top/, 'iOS route overlays should account for the status bar safe area');
+    assert.match(app, /vendorAssistant/, 'mobile shell should expose the vendor AI assistant entrypoint');
+    assert.match(app, /data-native-action="openVendorAssistant"/, 'driver map should include a native action for opening vendor AI assistant');
+
+    const appConfig = read('services/appConfig.ts');
+    assert.match(appConfig, /assistant:\s*'\/vendor\/assistant'/, 'vendor AI assistant should route to the real vendor assistant page');
   });
 
   it('sends driver position beacons to the Trashed web app API from the WebView shell', () => {
@@ -95,6 +119,9 @@ describe('mobile WebView shell contract', () => {
     const app = read('App.tsx');
     assert.match(app, /startBackgroundDriverTracking/, 'App should start background tracking for driver routes');
     assert.match(app, /stopBackgroundDriverTracking/, 'App should stop background tracking on cleanup');
+    assert.match(app, /LOCATION_DISCLOSURE_STORAGE_KEY/, 'App should gate background tracking behind an explicit location disclosure');
+    assert.match(app, /even when the app is closed or not in use/, 'location disclosure should explain background location use');
+    assert.match(app, /persistent Android notification/, 'location disclosure should mention the foreground-service notification');
     assert.match(app, /const isRouteActive = useMemo\(\(\) => isRouteTrackingActive\(stops\), \[stops\]\)/, 'route activity should be derived from stop statuses');
     assert.doesNotMatch(app, /setIsRouteActive/, 'route activity should not be a stale one-way boolean');
     assert.match(app, /stop\.status === 'in-transit' \|\| stop\.status === 'arrived'/, 'route tracking should stop when all stops are completed');
