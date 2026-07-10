@@ -361,8 +361,13 @@ public class MainActivity extends BridgeActivity {
     }
 
     private List<String> setCookieHeaders(Map<String, List<String>> headers) {
-        List<String> cookies = headers.get("Set-Cookie");
-        return cookies == null ? java.util.Collections.emptyList() : cookies;
+        for (Map.Entry<String, List<String>> header : headers.entrySet()) {
+            if ("Set-Cookie".equalsIgnoreCase(header.getKey())) {
+                List<String> cookies = header.getValue();
+                return cookies == null ? java.util.Collections.emptyList() : cookies;
+            }
+        }
+        return java.util.Collections.emptyList();
     }
 
     private String readError(HttpURLConnection connection, String fallback) {
@@ -391,7 +396,7 @@ public class MainActivity extends BridgeActivity {
 
         try {
             URL url = new URL(driverUrl);
-            String origin = url.getProtocol() + "://" + url.getHost();
+            String origin = url.getProtocol() + "://" + url.getAuthority();
             return new AuthConfig(
                 origin,
                 driverUrl,
