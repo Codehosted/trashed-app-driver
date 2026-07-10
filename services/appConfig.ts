@@ -1,6 +1,7 @@
 export type VendorWebTarget =
   | 'dashboard'
   | 'dispatch'
+  | 'assistant'
   | 'rentals'
   | 'inventory'
   | 'customers'
@@ -29,6 +30,7 @@ export function buildVendorWebUrl(target: VendorWebTarget): string {
   const targetPaths: Record<VendorWebTarget, string> = {
     dashboard: '/vendor/dashboard',
     dispatch: '/vendor/dispatch',
+    assistant: '/vendor/assistant',
     rentals: '/vendor/rentals',
     inventory: '/vendor/inventory',
     customers: '/vendor/customers',

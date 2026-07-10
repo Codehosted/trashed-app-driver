@@ -1,11 +1,14 @@
 # Trashed Driver — App Store / Play Store Submission Packet
 
-Updated: 2026-06-12T03:14:19Z
+Updated: 2026-07-04
 
 ## App listing
 
 ### App name
 Trashed Driver
+
+### Android package name
+`com.trashed.driver`
 
 ### Subtitle / short description
 Realtime driver routes and vendor tools for dumpster haulers.
@@ -17,7 +20,7 @@ Trashed Driver gives dumpster rental teams a mobile-first command center for dai
 - Driver map and route action screen.
 - Foreground and background GPS position beacons for active driver routes.
 - Realtime driver tracking fanout through the Trashed web app and SpacetimeDB.
-- Vendor dashboard, dispatch, rentals, inventory, customers, and settings WebView tabs.
+- Vendor dashboard, dispatch, AI assistant, rentals, inventory, customers, and settings WebView routes.
 - Capacitor Android shell around the Trashed web app.
 - Local-first configuration for development and preview.
 
@@ -39,9 +42,9 @@ https://trashed.app/privacy
 
 ## Store review notes
 
-Trashed Driver is intended for authorized dumpster hauler/vendor teams using Trashed. The app includes a native mobile shell for drivers and WebView-based vendor operations. The driver map remains in-app and the vendor experience is loaded through Trashed web routes so vendors get the same dashboard, dispatch, rental, inventory, customer, and settings experience as the web product.
+Trashed Driver is intended for authorized dumpster hauler/vendor teams using Trashed. The app includes a native mobile shell for drivers and WebView-based vendor operations. The driver map remains in-app and the vendor experience is loaded through Trashed web routes so vendors get the same dashboard, dispatch, rental, inventory, customer, and settings experience as the web product, including the vendor AI assistant when the vendor account has AI access enabled.
 
-For this local Linux capture pass, no production credentials were used. Vendor WebView screenshots therefore show the Trashed sign-in gate. Authenticated screenshots should be regenerated on an Android device/emulator or Mac/iOS simulator once test vendor credentials are available.
+For the existing local browser capture pass, no production credentials were used. Vendor WebView screenshots therefore show the Trashed sign-in gate. Authenticated screenshots should be regenerated on an Android device/emulator or Mac/iOS simulator once test vendor credentials are available.
 
 ## Privacy and data-safety copy
 
@@ -52,10 +55,11 @@ Trashed Driver requests foreground and background location access so an active d
 - Approximate and precise foreground/background location while a driver route is active and permission is granted.
 - Driver route identifiers needed to associate a beacon with a route.
 - Device/network data required by the embedded Trashed web experience.
+- Notifications used for active route/background tracking status and app alerts when enabled.
 
 ### Data not intended for this build
 - No camera permission is declared in the Android manifest.
-- No contacts, microphone, calendar, or health data access is declared.
+- No contacts, microphone, calendar, or health data access is declared by the Android shell. The authenticated web vendor AI assistant may request browser microphone access only if that web feature is opened and the user grants it.
 
 ## Permissions currently declared on Android
 
@@ -65,6 +69,7 @@ Trashed Driver requests foreground and background location access so an active d
 - `android.permission.ACCESS_BACKGROUND_LOCATION`
 - `android.permission.FOREGROUND_SERVICE`
 - `android.permission.FOREGROUND_SERVICE_LOCATION`
+- `android.permission.POST_NOTIFICATIONS`
 
 ## Realtime verification status
 
@@ -86,11 +91,19 @@ GET /api/vendor/driver/tracking?routeUuid=... -> 200 { ok: true, positions: [...
 
 ### Artwork
 - `artwork/trashed-driver-icon.svg`
-- `artwork/trashed-driver-icon-1024.png` — 1024×1024 PNG
+- `artwork/play-store-icon-512.png` — 512×512 PNG for Google Play
+- `artwork/trashed-driver-icon-1024.png` — 1024×1024 source PNG
 - `artwork/feature-graphic-1024x500.png` — 1024×500 PNG
 
-### Linux preview screenshots
-All current screenshots were captured from local Linux browser preview at 1280×577.
+### Preview screenshots
+The `play-phone-*` screenshots are 1080×1920 PNGs that meet Google Play phone screenshot size/aspect constraints. They should be replaced with authenticated on-device captures before public launch so dispatch and assistant content are not just the sign-in gate.
+
+- `screenshots/play-phone-01-driver-dispatch.png`
+- `screenshots/play-phone-02-vendor-dispatch.png`
+- `screenshots/play-phone-03-vendor-ai-assistant.png`
+- `screenshots/play-phone-04-vendor-dashboard.png`
+
+Legacy local browser captures:
 
 - `screenshots/01-driver-home.png`
 - `screenshots/02-driver-route-started.png`
@@ -105,6 +118,13 @@ All current screenshots were captured from local Linux browser preview at 1280×
 
 - Regenerate official store screenshots from a real Android emulator/device and, later, iOS simulator/device on the Mac.
 - Capture authenticated vendor WebView pages with test vendor credentials instead of the login gate.
-- Verify Android foreground/background location permission prompts, persistent foreground-service notification, and GPS beaconing on-device.
+- Verify Android foreground/background location disclosure, permission prompts, persistent foreground-service notification, and GPS beaconing on-device.
+- Verify the driver map, vendor dispatch map, and vendor AI assistant routes with an authenticated vendor account that has AI access enabled.
 - Verify the driver map and vendor dispatch map with `NEXT_PUBLIC_GOOGLE_MAPS_API_KEY` configured in the target environment.
-- Complete final Android debug/release build once a JDK is installed on this Linux host or when testing from the Mac companion.
+- Build the final Play upload AAB with the production upload signing key before submission; local unsigned release bundles are not enough for Play Console upload.
+
+## Local validation
+
+```sh
+python3 scripts/validate-play-store-assets.py
+```

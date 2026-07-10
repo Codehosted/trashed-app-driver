@@ -11,6 +11,7 @@
     "cap:sync": "npm run build && npx cap sync android",
     "cap:sync:ios": "npm run build && TRASHED_WEB_URL=${TRASHED_WEB_URL:-https://trashed.app} npx cap sync ios",
     "cap:sync:ios:dev": "npm run build && TRASHED_WEB_URL=${TRASHED_WEB_URL:-https://preview.trashed.app} npx cap sync ios",
+    "android:install:device": "bash scripts/install-android-device.sh",
     "android:open": "npx cap open android",
     "ios:open": "npx cap open ios"
   },

@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { AnimatePresence, motion, PanInfo } from 'framer-motion';
-import { ChevronLeft, ChevronRight, List, Plus, Minus, User as UserIcon, Settings, Truck, Bell, LayoutDashboard, Route as RouteIcon } from 'lucide-react';
+import { ChevronLeft, ChevronRight, List, Plus, Minus, User as UserIcon, Settings, Truck, Bell, LayoutDashboard, Route as RouteIcon, Sparkles } from 'lucide-react';
 import { INITIAL_STOPS, INITIAL_MESSAGES, MAP_CONFIG, APP_CONFIG } from './constants';
 import { RouteStop, Theme } from './types';
 import { RoadMap } from './components/RoadMap';
@@ -23,6 +23,29 @@ interface DriverUser {
   photoURL: string | null;
 }
 
+type AppView = 'driverMap' | 'profile' | 'vendorDashboard' | 'vendorDispatch' | 'vendorAssistant';
+const LOCATION_DISCLOSURE_STORAGE_KEY = 'trashed_driver_location_disclosure_accepted';
+
+function getInitialView(): AppView {
+  const envView = import.meta.env.VITE_LOCAL_E2E_INITIAL_VIEW as AppView | undefined;
+  const urlParams = new URLSearchParams(window.location.search);
+  const queryView = urlParams.get('view') as AppView | null;
+  const requestedView = queryView || envView;
+
+  return requestedView === 'profile' ||
+    requestedView === 'vendorDashboard' ||
+    requestedView === 'vendorDispatch' ||
+    requestedView === 'vendorAssistant'
+    ? requestedView
+    : 'driverMap';
+}
+
+function readLocationDisclosureAccepted(): boolean {
+  if (typeof localStorage === 'undefined') return false;
+
+  return localStorage.getItem(LOCATION_DISCLOSURE_STORAGE_KEY) === '1';
+}
+
 // Haversine Distance Helper
 function getDistance(lat1: number, lon1: number, lat2: number, lon2: number) {
   const R = 6371; // km
@@ -43,8 +66,7 @@ export default function App() {
   // Auth State
   const [user, setUser] = useState<DriverUser | null>(null);
   const [authLoading] = useState(false);
-  const initialView = (import.meta.env.VITE_LOCAL_E2E_INITIAL_VIEW as 'driverMap' | 'profile' | 'vendorDashboard' | 'vendorDispatch' | undefined) || 'driverMap';
-  const [currentView, setCurrentView] = useState<'driverMap' | 'profile' | 'vendorDashboard' | 'vendorDispatch'>(initialView);
+  const [currentView, setCurrentView] = useState<AppView>(getInitialView);
 
   // App State
   const [stops, setStops] = useState<RouteStop[]>(INITIAL_STOPS);
@@ -53,6 +75,9 @@ export default function App() {
   const isRouteActive = useMemo(() => isRouteTrackingActive(stops), [stops]);
   const [theme, setTheme] = useState<Theme>('dark');
   const [zoom, setZoom] = useState(MAP_CONFIG.defaultZoom);
+  const [locationDisclosureAccepted, setLocationDisclosureAccepted] = useState(readLocationDisclosureAccepted);
+  const [locationDisclosureDismissed, setLocationDisclosureDismissed] = useState(false);
+  const [showLocationDisclosure, setShowLocationDisclosure] = useState(false);
 
   // Initialize theme and route context from URL query params
   useEffect(() => {
@@ -79,6 +104,10 @@ export default function App() {
   // when the app is backgrounded; browser preview falls back to navigator.geolocation.
   useEffect(() => {
     if (!isRouteActive) return;
+    if (!locationDisclosureAccepted) {
+      if (!locationDisclosureDismissed) setShowLocationDisclosure(true);
+      return;
+    }
 
     const routeUuid = activeRouteUuidRef.current || getDefaultDriverRouteUuid();
     if (!routeUuid) {
@@ -107,7 +136,7 @@ export default function App() {
       cancelled = true;
       void stopBackgroundDriverTracking(controller);
     };
-  }, [isRouteActive]);
+  }, [isRouteActive, locationDisclosureAccepted, locationDisclosureDismissed]);
 
   // Derived Travel Metrics (ETA)
   const travelStats = useMemo(() => {
@@ -178,6 +207,18 @@ export default function App() {
     });
   };
 
+  const handleAcceptLocationDisclosure = () => {
+    localStorage.setItem(LOCATION_DISCLOSURE_STORAGE_KEY, '1');
+    setLocationDisclosureAccepted(true);
+    setLocationDisclosureDismissed(false);
+    setShowLocationDisclosure(false);
+  };
+
+  const handleDismissLocationDisclosure = () => {
+    setLocationDisclosureDismissed(true);
+    setShowLocationDisclosure(false);
+  };
+
   // --- Auth & Routing Logic ---
 
   if (APP_CONFIG.enableAuth && authLoading) {
@@ -201,10 +242,16 @@ export default function App() {
     );
   }
 
-  if (currentView === 'vendorDashboard' || currentView === 'vendorDispatch') {
+  if (currentView === 'vendorDashboard' || currentView === 'vendorDispatch' || currentView === 'vendorAssistant') {
     return (
       <VendorExperienceWebView
-        initialTarget={currentView === 'vendorDispatch' ? 'dispatch' : 'dashboard'}
+        initialTarget={
+          currentView === 'vendorDispatch'
+            ? 'dispatch'
+            : currentView === 'vendorAssistant'
+              ? 'assistant'
+              : 'dashboard'
+        }
         theme={theme}
         onBackToDriverMap={() => setCurrentView('driverMap')}
       />
@@ -221,6 +268,60 @@ export default function App() {
         notification={activeNotification}
         onClose={() => setActiveNotification(null)}
       />
+
+      <AnimatePresence>
+        {showLocationDisclosure && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="absolute inset-0 z-50 flex items-end justify-center bg-black/50 p-4 backdrop-blur-sm sm:items-center"
+          >
+            <motion.div
+              initial={{ y: 24, opacity: 0 }}
+              animate={{ y: 0, opacity: 1 }}
+              exit={{ y: 24, opacity: 0 }}
+              className={`w-full max-w-md rounded-3xl border p-5 shadow-2xl ${
+                theme === 'dark'
+                  ? 'border-slate-700 bg-slate-950 text-white'
+                  : 'border-slate-200 bg-white text-slate-950'
+              }`}
+            >
+              <div className="mb-3 flex h-11 w-11 items-center justify-center rounded-2xl bg-indigo-500/15 text-indigo-300">
+                <RouteIcon size={20} />
+              </div>
+              <p className="text-xs font-black uppercase tracking-[0.2em] text-indigo-400">Location sharing</p>
+              <h2 className="mt-2 text-xl font-black tracking-tight">Share route location with dispatch?</h2>
+              <p className={`mt-3 text-sm leading-6 ${theme === 'dark' ? 'text-slate-300' : 'text-slate-600'}`}>
+                This app collects location data to enable active route tracking and dispatch visibility even when the app is closed or not in use.
+              </p>
+              <p className={`mt-2 text-xs leading-5 ${theme === 'dark' ? 'text-slate-400' : 'text-slate-500'}`}>
+                Tracking starts only for an active driver route and uses a persistent Android notification while background tracking is running.
+              </p>
+              <div className="mt-5 flex gap-2">
+                <button
+                  type="button"
+                  onClick={handleDismissLocationDisclosure}
+                  className={`h-11 flex-1 rounded-2xl text-sm font-bold ${
+                    theme === 'dark'
+                      ? 'bg-slate-800 text-slate-200 hover:bg-slate-700'
+                      : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                  }`}
+                >
+                  Not now
+                </button>
+                <button
+                  type="button"
+                  onClick={handleAcceptLocationDisclosure}
+                  className="h-11 flex-1 rounded-2xl bg-indigo-600 text-sm font-black text-white shadow-lg shadow-indigo-600/25 hover:bg-indigo-500"
+                >
+                  Continue
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Top Overlay Gradient */}
       <div className={`absolute top-0 w-full h-32 bg-gradient-to-b z-10 pointer-events-none transition-colors duration-500 ${
@@ -366,6 +467,19 @@ export default function App() {
                 aria-label="Open vendor dispatch"
             >
                 <RouteIcon size={16} />
+            </button>
+
+            <button
+                data-native-action="openVendorAssistant"
+                onClick={() => setCurrentView('vendorAssistant')}
+                className={`w-9 h-9 backdrop-blur border rounded-full shadow-lg flex items-center justify-center transition-colors ${
+                    theme === 'dark'
+                    ? 'bg-slate-800/80 border-slate-700 text-white hover:bg-slate-700'
+                    : 'bg-white/80 border-slate-200 text-slate-700 hover:bg-slate-50'
+                }`}
+                aria-label="Open vendor AI assistant"
+            >
+                <Sparkles size={16} />
             </button>
         </div>
 
