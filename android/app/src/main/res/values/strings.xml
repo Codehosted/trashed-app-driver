@@ -4,4 +4,6 @@
     <string name="title_activity_main">Trashed Driver</string>
     <string name="package_name">com.trashed.driver</string>
     <string name="custom_url_scheme">com.trashed.driver</string>
+    <string name="continue_with_google">Continue with Google</string>
+    <string name="sign_in">Sign In</string>
 </resources>
