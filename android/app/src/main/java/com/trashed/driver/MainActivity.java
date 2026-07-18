@@ -112,7 +112,7 @@ public class MainActivity extends BridgeActivity {
         card.addView(body, matchWrapParams());
 
         googleButton = new Button(this);
-        googleButton.setText("Continue with Google");
+        googleButton.setText(R.string.continue_with_google);
         googleButton.setTextColor(Color.rgb(15, 23, 42));
         googleButton.setTextSize(16);
         googleButton.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
@@ -136,7 +136,7 @@ public class MainActivity extends BridgeActivity {
         card.addView(passwordField, fieldParams());
 
         signInButton = new Button(this);
-        signInButton.setText("Sign In");
+        signInButton.setText(R.string.sign_in);
         signInButton.setTextColor(Color.WHITE);
         signInButton.setTextSize(16);
         signInButton.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
