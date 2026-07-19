@@ -1,5 +1,32 @@
 apply plugin: 'com.android.application'
 
+def envValue = { String name ->
+    def value = System.getenv(name)
+    value == null ? null : value.trim()
+}
+
+def signingEnvironment = [
+    keystore: envValue('TRASHED_ANDROID_KEYSTORE'),
+    alias: envValue('TRASHED_ANDROID_KEY_ALIAS'),
+    storePassword: envValue('TRASHED_ANDROID_KEYSTORE_PASSWORD'),
+    keyPassword: envValue('TRASHED_ANDROID_KEY_PASSWORD')
+]
+def hasAnySigningValue = signingEnvironment.values().any { it }
+def hasCompleteSigningEnvironment = signingEnvironment.values().every { it }
+def requireSigning = envValue('TRASHED_REQUIRE_SIGNING')?.toBoolean() ?: false
+def configuredVersionCode = (envValue('TRASHED_ANDROID_VERSION_CODE') ?: '1').toInteger()
+def configuredVersionName = envValue('TRASHED_ANDROID_VERSION_NAME') ?: '1.0'
+
+if (hasAnySigningValue && !hasCompleteSigningEnvironment) {
+    throw new GradleException('Android release signing is partially configured; all TRASHED_ANDROID_* signing variables are required')
+}
+if (requireSigning && !hasCompleteSigningEnvironment) {
+    throw new GradleException('TRASHED_REQUIRE_SIGNING=true but Android release signing is not configured')
+}
+if (hasCompleteSigningEnvironment && !file(signingEnvironment.keystore).isFile()) {
+    throw new GradleException('TRASHED_ANDROID_KEYSTORE does not point to a readable file')
+}
+
 android {
     namespace "com.trashed.driver"
     compileSdk rootProject.ext.compileSdkVersion
@@ -7,8 +34,8 @@ android {
         applicationId "com.trashed.driver"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 1
-        versionName "1.0"
+        versionCode configuredVersionCode
+        versionName configuredVersionName
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
              // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.
@@ -16,8 +43,25 @@ android {
             ignoreAssetsPattern '!.svn:!.git:!.ds_store:!*.scc:.*:!CVS:!thumbs.db:!picasa.ini:!*~'
         }
     }
+    signingConfigs {
+        if (hasCompleteSigningEnvironment) {
+            release {
+                storeFile file(signingEnvironment.keystore)
+                storePassword signingEnvironment.storePassword
+                keyAlias signingEnvironment.alias
+                keyPassword signingEnvironment.keyPassword
+                enableV1Signing true
+                enableV2Signing true
+                enableV3Signing true
+                enableV4Signing true
+            }
+        }
+    }
     buildTypes {
         release {
+            if (hasCompleteSigningEnvironment) {
+                signingConfig signingConfigs.release
+            }
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
         }

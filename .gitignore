@@ -27,6 +27,10 @@ dist-ssr
 .expo/
 expo-env.d.ts
 bun.lockb
+.gradle-user/
+android/.gradle-user/
+artifacts/
+qa-artifacts/
 
 # Signing material and local backups
 credentials/
