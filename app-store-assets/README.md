@@ -14,11 +14,11 @@ Trashed
 Run your waste management operation on-the-go.
 
 ### Full description
-Trashed Driver gives dumpster rental teams a mobile-first command center for daily routes, delivery and pickup stops, and vendor operations. Drivers can keep the live route map open, start routes, mark arrival, and share realtime position beacons with dispatch. Vendors can open the full Trashed experience inside secure WebViews for dispatch, rentals, inventory, customers, and settings.
+Trashed Driver gives dumpster rental teams a mobile-first command center for daily routes, delivery and pickup stops, and vendor operations. Drivers can keep the live route map open, start routes, mark arrival, and share realtime position beacons with dispatch. When a driver goes online, Trashed Driver can continue sharing precise location with the assigned vendor's dispatch team while the app is closed or not in use, until the driver goes offline. Vendors can open the full Trashed experience inside secure WebViews for dispatch, rentals, inventory, customers, and settings.
 
 ### Key features
 - Driver map and route action screen.
-- Foreground and background GPS position beacons for active driver routes.
+- Foreground and background GPS position beacons while the driver is online.
 - Realtime driver tracking fanout through the Trashed web app and SpacetimeDB.
 - Vendor dashboard, dispatch, AI assistant, rentals, inventory, customers, and settings WebView routes.
 - Capacitor Android shell around the Trashed web app.
@@ -50,18 +50,18 @@ Reviewer username: `play-reviewer@codehosted.com`
 
 Google Play instructions:
 
-> Open Trashed Driver. Under OR SIGN IN WITH EMAIL, enter the username and password above; tap Sign In. Do not use Google. Allow notifications. The account opens a synthetic route. Open the route list to select a stop. Tap chat for messages. Tap a stop, then camera, for saved photos. For background location, tap Go Online, review the disclosure, tap Continue, and allow precise location. Android shows a persistent tracking notification. Tap Go Offline to stop. No OTP or payment is required.
+> Open Trashed Driver. Under OR SIGN IN WITH EMAIL, enter the username and password above; tap Sign In. Do not use Google. Allow notifications. The account opens a synthetic route. Open the route list to select a stop. Tap chat for messages. Tap a stop, then camera, for saved photos. For background location, tap Go Online, review the disclosure, tap Share location, and allow precise location. Android shows a persistent tracking notification. Tap Go Offline to stop. No OTP or payment is required.
 
 ## Privacy and data-safety copy
 
 ### Location permission rationale
-Trashed Driver requests precise location access so a user-initiated active driver route can continue sharing realtime position beacons with dispatch/vendor map views when the driver switches apps, locks the device, or leaves the app in the background. Location is used to display route progress and help dispatch coordinate dumpster deliveries, swaps, and pickups. Tracking starts only for an active route and continues in a location foreground service with a persistent Android notification while tracking is running. The app does not request Android's separate background-location permission.
+Trashed Driver requests precise location access so a driver who chooses Go Online can continue sharing realtime position beacons with the assigned vendor's dispatch team when the driver switches apps, locks the device, or leaves the app in the background. Location is used to display route progress and help dispatch coordinate dumpster deliveries, swaps, and pickups. Tracking continues in a location foreground service with a persistent Android notification while the driver is online and stops when the driver chooses Go Offline. The app does not request Android's separate background-location permission.
 
 ### Data collected / processed
-- Approximate and precise location while a user-initiated driver route is active and permission is granted, including while the app is backgrounded under the location foreground service.
+- Approximate and precise location while the driver is online and permission is granted, including while the app is backgrounded under the location foreground service.
 - Driver route identifiers needed to associate a beacon with a route.
 - Device/network data required by the embedded Trashed web experience.
-- Notifications used for active route/background tracking status and app alerts when enabled.
+- Notifications used for foreground-service tracking status and app alerts when enabled.
 
 ### Data not intended for this build
 - No camera permission is declared in the Android manifest.
