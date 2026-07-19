@@ -40,6 +40,10 @@ https://trashed.app
 ### Privacy Policy
 https://trashed.app/privacy
 
+### Public app contact
+- Email: support@trashed.app
+- Phone: +1 888-830-9750
+
 ## Store review notes
 
 Trashed Driver is intended for authorized dumpster hauler/vendor teams using Trashed. The app includes a native mobile shell for drivers and WebView-based vendor operations. The driver map remains in-app and the vendor experience is loaded through Trashed web routes so vendors get the same dashboard, dispatch, rental, inventory, customer, and settings experience as the web product, including the vendor AI assistant when the vendor account has AI access enabled.
@@ -124,6 +128,8 @@ Legacy local browser captures:
 ## Verified release state
 
 - Signed Android App Bundle `1.0.1 (2)` is active on Google Play internal testing.
+- The exact en-US title, short description, full description, icon, feature graphic, and four phone screenshots are committed through the Android Publisher API.
+- Google Play production has a saved draft release named `1.0.1 (2) - Production` using version code `2`; the first public rollout still requires completing the Play Console declarations and starting review.
 - Google Play app-signing SHA-1 and SHA-256 certificates are registered with Firebase.
 - Android precise-location disclosure and the persistent location foreground service were verified on a physical Pixel 2 while the screen was off.
 - A real FCM notification was delivered to the physical device while it was dozing.
