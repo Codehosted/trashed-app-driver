@@ -26,6 +26,10 @@ def check_png(path: Path, size: Optional[tuple[int, int]] = None, max_bytes: Opt
 def check_screenshot(path: Path) -> None:
     check_png(path)
     with Image.open(path) as image:
+        if image.size != (1080, 1920):
+            raise SystemExit(f"{path} must be 1080x1920, got {image.size[0]}x{image.size[1]}")
+        if image.mode != "RGB":
+            raise SystemExit(f"{path} must be RGB with no alpha channel, got {image.mode}")
         width, height = image.size
         shortest = min(width, height)
         longest = max(width, height)

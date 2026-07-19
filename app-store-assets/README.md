@@ -1,6 +1,6 @@
 # Trashed Driver — App Store / Play Store Submission Packet
 
-Updated: 2026-07-04
+Updated: 2026-07-19
 
 ## App listing
 
@@ -44,7 +44,13 @@ https://trashed.app/privacy
 
 Trashed Driver is intended for authorized dumpster hauler/vendor teams using Trashed. The app includes a native mobile shell for drivers and WebView-based vendor operations. The driver map remains in-app and the vendor experience is loaded through Trashed web routes so vendors get the same dashboard, dispatch, rental, inventory, customer, and settings experience as the web product, including the vendor AI assistant when the vendor account has AI access enabled.
 
-For the existing local browser capture pass, no production credentials were used. Vendor WebView screenshots therefore show the Trashed sign-in gate. Authenticated screenshots should be regenerated on an Android device/emulator or Mac/iOS simulator once test vendor credentials are available.
+A dedicated, non-privileged Google Play reviewer account is configured in an isolated synthetic vendor tenant. Its password is stored in macOS Keychain under service `com.codehosted.trashed-driver.play-reviewer`; it is never stored in this repository. The reviewer fixture provides a fresh daily three-stop route through 2026-10-17, three dispatch messages, and three route photos for every first stop.
+
+Reviewer username: `play-reviewer@codehosted.com`
+
+Google Play instructions:
+
+> Open Trashed Driver. Under OR SIGN IN WITH EMAIL, enter the username and password above; tap Sign In. Do not use Google. Allow notifications. The account opens a synthetic route. Open the route list to select a stop. Tap chat for messages. Tap a stop, then camera, for saved photos. For background location, tap Go Online, review the disclosure, tap Continue, and allow precise location. Android shows a persistent tracking notification. Tap Go Offline to stop. No OTP or payment is required.
 
 ## Privacy and data-safety copy
 
@@ -94,13 +100,15 @@ GET /api/vendor/driver/tracking?routeUuid=... -> 200 { ok: true, positions: [...
 - `artwork/trashed-driver-icon-1024.png` — 1024×1024 source PNG
 - `artwork/feature-graphic-1024x500.png` — 1024×500 PNG
 
-### Preview screenshots
-The `play-phone-*` screenshots are 1080×1920 PNGs that meet Google Play phone screenshot size/aspect constraints. They should be replaced with authenticated on-device captures before public launch so dispatch and assistant content are not just the sign-in gate.
+### Google Play phone screenshots
+The current `play-phone-*` set is built from authenticated 1080×1920 Pixel 2 captures. Exact UI pixels are preserved inside a deterministic product frame. Nano Banana 2 (`gemini-3.1-flash-image`) generated only the abstract background and synthetic route-photo content, so it could not alter interface text, maps, icons, or controls.
 
-- `screenshots/play-phone-01-driver-dispatch.png`
-- `screenshots/play-phone-02-vendor-dispatch.png`
-- `screenshots/play-phone-03-vendor-ai-assistant.png`
-- `screenshots/play-phone-04-vendor-dashboard.png`
+- `screenshots/play-phone-01-driver-routes.png` — three-stop daily route.
+- `screenshots/play-phone-02-dispatch-messages.png` — driver/dispatch conversation.
+- `screenshots/play-phone-03-customer-details.png` — synthetic customer route card.
+- `screenshots/play-phone-04-route-photos.png` — three artifact-checked route photos.
+
+All four files are 1080×1920 RGB PNGs with no alpha channel. Source captures are intentionally kept under the ignored `build/play-review-capture/` directory rather than committed.
 
 Legacy local browser captures:
 
@@ -113,14 +121,13 @@ Legacy local browser captures:
 - `screenshots/07-vendor-customers-webview.png`
 - `screenshots/08-vendor-settings-webview.png`
 
-## Release caveats before public store submission
+## Verified release state
 
-- Regenerate official store screenshots from a real Android emulator/device and, later, iOS simulator/device on the Mac.
-- Capture authenticated vendor WebView pages with test vendor credentials instead of the login gate.
-- Verify Android precise-location prompt, prominent background-use disclosure, persistent foreground-service notification, and GPS beaconing on-device while the app is backgrounded.
-- Verify the driver map, vendor dispatch map, and vendor AI assistant routes with an authenticated vendor account that has AI access enabled.
-- Verify the driver map and vendor dispatch map with `NEXT_PUBLIC_GOOGLE_MAPS_API_KEY` configured in the target environment.
-- Build the final Play upload AAB with the production upload signing key before submission; local unsigned release bundles are not enough for Play Console upload.
+- Signed Android App Bundle `1.0.1 (2)` is active on Google Play internal testing.
+- Google Play app-signing SHA-1 and SHA-256 certificates are registered with Firebase.
+- Android precise-location disclosure and the persistent location foreground service were verified on a physical Pixel 2 while the screen was off.
+- A real FCM notification was delivered to the physical device while it was dozing.
+- The isolated reviewer password login, current route, messages, customer detail, and saved photos were verified against production.
 
 ## Local validation
 
