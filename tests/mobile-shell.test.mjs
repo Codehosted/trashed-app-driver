@@ -6,6 +6,7 @@ import { describe, it } from 'node:test';
 const root = new URL('..', import.meta.url).pathname;
 const read = (relativePath) => readFileSync(join(root, relativePath), 'utf8');
 const pkg = JSON.parse(read('package.json'));
+const packageLock = JSON.parse(read('package-lock.json'));
 
 const dependencies = {
   ...pkg.dependencies,
@@ -127,7 +128,7 @@ describe('mobile WebView shell contract', () => {
     assert.match(app, /stop\.status === 'in-transit' \|\| stop\.status === 'arrived'/, 'route tracking should stop when all stops are completed');
 
     const manifest = read('android/app/src/main/AndroidManifest.xml');
-    assert.match(manifest, /ACCESS_BACKGROUND_LOCATION/, 'Android manifest should declare background location permission');
+    assert.doesNotMatch(manifest, /ACCESS_BACKGROUND_LOCATION/, 'user-started foreground tracking must not request Android background location permission');
     assert.match(manifest, /FOREGROUND_SERVICE_LOCATION/, 'Android manifest should declare foreground service location permission');
 
     const iosInfo = read('ios/App/App/Info.plist');
@@ -136,6 +137,39 @@ describe('mobile WebView shell contract', () => {
     assert.match(iosInfo, /NSLocationAlwaysAndWhenInUseUsageDescription/, 'iOS must explain background location use');
     assert.match(iosInfo, /UIBackgroundModes[\s\S]*location/, 'iOS must enable background location mode');
     assert.match(iosController, /driverSafeAreaScript[\s\S]*safe-area-inset-top/, 'iOS WebView should inject safe-area protection for the remote driver page');
+  });
+
+  it('configures Android background delivery and Capacitor 7 push notifications', () => {
+    const pushVersion = dependencies['@capacitor/push-notifications'];
+    assert.match(pushVersion, /^[~^]?7\./, 'push notifications plugin should match Capacitor 7');
+    assert.equal(
+      packageLock.packages[''].dependencies['@capacitor/push-notifications'],
+      pushVersion,
+      'package lock should pin the declared push notifications range'
+    );
+    assert.match(
+      packageLock.packages['node_modules/@capacitor/push-notifications'].version,
+      /^7\./,
+      'package lock should resolve a Capacitor 7 push notifications plugin'
+    );
+
+    const capacitorBuild = read('android/app/capacitor.build.gradle');
+    const capacitorSettings = read('android/capacitor.settings.gradle');
+    assert.match(capacitorBuild, /implementation project\(':capacitor-push-notifications'\)/, 'Android build should include the push plugin');
+    assert.match(capacitorSettings, /node_modules\/@capacitor\/push-notifications\/android/, 'Android settings should register the push plugin');
+
+    const capacitorConfig = read('capacitor.config.ts');
+    assert.match(capacitorConfig, /useLegacyBridge:\s*true/, 'Android legacy bridge should keep background location callbacks alive');
+    assert.doesNotMatch(capacitorConfig, /CapacitorHttp:\s*{[\s\S]*?enabled:\s*true/, 'native HTTP must not globally patch WebView requests');
+
+    const manifest = read('android/app/src/main/AndroidManifest.xml');
+    assert.match(manifest, /android\.permission\.POST_NOTIFICATIONS/, 'Android 13+ should declare notification permission');
+
+    const instrumentedTest = read('android/app/src/androidTest/java/com/getcapacitor/myapp/ExampleInstrumentedTest.java');
+    assert.match(instrumentedTest, /assertEquals\("com\.trashed\.driver"/, 'instrumented test should assert the production package');
+
+    const installer = read('scripts/install-android-device.sh');
+    assert.doesNotMatch(installer, /\bmapfile\b/, 'device installer should work with macOS Bash 3.2');
   });
 
   it('keeps Google geocoding behind Trashed web API routes, not mobile credentials', () => {

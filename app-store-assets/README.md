@@ -49,10 +49,10 @@ For the existing local browser capture pass, no production credentials were used
 ## Privacy and data-safety copy
 
 ### Location permission rationale
-Trashed Driver requests foreground and background location access so an active driver route can continue sharing realtime position beacons with dispatch/vendor map views when the driver switches apps, locks the device, or leaves the app in the background. Location is used to display route progress and help dispatch coordinate dumpster deliveries, swaps, and pickups. Background tracking starts only for an active route and uses a persistent Android foreground-service notification while tracking is running.
+Trashed Driver requests precise location access so a user-initiated active driver route can continue sharing realtime position beacons with dispatch/vendor map views when the driver switches apps, locks the device, or leaves the app in the background. Location is used to display route progress and help dispatch coordinate dumpster deliveries, swaps, and pickups. Tracking starts only for an active route and continues in a location foreground service with a persistent Android notification while tracking is running. The app does not request Android's separate background-location permission.
 
 ### Data collected / processed
-- Approximate and precise foreground/background location while a driver route is active and permission is granted.
+- Approximate and precise location while a user-initiated driver route is active and permission is granted, including while the app is backgrounded under the location foreground service.
 - Driver route identifiers needed to associate a beacon with a route.
 - Device/network data required by the embedded Trashed web experience.
 - Notifications used for active route/background tracking status and app alerts when enabled.
@@ -66,7 +66,6 @@ Trashed Driver requests foreground and background location access so an active d
 - `android.permission.INTERNET`
 - `android.permission.ACCESS_COARSE_LOCATION`
 - `android.permission.ACCESS_FINE_LOCATION`
-- `android.permission.ACCESS_BACKGROUND_LOCATION`
 - `android.permission.FOREGROUND_SERVICE`
 - `android.permission.FOREGROUND_SERVICE_LOCATION`
 - `android.permission.POST_NOTIFICATIONS`
@@ -118,7 +117,7 @@ Legacy local browser captures:
 
 - Regenerate official store screenshots from a real Android emulator/device and, later, iOS simulator/device on the Mac.
 - Capture authenticated vendor WebView pages with test vendor credentials instead of the login gate.
-- Verify Android foreground/background location disclosure, permission prompts, persistent foreground-service notification, and GPS beaconing on-device.
+- Verify Android precise-location prompt, prominent background-use disclosure, persistent foreground-service notification, and GPS beaconing on-device while the app is backgrounded.
 - Verify the driver map, vendor dispatch map, and vendor AI assistant routes with an authenticated vendor account that has AI access enabled.
 - Verify the driver map and vendor dispatch map with `NEXT_PUBLIC_GOOGLE_MAPS_API_KEY` configured in the target environment.
 - Build the final Play upload AAB with the production upload signing key before submission; local unsigned release bundles are not enough for Play Console upload.
