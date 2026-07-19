@@ -81,10 +81,10 @@ fg.save(root / 'artwork' / 'feature-graphic-1024x500.png')
 metadata = '''# Trashed Driver — App Store / Play Store Submission Notes
 
 ## App name
-Trashed Driver
+Trashed
 
 ## Subtitle / short description
-Realtime driver routes and vendor tools for dumpster haulers.
+Run your waste management operation on-the-go.
 
 ## Full description
 Trashed Driver gives dumpster rental teams a mobile-first command center for daily routes, delivery and pickup stops, and vendor operations. Drivers can keep the live route map open, start routes, mark arrival, and share realtime position beacons with dispatch. Vendors can open the full Trashed experience inside secure WebViews for dispatch, rentals, inventory, customers, and settings.
