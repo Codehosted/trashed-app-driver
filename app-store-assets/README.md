@@ -123,6 +123,13 @@ The current `play-phone-*` set is built from authenticated 1080×1920 Pixel 2 ca
 
 All four files are 1080×1920 RGB PNGs with no alpha channel. Source captures are intentionally kept under the ignored `build/play-review-capture/` directory rather than committed.
 
+### Google Play review evidence
+
+- `review/foreground-service/trashed-driver-fgs-declaration.mp4` — 29-second foreground-service declaration video built from actual Android captures.
+- `review/foreground-service/trashed-driver-fgs-storyboard.png` — visual storyboard/contact sheet.
+- `review/foreground-service/trashed-driver-fgs-storyboard.md` — scene timing, capture provenance, and claim boundaries.
+- `review/foreground-service/MANIFEST.md` and `review/foreground-service/SHA256SUMS.txt` — submission snapshot, media metadata, and integrity hashes.
+
 Legacy local browser captures:
 
 - `screenshots/01-driver-home.png`
@@ -136,21 +143,21 @@ Legacy local browser captures:
 
 ## Verified release state
 
-- Signed Android App Bundle `1.0.1 (2)` is active on Google Play internal testing.
+- Google Play production release `1.0.1 (2)` was submitted on 2026-07-19. Play Console showed **Changes in review** after submission. Production availability is United States.
+- Signed Android App Bundle `1.0.1 (2)` remains active on Google Play internal testing.
 - The exact en-US title, short description, full description, icon, feature graphic, and four phone screenshots are committed through the Android Publisher API.
-- Google Play production has a saved draft release named `1.0.1 (2) - Production` using version code `2`; the first public rollout still requires completing the Play Console declarations and starting review.
+- The foreground-service declaration includes a 29-second reviewer video made from actual Android screenshots and an actual ADB lock-screen recording.
+- Advertising ID is declared **No**; the tracked Android manifest contains no `android.permission.AD_ID` declaration.
 - Google Play app-signing SHA-1 and SHA-256 certificates are registered with Firebase.
 - Android precise-location disclosure and the persistent location foreground service were verified on a physical Pixel 2 while the screen was off.
 - A real FCM notification was delivered to the physical device while it was dozing.
 - The isolated reviewer password login, current route, messages, customer detail, and saved photos were verified against production.
+- Reviewer credentials remain Keychain-only; no reviewer password is stored in the repository.
 
-## Remaining Google Play Console work
+## Google Play review status
 
-- Select the United States for production availability.
-- Complete the location foreground-service declaration and attach the reviewer demonstration video.
-- Verify the saved reviewer username, password, and access instructions in App access.
-- Complete Target audience, Content rating, Government apps, Financial features, Health apps, category, pricing, and distribution declarations.
-- Resolve any remaining Publishing overview warnings, then choose **Send for review**.
+- Submission tasks are complete. Google Play review remains pending.
+- **Changes in review** records submission, not approval or public publication.
 
 ## Local validation
 
