@@ -71,6 +71,15 @@ Trashed Driver requests precise location access so a driver who chooses Go Onlin
 - No camera permission is declared in the Android manifest.
 - No contacts, microphone, calendar, or health data access is declared by the Android shell. The authenticated web vendor AI assistant may request browser microphone access only if that web feature is opened and the user grants it.
 
+## Google Play Data Safety submission
+
+- Submitted successfully through the Android Publisher API with HTTP `204`.
+- Submitted CSV SHA-256: `8b8b24d9518efeda7140115505f3e52f60264c269f068b9550461acd793655e7`.
+- The declaration covers all 24 applicable Google Play data types across the native driver shell and the full authenticated vendor WebView experience.
+- Declared data is collected, not shared, and encrypted in transit.
+- Users can request deletion at https://trashed.app/privacy.
+- The app does not create accounts in-app. Accounts are created outside the app by an employer or enterprise and then used to sign in.
+
 ## Permissions currently declared on Android
 
 - `android.permission.INTERNET`
@@ -134,6 +143,14 @@ Legacy local browser captures:
 - Android precise-location disclosure and the persistent location foreground service were verified on a physical Pixel 2 while the screen was off.
 - A real FCM notification was delivered to the physical device while it was dozing.
 - The isolated reviewer password login, current route, messages, customer detail, and saved photos were verified against production.
+
+## Remaining Google Play Console work
+
+- Select the United States for production availability.
+- Complete the location foreground-service declaration and attach the reviewer demonstration video.
+- Verify the saved reviewer username, password, and access instructions in App access.
+- Complete Target audience, Content rating, Government apps, Financial features, Health apps, category, pricing, and distribution declarations.
+- Resolve any remaining Publishing overview warnings, then choose **Send for review**.
 
 ## Local validation
 
