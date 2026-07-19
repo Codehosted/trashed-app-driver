@@ -1,0 +1,55 @@
+{
+  "project_info": {
+    "project_number": "151975222689",
+    "project_id": "trashed-app",
+    "storage_bucket": "trashed-app.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:151975222689:android:316ed9b8f1583c0ea9bfe0",
+        "android_client_info": {
+          "package_name": "com.trashed.driver"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "151975222689-ei612rvbjm81cmt42riqd6hslphdjoce.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.trashed.driver",
+            "certificate_hash": "45b8ffa22fe8b43dbed6d636c775422660a315bd"
+          }
+        },
+        {
+          "client_id": "151975222689-l7bkn1fj9381kkv8tsts3s222kkl82nl.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.trashed.driver",
+            "certificate_hash": "1dc9fdec2c43a12603309d55ba5b4b16f6814858"
+          }
+        },
+        {
+          "client_id": "151975222689-vbf81b007o7if4ajtjkjs2b07lf636f9.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCMMGCipLWYJGUm7EwPLt6e-qH-rC073BA"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "151975222689-vbf81b007o7if4ajtjkjs2b07lf636f9.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

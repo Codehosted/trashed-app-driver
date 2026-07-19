@@ -20,6 +20,7 @@
     "@capacitor/android": "^7.4.4",
     "@capacitor/core": "^7.4.4",
     "@capacitor/ios": "^7.6.6",
+    "@capacitor/push-notifications": "^7.0.7",
     "@google/genai": "^1.31.0",
     "framer-motion": "^12.23.25",
     "lucide-react": "^0.555.0",

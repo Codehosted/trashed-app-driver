@@ -16,13 +16,12 @@ if [[ ! -f "$APK_PATH" ]]; then
 fi
 
 adb start-server >/dev/null
-mapfile -t devices < <(adb devices | awk 'NR > 1 && $2 == "device" { print $1 }')
-mapfile -t physical_devices < <(printf '%s\n' "${devices[@]}" | awk '$1 !~ /^emulator-/ { print $1 }')
+physical_device="$(adb devices | awk 'NR > 1 && $2 == "device" && $1 !~ /^emulator-/ { print $1; exit }')"
 
 if [[ -n "${ANDROID_SERIAL:-}" ]]; then
   device="$ANDROID_SERIAL"
-elif [[ "${#physical_devices[@]}" -gt 0 ]]; then
-  device="${physical_devices[0]}"
+elif [[ -n "$physical_device" ]]; then
+  device="$physical_device"
 else
   adb devices -l
   echo "No authorized physical Android device found. Enable USB debugging, accept the RSA prompt, and reconnect with a data-capable cable." >&2
