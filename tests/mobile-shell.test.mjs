@@ -156,4 +156,30 @@ describe('mobile WebView shell contract', () => {
       'driver mobile source must not ship Google API credentials or call Google APIs directly'
     );
   });
+
+  it('uses environment-only signing for fail-closed Android release builds', () => {
+    const androidBuild = read('android/app/build.gradle');
+    assert.match(androidBuild, /TRASHED_ANDROID_KEYSTORE/, 'release signing should read the keystore path from the environment');
+    assert.match(androidBuild, /TRASHED_ANDROID_KEY_ALIAS/, 'release signing should read the key alias from the environment');
+    assert.match(androidBuild, /TRASHED_ANDROID_KEYSTORE_PASSWORD/, 'release signing should read the store password from the environment');
+    assert.match(androidBuild, /TRASHED_ANDROID_KEY_PASSWORD/, 'release signing should read the key password from the environment');
+    assert.match(androidBuild, /TRASHED_REQUIRE_SIGNING/, 'CI should be able to require signing and fail closed');
+    assert.doesNotMatch(androidBuild, /storePassword\s+['"][^'"]+['"]/, 'Gradle must not contain a hard-coded store password');
+    assert.doesNotMatch(androidBuild, /keyPassword\s+['"][^'"]+['"]/, 'Gradle must not contain a hard-coded key password');
+  });
+
+  it('has a production-targeted Android CI build that verifies release artifacts', () => {
+    assert.ok(existsSync(join(root, 'scripts/ci-build-android.sh')), 'missing Android CI build script');
+    const script = read('scripts/ci-build-android.sh');
+    assert.match(script, /TRASHED_WEB_URL=https:\/\/trashed\.app/, 'release CI must target production Trashed');
+    assert.match(script, /npm ci/, 'CI should install from the npm lockfile');
+    assert.match(script, /npm test/, 'CI should run the mobile contract tests');
+    assert.match(script, /lintRelease/, 'release CI should run Android lint');
+    assert.match(script, /testReleaseUnitTest/, 'release CI should run Android unit tests');
+    assert.match(script, /assembleRelease/, 'release CI should build an APK');
+    assert.match(script, /bundleRelease/, 'release CI should build an AAB');
+    assert.match(script, /apksigner verify/, 'release CI should verify the APK signature');
+    assert.match(script, /jarsigner -verify/, 'release CI should verify the AAB signature');
+    assert.match(script, /sha256sum/, 'release CI should emit artifact checksums');
+  });
 });
