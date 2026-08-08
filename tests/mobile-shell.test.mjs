@@ -185,6 +185,35 @@ describe('mobile WebView shell contract', () => {
     assert.doesNotMatch(installer, /\bmapfile\b/, 'device installer should work with macOS Bash 3.2');
   });
 
+  it('configures production iOS push notifications and release checks', () => {
+    const appDelegate = read('ios/App/App/AppDelegate.swift');
+    const entitlements = read('ios/App/App/App.entitlements');
+    const podfile = read('ios/App/Podfile');
+    const podfileLock = read('ios/App/Podfile.lock');
+    const xcodeProject = read('ios/App/App.xcodeproj/project.pbxproj');
+    const capacitorConfig = read('capacitor.config.ts');
+    const workflow = read('.github/workflows/testflight.yml');
+    const uploadScript = read('scripts/ci-upload-testflight.sh');
+
+    assert.match(podfile, /pod 'CapacitorPushNotifications'/, 'iOS should install the Capacitor push plugin');
+    assert.match(podfileLock, /CapacitorPushNotifications \(7\./, 'iOS should lock the Capacitor 7 push plugin');
+    assert.match(appDelegate, /capacitorDidRegisterForRemoteNotifications/, 'iOS should forward APNs registration success to Capacitor');
+    assert.match(appDelegate, /capacitorDidFailToRegisterForRemoteNotifications/, 'iOS should forward APNs registration failures to Capacitor');
+    assert.match(entitlements, /<key>aps-environment<\/key>\s*<string>production<\/string>/, 'App Store builds should use production APNs');
+    assert.match(xcodeProject, /CODE_SIGN_ENTITLEMENTS = App\/App\.entitlements;/, 'Release signing should include the push entitlement');
+    assert.match(xcodeProject, /com\.apple\.Push = {[\s\S]*enabled = 1;/, 'the Xcode target should enable the push capability');
+    assert.doesNotMatch(xcodeProject, /TARGETED_DEVICE_FAMILY = "1,2";/, 'the iPhone app should not require iPad release assets');
+    assert.match(xcodeProject, /TARGETED_DEVICE_FAMILY = 1;/, 'the app should target iPhone');
+    assert.match(capacitorConfig, /PushNotifications:[\s\S]*presentationOptions:[\s\S]*'alert'/, 'foreground iOS notifications should be visible');
+    assert.match(workflow, /Xcode_26\*\.app/, 'TestFlight CI should select Xcode 26');
+    assert.match(workflow, /oven-sh\/setup-bun@v2/, 'TestFlight CI should install Bun');
+    assert.match(uploadScript, /bun install --frozen-lockfile/, 'TestFlight CI should install the locked Bun dependencies');
+    assert.match(uploadScript, /bun run test/, 'TestFlight CI should run the mobile contract tests');
+    assert.match(uploadScript, /GOOGLE_IOS_REVERSED_CLIENT_ID is not a valid URL scheme/, 'TestFlight CI should reject an invalid Google URL scheme');
+    assert.match(uploadScript, /Print aps-environment/, 'TestFlight CI should inspect the archived APNs entitlement');
+    assert.match(uploadScript, /CapacitorPushNotifications\.framework/, 'TestFlight CI should verify the push plugin is embedded');
+  });
+
   it('keeps Google geocoding behind Trashed web API routes, not mobile credentials', () => {
     const appConfig = read('services/appConfig.ts');
     assert.match(appConfig, /\/api\/address\/reverse-geocode/, 'mobile app should call Trashed reverse-geocode API route');

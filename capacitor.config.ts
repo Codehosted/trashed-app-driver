@@ -23,6 +23,9 @@ const config: CapacitorConfig = {
     useLegacyBridge: true,
   },
   plugins: {
+    PushNotifications: {
+      presentationOptions: ['badge', 'sound', 'alert'],
+    },
     SplashScreen: {
       launchShowDuration: 900,
       backgroundColor: '#020617',

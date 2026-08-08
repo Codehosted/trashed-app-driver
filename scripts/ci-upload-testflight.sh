@@ -20,6 +20,11 @@ require_env IOS_DISTRIBUTION_CERTIFICATE_BASE64
 require_env IOS_DISTRIBUTION_CERTIFICATE_PASSWORD
 require_env IOS_APPSTORE_PROFILE_BASE64
 
+if [[ ! "$GOOGLE_IOS_REVERSED_CLIENT_ID" =~ ^[A-Za-z][A-Za-z0-9.+-]*$ ]]; then
+  echo "GOOGLE_IOS_REVERSED_CLIENT_ID is not a valid URL scheme." >&2
+  exit 2
+fi
+
 if [[ -z "${APP_STORE_CONNECT_API_KEY_P8_BASE64:-}" && -z "${APP_STORE_CONNECT_API_KEY_P8:-}" ]]; then
   echo "Missing APP_STORE_CONNECT_API_KEY_P8_BASE64 or APP_STORE_CONNECT_API_KEY_P8" >&2
   exit 2
@@ -64,9 +69,10 @@ printf '%s' "$IOS_APPSTORE_PROFILE_BASE64" | base64 -D > "$PROFILE_PATH"
 PROFILE_UUID=$(/usr/libexec/PlistBuddy -c 'Print UUID' /dev/stdin <<< "$(security cms -D -i "$PROFILE_PATH")")
 cp "$PROFILE_PATH" "$HOME/Library/MobileDevice/Provisioning Profiles/$PROFILE_UUID.mobileprovision"
 
-npm install
-TRASHED_WEB_URL="${TRASHED_WEB_URL:-https://trashed.app}" npm run build
-TRASHED_WEB_URL="${TRASHED_WEB_URL:-https://trashed.app}" npx cap sync ios
+bun install --frozen-lockfile
+bun run test
+TRASHED_WEB_URL="${TRASHED_WEB_URL:-https://trashed.app}" bun run build
+TRASHED_WEB_URL="${TRASHED_WEB_URL:-https://trashed.app}" bunx cap sync ios
 (cd ios/App && pod install)
 
 python3 - <<PY
@@ -136,6 +142,17 @@ if /usr/libexec/PlistBuddy -c 'Print GIDClientID' "$APP_PATH/Info.plist" | grep 
 fi
 if /usr/libexec/PlistBuddy -c 'Print CFBundleURLTypes:0:CFBundleURLSchemes:0' "$APP_PATH/Info.plist" | grep -q '\$('; then
   echo 'Google reversed client URL scheme was not expanded.' >&2
+  exit 3
+fi
+
+ARCHIVE_ENTITLEMENTS="$EXPORT_PATH/App.entitlements.plist"
+codesign -d --entitlements :- "$APP_PATH" > "$ARCHIVE_ENTITLEMENTS" 2>/dev/null
+if [[ "$(/usr/libexec/PlistBuddy -c 'Print aps-environment' "$ARCHIVE_ENTITLEMENTS")" != "production" ]]; then
+  echo 'Archived app is missing the production APNs entitlement.' >&2
+  exit 3
+fi
+if [[ ! -d "$APP_PATH/Frameworks/CapacitorPushNotifications.framework" ]]; then
+  echo 'Archived app is missing CapacitorPushNotifications.framework.' >&2
   exit 3
 fi
 
