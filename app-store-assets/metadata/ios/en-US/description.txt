@@ -1,0 +1,7 @@
+Trashed Driver gives dumpster rental teams a mobile-first command center for daily routes, delivery and pickup stops, and vendor operations.
+
+Drivers can keep the live route map open, start routes, mark arrival, review customer and stop details, share photos, and stay in sync with dispatch. Route assignments, route changes, and dispatch messages can arrive as push notifications so drivers can respond without constantly checking the app.
+
+When a driver chooses Go Online, Trashed Driver can continue sharing precise location with the assigned vendor's dispatch team while the app is closed or not in use. Location sharing stops when the driver chooses Go Offline.
+
+Trashed Driver is intended for authorized dumpster hauler and vendor teams using Trashed. An account provided by your employer or organization is required.
