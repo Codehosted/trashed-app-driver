@@ -37,6 +37,19 @@ describe('mobile WebView shell contract', () => {
     assert.match(androidStrings, /<string name=\"package_name\">com\.trashed\.driver<\/string>/, 'Android package string should match the app package');
   });
 
+  it('uses the Google Play icon for every Android launcher resource', () => {
+    const launcherSync = read('scripts/sync-android-launcher-icon.py');
+    const adaptiveIcon = read('android/app/src/main/res/mipmap-anydpi-v26/ic_launcher.xml');
+    const adaptiveRoundIcon = read('android/app/src/main/res/mipmap-anydpi-v26/ic_launcher_round.xml');
+
+    assert.match(launcherSync, /play-store-icon-512\.png/, 'Google Play icon should be the Android launcher source');
+    assert.match(launcherSync, /ic_launcher_store_art\.png/, 'adaptive launcher artwork should be generated from the same source');
+    assert.match(adaptiveIcon, /@mipmap\/ic_launcher_store_art/, 'adaptive icon should use the Google Play artwork');
+    assert.match(adaptiveRoundIcon, /@mipmap\/ic_launcher_store_art/, 'round adaptive icon should use the Google Play artwork');
+    assert.doesNotMatch(adaptiveIcon, /ic_launcher_foreground/, 'adaptive icon must not use Capacitor default artwork');
+    assert.doesNotMatch(adaptiveRoundIcon, /ic_launcher_foreground/, 'round adaptive icon must not use Capacitor default artwork');
+  });
+
   it('shows a native iOS driver sign-in before falling back to the WebView login', () => {
     const controller = read('ios/App/App/MainViewController.swift');
     const xcodeProject = read('ios/App/App.xcodeproj/project.pbxproj');

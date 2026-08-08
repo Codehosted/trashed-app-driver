@@ -1,5 +1,7 @@
 #!/usr/bin/env python3
 from pathlib import Path
+from subprocess import run
+import sys
 from typing import Optional
 from PIL import Image
 
@@ -54,6 +56,8 @@ def main() -> None:
 
     for screenshot in screenshots:
         check_screenshot(screenshot)
+
+    run([sys.executable, str(ROOT / "scripts" / "sync-android-launcher-icon.py"), "--check"], check=True)
 
     print(f"Play Store assets OK: 1 icon, 1 feature graphic, {len(screenshots)} phone screenshots")
 
