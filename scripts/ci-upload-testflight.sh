@@ -15,15 +15,18 @@ require_env() {
 require_env APP_STORE_CONNECT_KEY_ID
 require_env APP_STORE_CONNECT_ISSUER_ID
 require_env GOOGLE_IOS_CLIENT_ID
-require_env GOOGLE_IOS_REVERSED_CLIENT_ID
 require_env IOS_DISTRIBUTION_CERTIFICATE_BASE64
 require_env IOS_DISTRIBUTION_CERTIFICATE_PASSWORD
 require_env IOS_APPSTORE_PROFILE_BASE64
 
-if [[ ! "$GOOGLE_IOS_REVERSED_CLIENT_ID" =~ ^[A-Za-z][A-Za-z0-9.+-]*$ ]]; then
-  echo "GOOGLE_IOS_REVERSED_CLIENT_ID is not a valid URL scheme." >&2
+GOOGLE_CLIENT_ID_SUFFIX='.apps.googleusercontent.com'
+if [[ ! "$GOOGLE_IOS_CLIENT_ID" =~ ^[A-Za-z0-9_-]+[.]apps[.]googleusercontent[.]com$ ]]; then
+  echo "GOOGLE_IOS_CLIENT_ID is not a valid Google iOS client ID." >&2
   exit 2
 fi
+GOOGLE_IOS_CLIENT_PREFIX="${GOOGLE_IOS_CLIENT_ID%$GOOGLE_CLIENT_ID_SUFFIX}"
+GOOGLE_IOS_REVERSED_CLIENT_ID="com.googleusercontent.apps.$GOOGLE_IOS_CLIENT_PREFIX"
+export GOOGLE_IOS_REVERSED_CLIENT_ID
 
 if [[ -z "${APP_STORE_CONNECT_API_KEY_P8_BASE64:-}" && -z "${APP_STORE_CONNECT_API_KEY_P8:-}" ]]; then
   echo "Missing APP_STORE_CONNECT_API_KEY_P8_BASE64 or APP_STORE_CONNECT_API_KEY_P8" >&2
