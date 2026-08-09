@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { spawnSync } from 'node:child_process';
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, it } from 'node:test';
@@ -247,6 +248,9 @@ describe('mobile WebView shell contract', () => {
     assert.match(workflow, /XCODE_VERSION_OUTPUT="\$\(xcodebuild -version\)"/, 'TestFlight CI should capture the complete Xcode version output before checking it');
     assert.match(workflow, /oven-sh\/setup-bun@v2/, 'TestFlight CI should install Bun');
     assert.match(workflow, /bun-version: 1\.1\.38/, 'TestFlight CI should use the Bun version that produced the committed lockfile');
+    assert.match(workflow, /- "bun\.lockb"/, 'TestFlight CI should run when the Bun lockfile changes');
+    assert.ok(existsSync(join(root, 'bun.lockb')), 'Bun 1.1.38 should have a committed binary lockfile');
+    assert.ok(!existsSync(join(root, 'bun.lock')), 'the unsupported text Bun lockfile should not shadow package-lock migration');
     assert.match(uploadScript, /bun install --frozen-lockfile/, 'TestFlight CI should install the locked Bun dependencies');
     assert.match(uploadScript, /bun run test/, 'TestFlight CI should run the mobile contract tests');
     assert.match(uploadScript, /GOOGLE_IOS_CLIENT_ID is not a valid Google iOS client ID/, 'TestFlight CI should reject an invalid Google iOS client ID');
@@ -256,6 +260,22 @@ describe('mobile WebView shell contract', () => {
     assert.doesNotMatch(workflow, /secrets\.GOOGLE_IOS_REVERSED_CLIENT_ID/, 'TestFlight CI should not depend on a separately maintained reversed client ID secret');
     assert.match(uploadScript, /Print aps-environment/, 'TestFlight CI should inspect the archived APNs entitlement');
     assert.match(uploadScript, /CapacitorPushNotifications\.framework/, 'TestFlight CI should verify the push plugin is embedded');
+
+    const invalidClientId = spawnSync('bash', ['scripts/ci-upload-testflight.sh'], {
+      cwd: root,
+      encoding: 'utf8',
+      env: {
+        ...process.env,
+        APP_STORE_CONNECT_KEY_ID: 'test-key',
+        APP_STORE_CONNECT_ISSUER_ID: 'test-issuer',
+        GOOGLE_IOS_CLIENT_ID: 'invalid_prefix.apps.googleusercontent.com',
+        IOS_DISTRIBUTION_CERTIFICATE_BASE64: 'test-certificate',
+        IOS_DISTRIBUTION_CERTIFICATE_PASSWORD: 'test-password',
+        IOS_APPSTORE_PROFILE_BASE64: 'test-profile',
+      },
+    });
+    assert.equal(invalidClientId.status, 2, 'TestFlight CI should reject an underscore in the derived URL scheme');
+    assert.match(invalidClientId.stderr, /GOOGLE_IOS_CLIENT_ID is not a valid Google iOS client ID/);
   });
 
   it('keeps Google geocoding behind Trashed web API routes, not mobile credentials', () => {

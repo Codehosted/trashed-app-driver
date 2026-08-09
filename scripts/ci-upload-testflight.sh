@@ -20,7 +20,7 @@ require_env IOS_DISTRIBUTION_CERTIFICATE_PASSWORD
 require_env IOS_APPSTORE_PROFILE_BASE64
 
 GOOGLE_CLIENT_ID_SUFFIX='.apps.googleusercontent.com'
-if [[ ! "$GOOGLE_IOS_CLIENT_ID" =~ ^[A-Za-z0-9_-]+[.]apps[.]googleusercontent[.]com$ ]]; then
+if [[ ! "$GOOGLE_IOS_CLIENT_ID" =~ ^[A-Za-z0-9-]+[.]apps[.]googleusercontent[.]com$ ]]; then
   echo "GOOGLE_IOS_CLIENT_ID is not a valid Google iOS client ID." >&2
   exit 2
 fi
