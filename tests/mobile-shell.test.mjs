@@ -213,6 +213,8 @@ describe('mobile WebView shell contract', () => {
     assert.match(uploadScript, /bun run test/, 'TestFlight CI should run the mobile contract tests');
     assert.match(uploadScript, /GOOGLE_IOS_CLIENT_ID is not a valid Google iOS client ID/, 'TestFlight CI should reject an invalid Google iOS client ID');
     assert.match(uploadScript, /GOOGLE_IOS_REVERSED_CLIENT_ID="com\.googleusercontent\.apps\.\$GOOGLE_IOS_CLIENT_PREFIX"/, 'TestFlight CI should derive the reversed URL scheme from the validated client ID');
+    assert.match(workflow, /GOOGLE_IOS_CLIENT_ID: 250847337560-a6992nl3hfasf80qi0gf4m82m3udipm3\.apps\.googleusercontent\.com/, 'TestFlight CI should use the production iOS OAuth client ID served by the backend');
+    assert.doesNotMatch(workflow, /secrets\.GOOGLE_IOS_CLIENT_ID/, 'The public iOS OAuth client ID should not depend on the stale GitHub secret');
     assert.doesNotMatch(workflow, /secrets\.GOOGLE_IOS_REVERSED_CLIENT_ID/, 'TestFlight CI should not depend on a separately maintained reversed client ID secret');
     assert.match(uploadScript, /Print aps-environment/, 'TestFlight CI should inspect the archived APNs entitlement');
     assert.match(uploadScript, /CapacitorPushNotifications\.framework/, 'TestFlight CI should verify the push plugin is embedded');
