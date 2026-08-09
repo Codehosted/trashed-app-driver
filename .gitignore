@@ -26,7 +26,6 @@ dist-ssr
 # Local/generated mobile tooling state
 .expo/
 expo-env.d.ts
-bun.lockb
 .gradle-user/
 android/.gradle-user/
 artifacts/

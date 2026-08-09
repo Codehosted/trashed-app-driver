@@ -20,6 +20,7 @@ on:
       - "services/**"
       - "package.json"
       - "package-lock.json"
+      - "bun.lockb"
       - "capacitor.config.ts"
       - "scripts/ci-upload-testflight.sh"
       - ".github/workflows/testflight.yml"
