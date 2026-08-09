@@ -209,6 +209,7 @@ describe('mobile WebView shell contract', () => {
     assert.doesNotMatch(workflow, /xcodebuild -version\s*\|/, 'Xcode version verification must not close xcodebuild stdout through an early-exiting pipe');
     assert.match(workflow, /XCODE_VERSION_OUTPUT="\$\(xcodebuild -version\)"/, 'TestFlight CI should capture the complete Xcode version output before checking it');
     assert.match(workflow, /oven-sh\/setup-bun@v2/, 'TestFlight CI should install Bun');
+    assert.match(workflow, /bun-version: 1\.1\.38/, 'TestFlight CI should use the Bun version that produced the committed lockfile');
     assert.match(uploadScript, /bun install --frozen-lockfile/, 'TestFlight CI should install the locked Bun dependencies');
     assert.match(uploadScript, /bun run test/, 'TestFlight CI should run the mobile contract tests');
     assert.match(uploadScript, /GOOGLE_IOS_CLIENT_ID is not a valid Google iOS client ID/, 'TestFlight CI should reject an invalid Google iOS client ID');
