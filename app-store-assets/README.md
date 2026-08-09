@@ -111,7 +111,7 @@ GET /api/vendor/driver/tracking?routeUuid=... -> 200 { ok: true, positions: [...
 - `artwork/trashed-driver-icon.svg`
 - `artwork/play-store-icon-512.png` — 512×512 PNG for Google Play
 - `artwork/trashed-driver-icon-1024.png` — 1024×1024 source PNG
-- `artwork/feature-graphic-1024x500.png` — 1024×500 PNG
+- `artwork/feature-graphic-1024x500.png` — 1024×500 RGB PNG composited from a fresh authenticated landscape Pixel 2 route-map capture. Regenerate it with `python3 scripts/generate-app-store-assets.py`; the checked source capture and Inter fonts live in `sources/play-feature-graphic/`.
 
 ### Google Play phone screenshots
 The current `play-phone-*` set is built from authenticated 1080×1920 Pixel 2 captures. Exact UI pixels are preserved inside a deterministic product frame. Nano Banana 2 (`gemini-3.1-flash-image`) generated only the abstract background and synthetic route-photo content, so it could not alter interface text, maps, icons, or controls.
