@@ -1,0 +1,1 @@
+Route assignments, route changes, and dispatch messages can now arrive as push notifications. This update also improves notification handling and iPhone release compatibility.
