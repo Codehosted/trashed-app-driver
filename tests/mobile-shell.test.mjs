@@ -8,6 +8,12 @@ const read = (relativePath) => readFileSync(join(root, relativePath), 'utf8');
 const pkg = JSON.parse(read('package.json'));
 const packageLock = JSON.parse(read('package-lock.json'));
 
+const readPngDimensions = (relativePath) => {
+  const png = readFileSync(join(root, relativePath));
+  assert.equal(png.subarray(1, 4).toString('ascii'), 'PNG', `${relativePath} should be a PNG`);
+  return [png.readUInt32BE(16), png.readUInt32BE(20)];
+};
+
 const dependencies = {
   ...pkg.dependencies,
   ...pkg.devDependencies,
@@ -48,6 +54,37 @@ describe('mobile WebView shell contract', () => {
     assert.match(adaptiveRoundIcon, /@mipmap\/ic_launcher_store_art/, 'round adaptive icon should use the Google Play artwork');
     assert.doesNotMatch(adaptiveIcon, /ic_launcher_foreground/, 'adaptive icon must not use Capacitor default artwork');
     assert.doesNotMatch(adaptiveRoundIcon, /ic_launcher_foreground/, 'round adaptive icon must not use Capacitor default artwork');
+  });
+
+  it('builds Apple 6.9-inch screenshots from verified real UI captures', () => {
+    const generator = read('scripts/generate-ios-app-store-screenshots.py');
+    const sources = [
+      'driver-route-map.png',
+      'driver-dispatch-chat.png',
+      'driver-route-photos.png',
+      'completed-routes-metrics.png',
+    ];
+    const outputs = [
+      'ios-6.9-01-driver-routes.png',
+      'ios-6.9-02-dispatch-messages.png',
+      'ios-6.9-03-route-photos.png',
+    ];
+
+    for (const source of sources) {
+      assert.ok(existsSync(join(root, 'app-store-assets/sources/ios-6.9', source)), `missing ${source}`);
+      assert.match(generator, new RegExp(source.replaceAll('.', '\\.')), `${source} should be pinned by the generator`);
+    }
+    for (const output of outputs) {
+      assert.deepEqual(
+        readPngDimensions(`app-store-assets/screenshots/ios-6.9/${output}`),
+        [1290, 2796],
+        `${output} should match Apple's 6.9-inch screenshot size`,
+      );
+    }
+
+    assert.match(generator, /verify_source\(context, shot\["context_sha256"\]\)/, 'completion context should be checksum-verified');
+    assert.match(generator, /THEN ADD PHOTO PROOF/, 'photo screenshot should show the real post-route sequence');
+    assert.doesNotMatch(generator, /01-routes-raw\.png/, 'route screenshot must not use the inaccurate local route capture');
   });
 
   it('shows a native iOS driver sign-in before falling back to the WebView login', () => {
