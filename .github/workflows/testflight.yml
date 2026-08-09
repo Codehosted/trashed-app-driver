@@ -67,7 +67,9 @@ jobs:
             exit 1
           fi
           sudo xcode-select -s "$XCODE_PATH/Contents/Developer"
-          xcodebuild -version | grep -Eq '^Xcode 26([.]|$)'
+          XCODE_VERSION_OUTPUT="$(xcodebuild -version)"
+          printf '%s\n' "$XCODE_VERSION_OUTPUT"
+          grep -Eq '^Xcode 26([.]|$)' <<< "$XCODE_VERSION_OUTPUT"
 
       - name: Upload to TestFlight
         run: bash scripts/ci-upload-testflight.sh

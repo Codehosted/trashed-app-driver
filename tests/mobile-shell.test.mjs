@@ -206,6 +206,8 @@ describe('mobile WebView shell contract', () => {
     assert.match(xcodeProject, /TARGETED_DEVICE_FAMILY = 1;/, 'the app should target iPhone');
     assert.match(capacitorConfig, /PushNotifications:[\s\S]*presentationOptions:[\s\S]*'alert'/, 'foreground iOS notifications should be visible');
     assert.match(workflow, /Xcode_26\*\.app/, 'TestFlight CI should select Xcode 26');
+    assert.doesNotMatch(workflow, /xcodebuild -version\s*\|/, 'Xcode version verification must not close xcodebuild stdout through an early-exiting pipe');
+    assert.match(workflow, /XCODE_VERSION_OUTPUT="\$\(xcodebuild -version\)"/, 'TestFlight CI should capture the complete Xcode version output before checking it');
     assert.match(workflow, /oven-sh\/setup-bun@v2/, 'TestFlight CI should install Bun');
     assert.match(uploadScript, /bun install --frozen-lockfile/, 'TestFlight CI should install the locked Bun dependencies');
     assert.match(uploadScript, /bun run test/, 'TestFlight CI should run the mobile contract tests');
