@@ -130,6 +130,7 @@ class MainViewController: CAPBridgeViewController {
             guard url.scheme == config.origin.scheme,
                   url.host == config.origin.host,
                   url.port == config.origin.port,
+                  url.path == "/partners/login" ||
                   url.path == "/app/login" || url.path == "/api/auth/signin"
             else { return }
 

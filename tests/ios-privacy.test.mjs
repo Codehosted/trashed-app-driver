@@ -55,4 +55,9 @@ describe('iOS photo picker privacy', () => {
     assert.match(controller, /url\.path == "\/app\/login" \|\| url\.path == "\/api\/auth\/signin"/);
     assert.match(controller, /webView\.stopLoading\(\)\s+self\.presentNativeLogin\(config\)/);
   });
+
+  it('intercepts the production partner login destination used after logout', () => {
+    const controller = readFileSync(join(root, 'ios/App/App/MainViewController.swift'), 'utf8');
+    assert.match(controller, /url\.path == "\/partners\/login" \|\|/);
+  });
 });
