@@ -1,4 +1,4 @@
-name: Audit Driver App Review Resubmission
+name: Resubmit Exact Driver Build for App Review
 
 on:
   workflow_dispatch:
@@ -21,9 +21,9 @@ jobs:
       contents: read
     steps:
       - uses: actions/checkout@v4
-      - name: Read current Apple review state without exposing credentials
+      - name: Verify credentials and resubmit exact processed build
         env:
           APP_STORE_CONNECT_KEY_ID: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
           APP_STORE_CONNECT_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
           APP_STORE_CONNECT_API_KEY_P8_BASE64: ${{ secrets.APP_STORE_CONNECT_API_KEY_P8_BASE64 }}
-        run: node scripts/ci-app-review-audit.mjs
+        run: node scripts/ci-app-review-audit.mjs --submit-202609110306
