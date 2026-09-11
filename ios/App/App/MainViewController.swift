@@ -3,6 +3,8 @@ import SwiftUI
 import WebKit
 import Capacitor
 import GoogleSignIn
+import AuthenticationServices
+import CryptoKit
 
 private let driverSessionCookieNames = [
     "next-auth.session-token",
@@ -43,6 +45,10 @@ private struct DriverAuthConfig {
         URL(string: "/api/auth/mobile/google", relativeTo: origin)!.absoluteURL
     }
 
+    var appleLoginURL: URL {
+        URL(string: "/api/auth/mobile/apple", relativeTo: origin)!.absoluteURL
+    }
+
 }
 
 private struct NativeGoogleConfig: Decodable {
@@ -55,8 +61,15 @@ private struct NativeLoginResponse: Decodable {
     let error: String?
 }
 
+private struct NativeAppleCredential {
+    let identityToken: String
+    let nonce: String
+}
+
 class MainViewController: CAPBridgeViewController {
     private var nativeLoginController: UIHostingController<NativeDriverLoginView>?
+    private var loginURLObservation: NSKeyValueObservation?
+    private var pendingAppleCredential: NativeAppleCredential?
 
     override func webViewConfiguration(for instanceConfiguration: InstanceConfiguration) -> WKWebViewConfiguration {
         let configuration = super.webViewConfiguration(for: instanceConfiguration)
@@ -111,6 +124,20 @@ class MainViewController: CAPBridgeViewController {
         webView?.scrollView.bounces = false
         navigationController?.setNavigationBarHidden(true, animated: false)
         navigationController?.setToolbarHidden(true, animated: false)
+        loginURLObservation = webView?.observe(\.url, options: [.new]) { [weak self] webView, _ in
+            guard let self = self, let url = webView.url else { return }
+            let config = self.makeDriverAuthConfig()
+            guard url.scheme == config.origin.scheme,
+                  url.host == config.origin.host,
+                  url.port == config.origin.port,
+                  url.path == "/app/login" || url.path == "/api/auth/signin"
+            else { return }
+
+            // Expired sessions and sign-out must return to the same native login
+            // options as a fresh install, not the website's separate OAuth screen.
+            webView.stopLoading()
+            self.presentNativeLogin(config)
+        }
         showNativeLoginIfNeeded()
     }
 
@@ -172,6 +199,7 @@ class MainViewController: CAPBridgeViewController {
     }
 
     private func presentNativeLogin(_ config: DriverAuthConfig) {
+        pendingAppleCredential = nil
         removeNativeLogin()
 
         // CAPBridgeViewController's root view is the WKWebView. Hiding the WebView
@@ -184,6 +212,12 @@ class MainViewController: CAPBridgeViewController {
             },
             signInWithGoogle: { [weak self] completion in
                 self?.signInWithGoogle(config: config, completion: completion)
+            },
+            signInWithApple: { [weak self] credential, completion in
+                self?.signInWithApple(credential: credential, config: config, completion: completion)
+            },
+            cancelAppleLink: { [weak self] in
+                self?.pendingAppleCredential = nil
             }
         )
         let hostingController = UIHostingController(rootView: loginView)
@@ -221,16 +255,22 @@ class MainViewController: CAPBridgeViewController {
         config: DriverAuthConfig,
         completion: @escaping (String?) -> Void
     ) {
-        var request = URLRequest(url: config.loginURL)
+        let loginURL = pendingAppleCredential == nil ? config.loginURL : config.appleLoginURL
+        var request = URLRequest(url: loginURL)
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.setValue("application/json", forHTTPHeaderField: "Accept")
 
         do {
-            request.httpBody = try JSONSerialization.data(withJSONObject: [
+            var body = [
                 "email": email,
                 "password": password,
-            ])
+            ]
+            if let apple = pendingAppleCredential {
+                body["identityToken"] = apple.identityToken
+                body["nonce"] = apple.nonce
+            }
+            request.httpBody = try JSONSerialization.data(withJSONObject: body)
         } catch {
             completion("Could not prepare the sign-in request.")
             return
@@ -258,7 +298,7 @@ class MainViewController: CAPBridgeViewController {
                 return
             }
 
-            let responseCookies = self.cookies(from: httpResponse, for: config.loginURL)
+            let responseCookies = self.cookies(from: httpResponse, for: loginURL)
             let sessionCookies = self.expandedSessionCookies(from: responseCookies, for: config)
             if sessionCookies.isEmpty {
                 finish("The sign-in server did not return a mobile session.")
@@ -272,9 +312,56 @@ class MainViewController: CAPBridgeViewController {
                 }
 
                 self.installCookies(sessionCookies, in: cookieStore) {
+                    self.pendingAppleCredential = nil
                     self.removeNativeLogin()
                     self.loadDriverApp(config)
                     completion(nil)
+                }
+            }
+        }.resume()
+    }
+
+    private func signInWithApple(
+        credential: NativeAppleCredential,
+        config: DriverAuthConfig,
+        completion: @escaping (String?, Bool) -> Void
+    ) {
+        pendingAppleCredential = nil
+        var request = URLRequest(url: config.appleLoginURL)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.httpBody = try? JSONSerialization.data(withJSONObject: [
+            "identityToken": credential.identityToken,
+            "nonce": credential.nonce,
+        ])
+
+        URLSession.shared.dataTask(with: request) { [weak self] data, response, error in
+            DispatchQueue.main.async {
+                guard let self = self else { return }
+                guard error == nil, let response = response as? HTTPURLResponse else {
+                    completion("Could not reach Apple sign-in. Please try again.", false)
+                    return
+                }
+                let json = data.flatMap { try? JSONSerialization.jsonObject(with: $0) as? [String: Any] }
+                if response.statusCode == 409, json?["requiresAccountLink"] as? Bool == true {
+                    self.pendingAppleCredential = credential
+                    completion(nil, true)
+                    return
+                }
+                guard (200..<300).contains(response.statusCode) else {
+                    completion(self.mobileLoginError(from: data) ?? "Apple sign-in is unavailable. Please try again later.", false)
+                    return
+                }
+                let cookies = self.expandedSessionCookies(from: self.cookies(from: response, for: config.appleLoginURL), for: config)
+                guard self.hasSessionCookie(in: cookies, for: config),
+                      let store = self.webView?.configuration.websiteDataStore.httpCookieStore else {
+                    completion("The sign-in server did not return a mobile session.", false)
+                    return
+                }
+                self.installCookies(cookies, in: store) {
+                    self.removeNativeLogin()
+                    self.loadDriverApp(config)
+                    completion(nil, false)
                 }
             }
         }.resume()
@@ -504,6 +591,8 @@ class MainViewController: CAPBridgeViewController {
 private struct NativeDriverLoginView: View {
     let signIn: (_ email: String, _ password: String, _ completion: @escaping (String?) -> Void) -> Void
     let signInWithGoogle: (_ completion: @escaping (String?) -> Void) -> Void
+    let signInWithApple: (_ credential: NativeAppleCredential, _ completion: @escaping (String?, Bool) -> Void) -> Void
+    let cancelAppleLink: () -> Void
 
     @Environment(\.colorScheme) private var colorScheme
     @State private var email = ""
@@ -511,9 +600,12 @@ private struct NativeDriverLoginView: View {
     @State private var errorMessage: String?
     @State private var isSubmitting = false
     @State private var isGoogleSubmitting = false
+    @State private var isAppleSubmitting = false
+    @State private var appleNonce: String?
+    @State private var appleLinkPending = false
 
     private var canSubmit: Bool {
-        !email.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && !password.isEmpty && !isSubmitting && !isGoogleSubmitting
+        !email.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && !password.isEmpty && !isSubmitting && !isGoogleSubmitting && !isAppleSubmitting
     }
 
     private var isLightMode: Bool {
@@ -612,6 +704,21 @@ private struct NativeDriverLoginView: View {
                     }
 
                     VStack(spacing: 16) {
+                        SignInWithAppleButton(.continue, onRequest: { request in
+                            errorMessage = nil
+                            isAppleSubmitting = true
+                            let nonce = UUID().uuidString
+                            appleNonce = nonce
+                            request.requestedScopes = [.email]
+                            request.nonce = SHA256.hash(data: Data(nonce.utf8)).map { String(format: "%02x", $0) }.joined()
+                            request.state = nonce
+                        }, onCompletion: completeAppleAuthorization)
+                        .signInWithAppleButtonStyle(isLightMode ? .black : .white)
+                        .frame(height: 50)
+                        .cornerRadius(14)
+                        .disabled(isSubmitting || isGoogleSubmitting || isAppleSubmitting || appleLinkPending)
+                        .accessibilityIdentifier("native-driver-apple-sign-in")
+
                         Button(action: submitGoogle) {
                             HStack(spacing: 10) {
                                 if isGoogleSubmitting {
@@ -630,8 +737,22 @@ private struct NativeDriverLoginView: View {
                             .cornerRadius(14)
                             .shadow(color: cardShadowColor, radius: 10, x: 0, y: 6)
                         }
-                        .disabled(isSubmitting || isGoogleSubmitting)
+                        .disabled(isSubmitting || isGoogleSubmitting || isAppleSubmitting || appleLinkPending)
                         .accessibilityIdentifier("native-driver-google-sign-in")
+
+                        if appleLinkPending {
+                            Text("One-time setup: sign in with your existing Trashed email and password below to link Apple. Your Apple email can stay private. No new driver account will be created.")
+                                .font(.system(size: 13))
+                                .foregroundColor(secondaryTextColor)
+                                .accessibilityIdentifier("native-driver-apple-link-notice")
+                            Button("Cancel linking Apple") {
+                                cancelAppleLink()
+                                appleLinkPending = false
+                                errorMessage = nil
+                            }
+                            .disabled(isSubmitting)
+                            .accessibilityIdentifier("native-driver-apple-link-cancel")
+                        }
 
                         HStack {
                             Rectangle().fill(dividerColor).frame(height: 1)
@@ -748,7 +869,7 @@ private struct NativeDriverLoginView: View {
 
     private func submit() {
         let normalizedEmail = email.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !normalizedEmail.isEmpty && !password.isEmpty else { return }
+        guard canSubmit else { return }
 
         errorMessage = nil
         isSubmitting = true
@@ -761,7 +882,7 @@ private struct NativeDriverLoginView: View {
     }
 
     private func submitGoogle() {
-        guard !isSubmitting && !isGoogleSubmitting else { return }
+        guard !isSubmitting && !isGoogleSubmitting && !isAppleSubmitting && !appleLinkPending else { return }
 
         errorMessage = nil
         isGoogleSubmitting = true
@@ -770,6 +891,35 @@ private struct NativeDriverLoginView: View {
         signInWithGoogle { message in
             isGoogleSubmitting = false
             errorMessage = message
+        }
+    }
+
+    private func completeAppleAuthorization(_ result: Result<ASAuthorization, Error>) {
+        guard let nonce = appleNonce else {
+            isAppleSubmitting = false
+            return
+        }
+        appleNonce = nil
+        switch result {
+        case .failure(let error):
+            isAppleSubmitting = false
+            if (error as? ASAuthorizationError)?.code != .canceled {
+                errorMessage = "Apple sign-in failed. Please try again."
+            }
+        case .success(let authorization):
+            guard let credential = authorization.credential as? ASAuthorizationAppleIDCredential,
+                  credential.state == nonce,
+                  let data = credential.identityToken,
+                  let identityToken = String(data: data, encoding: .utf8) else {
+                isAppleSubmitting = false
+                errorMessage = "Apple did not return a valid sign-in credential."
+                return
+            }
+            signInWithApple(NativeAppleCredential(identityToken: identityToken, nonce: nonce)) { message, needsLink in
+                isAppleSubmitting = false
+                appleLinkPending = needsLink
+                errorMessage = message
+            }
         }
     }
 }
