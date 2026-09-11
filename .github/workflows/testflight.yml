@@ -23,6 +23,8 @@ on:
       - "bun.lockb"
       - "capacitor.config.ts"
       - "scripts/ci-upload-testflight.sh"
+      - "scripts/validate-ios-privacy.py"
+      - "fastlane/Fastfile"
       - ".github/workflows/testflight.yml"
 
 concurrency:
@@ -49,7 +51,6 @@ jobs:
       GOOGLE_IOS_CLIENT_ID: 250847337560-a6992nl3hfasf80qi0gf4m82m3udipm3.apps.googleusercontent.com
       IOS_DISTRIBUTION_CERTIFICATE_BASE64: ${{ secrets.IOS_DISTRIBUTION_CERTIFICATE_BASE64 }}
       IOS_DISTRIBUTION_CERTIFICATE_PASSWORD: ${{ secrets.IOS_DISTRIBUTION_CERTIFICATE_PASSWORD }}
-      IOS_APPSTORE_PROFILE_BASE64: ${{ secrets.IOS_APPSTORE_PROFILE_BASE64 }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4

@@ -62,6 +62,10 @@
 	</array>
 	<key>UIViewControllerBasedStatusBarAppearance</key>
 	<true/>
+	<key>NSCameraUsageDescription</key>
+	<string>Trashed Driver uses your camera to take photos of stops, completed work, and dumpsite tickets.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>Trashed Driver lets you choose photos to attach to stops, dumpsite tickets, and dispatch messages.</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string>Trashed Driver uses your location to update active route progress and show nearby stops.</string>
 	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>

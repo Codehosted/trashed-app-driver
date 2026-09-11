@@ -1,0 +1,26 @@
+require "fastlane_core/build_watcher"
+
+desc "Verify the uploaded build finished processing; never submit or notify testers"
+lane :verify_testflight do
+  Spaceship::ConnectAPI.token = Spaceship::ConnectAPI::Token.from_json_file(
+    ENV.fetch("APP_STORE_CONNECT_API_KEY_PATH")
+  )
+  app = Spaceship::ConnectAPI::App.find(ENV.fetch("BUNDLE_ID"))
+  UI.user_error!("Driver app not found in App Store Connect") unless app
+  build = FastlaneCore::BuildWatcher.wait_for_build_processing_to_be_complete(
+    app_id: app.id,
+    platform: "ios",
+    app_version: ENV.fetch("MARKETING_VERSION"),
+    build_version: ENV.fetch("BUILD_NUMBER"),
+    poll_interval: 30,
+    timeout_duration: 1800,
+    return_spaceship_testflight_build: false,
+    wait_for_build_beta_detail_processing: true
+  )
+  detail = build.build_beta_detail
+  UI.user_error!("Build processing failed: #{build.processing_state}") unless build.processing_state == "VALID"
+  unless ["READY_FOR_BETA_TESTING", "IN_BETA_TESTING"].include?(detail&.internal_build_state)
+    UI.user_error!("Build is not ready for internal TestFlight: #{detail&.internal_build_state}")
+  end
+  UI.success("TestFlight verified: #{build.app_version} (#{build.version}), #{build.id}; internal=#{detail.internal_build_state}; external=#{detail.external_build_state}")
+end
