@@ -11,11 +11,11 @@ invented completed orders. Source UI is resized proportionally and kept whole.
 
 The nested framed Customers/login covers below were not selected as the product-showcase direction. New direction: an edge-to-edge map, a single enlarged route card, no outer purple mats or device border.
 
-- [Map-led showcase concept](concepts/map-route-showcase-v2.png)
-- [Exact built-in imagegen prompt set](concepts/map-route-showcase-prompts.md)
-- [Dimensions, hash, source roles, and limitations](concepts/map-route-showcase-manifest.json)
+- [Map-led showcase concept — corrected logo](concepts/map-route-showcase-v3.png)
+- [Exact built-in imagegen logo-edit prompt](concepts/map-route-showcase-v3-prompt.md)
+- [Dimensions, hash, source roles, and limitations](concepts/map-route-showcase-v3-manifest.json)
 
-This is an **AI-composed marketing concept**, not a native capture or proof of live activity. Its route vocabulary comes from the existing map asset. The current 851×1848 preview still needs creative approval and final store exports; it is deliberately separate from the verified-capture manifest. Older framed assets are retained for provenance, not silently replaced with generated UI.
+This is an **AI-composed marketing concept**, not a native capture or proof of live activity. Its route vocabulary comes from the existing map asset. The current 851×1848 preview still needs creative approval and final store exports; it is deliberately separate from the verified-capture manifest. V3 corrects the wordmark letter shape and uses primary-colored lettering/symbol directly on the map with no logo tile. V2 and its prompts remain preserved for comparison. Older framed assets are retained for provenance, not silently replaced with generated UI.
 
 ## Outputs
 
