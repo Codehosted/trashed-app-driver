@@ -1,0 +1,81 @@
+# Trashed vendor + driver release — 2026-09-14
+
+**Status: local implementation verified; not deployed, submitted, or release-ready.**
+
+## Delivered locally
+
+- General **Trashed** display name and role-aware `/app` entry. Existing `com.trashed.driver` store identities and native authentication remain intact. Website features remain website features inside the wrapper; there is no parallel vendor UI implementation.
+- Startup animation limited to a WebView session, with four-page first-use walkthrough and persistent completion. Competing vendor setup prompts and notification permission registration wait for the walkthrough.
+- Real operational notification inbox/unread counts and driver messages replace demonstration alerts. Removed misleading notification test/settings controls.
+- iOS WebView constrained to native safe areas; Android system-bar/cutout padding retained. Larger flat driver controls and flat purple/white launcher artwork replace the gradient identity.
+- Customer phone links open the device's phone confirmation/dialer. No CallKit, incoming VoIP, direct-call permission, or automatic call-completion claim. This matches George's clarification.
+- Vendor push/inbox fanout covers managed Trisha/Telnyx call results, order approval events, and route changes. Ordinary outgoing phone calls do not generate an automatic result event. Fresh recipient access checks, event deduplication, shared-device token transfer, and revoke-before-logout are covered by tests.
+- New OG-style iOS cover and walkthrough artwork use actual current simulator captures. Android artwork remains explicitly a legacy draft, not a current native screenshot.
+
+## Verification
+
+| Check | Result | Evidence |
+|---|---|---|
+| Mobile/native contracts + branding/art tooling | 61/61 passed | `artifacts/native-experience/mobile-tests.log` |
+| Website experience tests | 75/75 across 12 suites | `../trashed-app/output/mobile-release/2026-09-14/mobile-experience-final-tests.json` |
+| Push, inbox, events, authorization, logout | 165/165 across 27 suites | `../trashed-app/output/mobile-release/2026-09-14/vendor-notification-final-tests.json` |
+| TypeScript, both repositories | Passed | Mobile `artifacts/native-experience/mobile-types.log`; web `output/mobile-release/2026-09-14/web-types.log` |
+| Whitespace/diff check, both repositories | Passed | `git diff --check` |
+| Flat launcher assets | 35 verified | `app-store-assets/artwork/icon-manifest.json` |
+| Store artwork | 4 RGB outputs, dimensions and hashes verified | `app-store-assets/2026-09/manifest.json` |
+| iOS Simulator native build | Passed | `/tmp/trashed-mobile-ios-build.log` |
+| Android debug + instrumentation build | Passed; lint 0 errors / 33 warnings | `artifacts/native-experience/android/verification.json` |
+| Android API 36 runtime regression suite | 2/2 passed: native login validation and measured safe-area bounds | `artifacts/native-experience/android/runtime/AndroidReleaseTest-results.json` |
+| Signed iOS device build | **Failed** embedding AppAuth.framework: `errSecInternalComponent` | `/tmp/trashed-mobile-ios-device-build.log` |
+| Local read-only smoke | 8/8 passed | `../trashed-app/output/mobile-release/2026-09-14T19-17-51.308Z/vendor-readonly-smoke.json` |
+| Production read-only smoke | Existing 7 boundaries passed; new `/app` **404** | `../trashed-app/output/mobile-release/2026-09-14T19-00-02.741Z/vendor-readonly-smoke.json` |
+
+Test groups overlap; do not add their counts as distinct cases. Source and mock tests do not establish device delivery or store publication. The smoke report's `releaseReady` field describes its routing checks only.
+
+## Observed simulator behavior
+
+iPhone 17 Pro Max, iOS 26.5, native development wrapper loading `http://localhost:3000`:
+
+- Native sign-in reached the vendor dashboard through `/app`.
+- All four walkthrough pages were visible and completed. A competing workspace chooser was found and subsequently gated; the gate fix is covered by tests.
+- Relaunch retained sign-in and did not repeat completed onboarding.
+- Dashboard → Customers → Call History navigation stayed in the wrapper without an observed repeat splash. Call History displayed its correct empty state, not a fabricated call.
+- Status-bar clearance and sidebar close-button placement were visually correct in portrait. This is not landscape, keyboard, VoiceOver, or physical-device proof.
+- Source captures are under `app-store-assets/sources/2026-09/`; call-history evidence is `artifacts/native-experience/ios-call-history.png`.
+- Development hot reload produced stale-chunk errors while parallel edits were underway; fresh navigation/relaunch recovered. Production caching behavior is not inferred from this dev session.
+
+## Safety and environment
+
+- No orders, calls, messages, or provider pushes were created/sent. Production checks were unauthenticated GET-only, without following redirects or exposing response bodies.
+- All development interaction used port 3000 and the isolated local `trashed_ios_review_20260910` database. Existing synthetic customers/orders were not changed. A disposable local-only QA manager was added; real account credentials were not changed.
+- `scripts/local-mobile-dev.mjs` loads development env files before stripping outbound/provider credentials and rejecting non-local databases. The development server remains available on port 3000.
+- iOS and Android generated configs were restored to `https://trashed.app/app?source=trashed-app` after retaining development artifacts. The installed simulator build intentionally still uses localhost.
+- Unrelated pre-existing dirty work in both repositories was preserved. The original checkouts remain uncommitted; isolated candidate branch state is tracked separately. Nothing was deployed or uploaded to either store.
+
+## Remaining release gates — do not skip
+
+1. Restore physical iPhone availability; Mirroring reports **iPhone Not Found**. Resolve signing-key access with George; do not change keychain ACLs or bypass certificate warnings.
+2. Use an approved local development connection to port 3000 on the physical device. Verify safe areas, keyboard, VoiceOver, onboarding persistence, and outgoing dialer number; cancel without placing a call.
+3. Run the permitted local order approval scenario **only on George's device against port 3000**. No production test orders.
+4. Prove iOS/Android push delivery, foreground/background/terminated behavior, notification tap routing, and logout revocation with an explicitly approved test device. Provider acceptance alone is insufficient. Do not switch production APNs environment to accommodate a development token.
+5. Run Android runtime checks and replace the legacy Android art with current native screenshots. Review and approve both store sets and listing copy.
+6. Validate/build the isolated release candidate, deploy web first, and rerun production smoke until `/app` passes. Then produce signed store builds, submit, and verify provider review/publication state separately.
+
+Details: [native contract](native-experience-verification.md), [store review packet](../app-store-assets/2026-09/README.md), and the paired website's `docs/mobile-vendor-release-verification.md`.
+
+## Isolated candidate follow-up
+
+- Clean paired worktrees: `/Users/georgebyers/GitHub/.codex-worktrees/trashed-stable-mobile-20260914/trashed-app` and `trashed-app-mobile`, both on `codex/mobile-vendor-stable-release-20260914`. Web base `7f5b0ad2d` retains the latest checkout/pricing fixes; mobile base `286097d` retains the merged native login recovery.
+- Campaign, robots, and unrelated checkout changes were excluded. Only two `/app` navigation guards were carried from the mixed root-shell file. File manifests are `web-isolation.json` and `mobile-isolation.json` beside the worktrees.
+- Existing Android SDK36/AGP/system-bar/version-guard work was explicitly adopted as a release prerequisite, not attributed as new work.
+- Review fixed two additional regressions: exact `/vendor` contact-alert links are accepted; vendor push latency no longer postpones existing call-end realtime/usage or driver assignment alerts. All parallel work is settled before return. Seven reviewed files were mirrored back to the original checkout.
+- Isolated mobile tests: 94/94 after adding the release preflight; isolated mobile type check passed. Combined web tests: 222/222 across 35 distinct files, with a separate latest 54/54 regression review. These are overlapping evidence, not additive totals.
+- Android runtime used a read-only, no-snapshot API36 emulator and an APK whose installed URL was verified as localhost:3000. No orders/calls. The existing automated regression suite passed; CUA cannot attach the unbundled emulator process, so manual navigation, dialer, and screenshot capture remain unverified.
+- App Store Connect's existing browser session now presents login. No store metadata or release state was changed.
+- Full isolated web build is a compile/packaging check using only an allowlisted environment and the isolated local database. No migration command or production credentials are passed. This development-configured artifact is not a production deployment artifact.
+
+A shared GET-only production `/app` preflight now gates iOS TestFlight upload and Android release builds before signing/artifact work. It correctly exits 3 on the current production 404. The required redirect is same-origin `/app/login` with exactly `callbackUrl=/app` and `source=trashed-app`. Android verification builds remain usable locally.
+
+Apple's public lookup currently reports **Trashed Driver 1.0.2**, released 2026-09-14 at 14:38:27 UTC, bundle `com.trashed.driver` ([listing](https://apps.apple.com/us/app/trashed-driver/id6756239268)). This confirms publication of the previous app, not this candidate. Before merging the native candidate, choose a new marketing version/build number and update the existing TestFlight default; its current 1.0.2 default must not be mistaken for the next release. Google Play current state still needs an authenticated refresh.
+
+The isolated web build completed compilation, TypeScript, static generation and 35 native libvips trace checks. The only later runtime-source change was role-neutral Google account-recovery wording, covered by its passing seven-test entry suite; a fresh provider build of the final commit remains a release gate. No deployment uses this local development-configured artifact.

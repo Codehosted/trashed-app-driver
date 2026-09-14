@@ -12,13 +12,13 @@ const validate = (path) => spawnSync('python3', ['scripts/validate-ios-privacy.p
   encoding: 'utf8',
 });
 
-describe('iOS photo picker privacy', () => {
-  it('declares camera and photo-library access in the shipping app', () => {
+describe('iOS media capture privacy', () => {
+  it('declares camera, photo-library, and microphone access in the shipping app', () => {
     const result = validate('ios/App/App/Info.plist');
     assert.equal(result.status, 0, result.stderr);
   });
 
-  for (const key of ['NSCameraUsageDescription', 'NSPhotoLibraryUsageDescription']) {
+  for (const key of ['NSCameraUsageDescription', 'NSPhotoLibraryUsageDescription', 'NSMicrophoneUsageDescription']) {
     for (const value of [null, '', '   ', '$(MISSING_PURPOSE)', '<integer>1</integer>']) {
       it(`rejects ${key} with invalid value ${JSON.stringify(value)}`, () => {
         const directory = mkdtempSync(join(tmpdir(), 'trashed-ios-privacy-'));

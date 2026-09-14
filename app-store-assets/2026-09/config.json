@@ -1,0 +1,53 @@
+{
+  "outputDirectory": "app-store-assets/2026-09",
+  "font": "app-store-assets/2026-09/fonts/Poppins-Bold.ttf",
+  "icon": "app-store-assets/artwork/trashed-driver-icon-1024.png",
+  "screenshots": [
+    {
+      "platform": "ios",
+      "output": "ios-cover-review-1320x2868.png",
+      "source": {
+        "file": "app-store-assets/sources/2026-09/ios-customers.png",
+        "sha256": "b0559d79589f275da61b61c997e85196cb2e1263fba9308b363d6efa53b3b397",
+        "platform": "ios",
+        "status": "verified-current",
+        "capturedAt": "2026-09-14T15:15:24-04:00",
+        "reviewedBy": "Codex root release task and artwork subagent; visually inspected iOS simulator capture",
+        "captureUrl": "http://localhost:3000/vendor/customers",
+        "provenance": "Actual iPhone 17 Pro Max iOS 26.5 simulator capture of the current vendor Customers page. Read-only navigation on the approved localhost development instance, with three disposable example.invalid customer fixtures (not real customer data). No UI redrawn or completed orders invented by the artwork generator. Root release task verified safe status/menu/bottom controls and no covering modal. Source review is not App Store approval."
+      }
+    },
+    {
+      "platform": "android",
+      "output": "android-cover-draft-1080x1920.png",
+      "source": {
+        "file": "app-store-assets/sources/ios-6.9/driver-route-map.png",
+        "sha256": "19befefaf2bb8fc2dc5d6b5743ebb802cd5b566a7ddce4f892d180f9d7ec18f4",
+        "platform": "web",
+        "noPlatformChrome": true,
+        "status": "legacy-draft",
+        "provenance": "Committed chrome-free 390x844 driver map capture documented in app-store-assets/README.md. Legacy UI, not evidence of current release. Visually reviewed 2026-09-14."
+      }
+    },
+    {
+      "platform": "ios",
+      "output": "ios-onboarding-review-1320x2868.png",
+      "headline": [
+        "One team.",
+        "One place.",
+        "Ready to go."
+      ],
+      "subtitle": "A simple start for every role.",
+      "source": {
+        "file": "app-store-assets/sources/2026-09/ios-onboarding-business.png",
+        "sha256": "73f3b9ace0249b3902401701e404710826308df78644eaf09593373f96573dec",
+        "platform": "ios",
+        "status": "verified-current",
+        "capturedAt": "2026-09-14T15:10:00-04:00",
+        "reviewedBy": "Codex root release task; visually inspected iOS simulator capture",
+        "captureUrl": "http://localhost:3000/vendor/dashboard",
+        "provenance": "Actual iPhone 17 Pro Max simulator capture of current first-launch walkthrough on the local development instance. Root release task verified clean and safe-area-correct on 2026-09-14. No orders created and no outbound calls made for this artwork. Source review is not App Store approval."
+      }
+    }
+  ]
+}

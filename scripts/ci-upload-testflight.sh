@@ -43,6 +43,8 @@ if ! printf '%s' "$APPLE_AUTH_CONFIG" | python3 -c 'import json, sys; config = j
   exit 3
 fi
 
+node scripts/check-mobile-backend.mjs
+
 BUILD_NUMBER="${BUILD_NUMBER:-$(date +%Y%m%d%H%M)}"
 MARKETING_VERSION="${MARKETING_VERSION:-1.0.2}"
 TEAM_ID="${DEVELOPMENT_TEAM_ID:-3BYF8CNWS2}"

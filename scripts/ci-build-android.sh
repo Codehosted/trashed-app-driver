@@ -7,6 +7,11 @@ case "$MODE" in
   *) echo "usage: $0 [verify|release]" >&2; exit 64 ;;
 esac
 
+if [[ "$MODE" == release ]]; then
+  : "${TRASHED_ANDROID_VERSION_CODE:?set an unused Google Play version code}"
+  : "${TRASHED_ANDROID_VERSION_NAME:?set the Android release version name}"
+fi
+
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 ARTIFACT_DIR="${ARTIFACT_DIR:-$ROOT_DIR/artifacts/android}"
 export TRASHED_WEB_URL=https://trashed.app
@@ -14,6 +19,9 @@ export GRADLE_USER_HOME="${GRADLE_USER_HOME:-$ROOT_DIR/android/.gradle-user}"
 export CI=true
 
 cd "$ROOT_DIR"
+if [[ "$MODE" == release ]]; then
+  node scripts/check-mobile-backend.mjs
+fi
 rm -rf "$ARTIFACT_DIR"
 mkdir -p "$ARTIFACT_DIR"
 

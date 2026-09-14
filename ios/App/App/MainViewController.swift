@@ -26,7 +26,7 @@ private struct DriverAuthConfig {
     }
 
     static func driverPath(theme: DriverTheme) -> String {
-        "/driver?source=trashed-driver-app&theme=\(theme.rawValue)"
+        "/app?source=trashed-app&theme=\(theme.rawValue)"
     }
 
     func driverURL(theme: DriverTheme) -> URL {
@@ -71,19 +71,29 @@ class MainViewController: CAPBridgeViewController {
     private var loginURLObservation: NSKeyValueObservation?
     private var pendingAppleCredential: NativeAppleCredential?
 
-    override func webViewConfiguration(for instanceConfiguration: InstanceConfiguration) -> WKWebViewConfiguration {
-        let configuration = super.webViewConfiguration(for: instanceConfiguration)
-        configuration.userContentController.addUserScript(WKUserScript(
-            source: Self.driverSafeAreaScript,
-            injectionTime: .atDocumentEnd,
-            forMainFrameOnly: true
-        ))
-        return configuration
+    override func capacitorDidLoad() {
+        super.capacitorDidLoad()
+        guard let webView = webView else { return }
+
+        // A native boundary protects every website screen and modal, not just
+        // driver controls with a particular CSS class. The status bar stays visible.
+        let container = UIView(frame: view.bounds)
+        container.backgroundColor = .systemBackground
+        view = container
+        webView.translatesAutoresizingMaskIntoConstraints = false
+        webView.scrollView.contentInsetAdjustmentBehavior = .never
+        container.addSubview(webView)
+        NSLayoutConstraint.activate([
+            webView.leadingAnchor.constraint(equalTo: container.safeAreaLayoutGuide.leadingAnchor),
+            webView.trailingAnchor.constraint(equalTo: container.safeAreaLayoutGuide.trailingAnchor),
+            webView.topAnchor.constraint(equalTo: container.safeAreaLayoutGuide.topAnchor),
+            webView.bottomAnchor.constraint(equalTo: container.safeAreaLayoutGuide.bottomAnchor),
+        ])
     }
 
     override func instanceDescriptor() -> InstanceDescriptor {
         let descriptor = super.instanceDescriptor()
-        let serverURL = descriptor.serverURL ?? bundledServerURLString() ?? "https://trashed.app/driver?source=trashed-driver-app"
+        let serverURL = descriptor.serverURL ?? bundledServerURLString() ?? "https://trashed.app/app?source=trashed-app"
         descriptor.serverURL = driverURLString(from: serverURL, theme: currentDriverTheme)
         return descriptor
     }
@@ -110,9 +120,9 @@ class MainViewController: CAPBridgeViewController {
             return serverURL
         }
 
-        components.path = "/driver"
+        components.path = "/app"
         components.queryItems = [
-            URLQueryItem(name: "source", value: "trashed-driver-app"),
+            URLQueryItem(name: "source", value: "trashed-app"),
             URLQueryItem(name: "theme", value: theme.rawValue),
         ]
         return components.url?.absoluteString ?? serverURL
@@ -203,8 +213,7 @@ class MainViewController: CAPBridgeViewController {
         pendingAppleCredential = nil
         removeNativeLogin()
 
-        // CAPBridgeViewController's root view is the WKWebView. Hiding the WebView
-        // also hides native child views, so keep it visible and cover it instead.
+        // Keep the WebView session alive underneath the native sign-in view.
         webView?.isHidden = false
 
         let loginView = NativeDriverLoginView(
@@ -565,28 +574,6 @@ class MainViewController: CAPBridgeViewController {
         return message
     }
 
-    private static let driverSafeAreaScript = """
-    (function () {
-      var viewport = document.querySelector('meta[name="viewport"]');
-      if (viewport && viewport.content.indexOf('viewport-fit=cover') === -1) {
-        viewport.content = viewport.content + ', viewport-fit=cover';
-      }
-      if (document.getElementById('trashed-ios-safe-area')) return;
-
-      var style = document.createElement('style');
-      style.id = 'trashed-ios-safe-area';
-      style.textContent = [
-        ':root { --trashed-ios-safe-top: env(safe-area-inset-top, 0px); }',
-        '@supports (top: env(safe-area-inset-top)) {',
-        '  .absolute.top-0, .fixed.top-0, .sticky.top-0 { top: var(--trashed-ios-safe-top) !important; }',
-        '  .absolute.top-3, .fixed.top-3, .sticky.top-3 { top: calc(var(--trashed-ios-safe-top) + 0.75rem) !important; }',
-        '  .absolute.top-4, .fixed.top-4, .sticky.top-4 { top: calc(var(--trashed-ios-safe-top) + 1rem) !important; }',
-        '  .absolute.top-6, .fixed.top-6, .sticky.top-6 { top: calc(var(--trashed-ios-safe-top) + 1.5rem) !important; }',
-        '}'
-      ].join('\\n');
-      document.head.appendChild(style);
-    })();
-    """
 }
 
 private struct NativeDriverLoginView: View {
@@ -689,16 +676,16 @@ private struct NativeDriverLoginView: View {
                             .frame(width: 104, height: 82)
                             .accessibilityHidden(true)
 
-                        Text("Trashed Driver")
+                        Text("Trashed")
                             .font(.system(size: 16, weight: .semibold, design: .rounded))
                             .foregroundColor(secondaryTextColor)
                     }
 
                     VStack(spacing: 8) {
-                        Text("Driver Sign In")
+                        Text("Sign in to Trashed")
                             .font(.system(size: 30, weight: .bold, design: .rounded))
                             .foregroundColor(primaryTextColor)
-                        Text("Sign in to open your route, stops, and dispatch messages.")
+                        Text("Manage your business, orders, routes, and team.")
                             .font(.system(size: 15, weight: .regular))
                             .foregroundColor(secondaryTextColor)
                             .multilineTextAlignment(.center)
@@ -742,7 +729,7 @@ private struct NativeDriverLoginView: View {
                         .accessibilityIdentifier("native-driver-google-sign-in")
 
                         if appleLinkPending {
-                            Text("One-time setup: sign in with your existing Trashed email and password below to link Apple. Your Apple email can stay private. No new driver account will be created.")
+                            Text("One-time setup: sign in with your existing Trashed email and password below to link Apple. Your Apple email can stay private. No new account will be created.")
                                 .font(.system(size: 13))
                                 .foregroundColor(secondaryTextColor)
                                 .accessibilityIdentifier("native-driver-apple-link-notice")
@@ -830,7 +817,7 @@ private struct NativeDriverLoginView: View {
                     )
                     .shadow(color: cardShadowColor, radius: 24, x: 0, y: 18)
 
-                    Text("Need driver access? Ask your dispatcher or account admin to add you. By signing in, you agree to the Trashed Terms and Privacy Policy.")
+                    Text("Need access? Ask your account administrator to add you. By signing in, you agree to the Trashed Terms and Privacy Policy.")
                         .font(.system(size: 12))
                         .foregroundColor(footnoteTextColor)
                         .multilineTextAlignment(.center)

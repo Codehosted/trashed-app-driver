@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Reject iOS builds whose WebView photo picker would exit on privacy access."""
+"""Reject iOS builds whose WebView media capture would exit on privacy access."""
 
 import plistlib
 import sys
@@ -13,12 +13,12 @@ def main():
     with Path(sys.argv[1]).open("rb") as file:
         info = plistlib.load(file)
 
-    for key in ("NSCameraUsageDescription", "NSPhotoLibraryUsageDescription"):
+    for key in ("NSCameraUsageDescription", "NSPhotoLibraryUsageDescription", "NSMicrophoneUsageDescription"):
         value = info.get(key)
         if not isinstance(value, str) or not value.strip() or "$(" in value:
-            sys.exit(f"Missing or invalid {key}: photo capture must have a privacy purpose string.")
+            sys.exit(f"Missing or invalid {key}: media capture must have a privacy purpose string.")
 
-    print("iOS camera and photo-library privacy descriptions verified.")
+    print("iOS camera, photo-library, and microphone privacy descriptions verified.")
 
 
 if __name__ == "__main__":

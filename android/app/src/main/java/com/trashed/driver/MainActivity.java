@@ -20,6 +20,10 @@ import android.widget.ProgressBar;
 import android.widget.ScrollView;
 import android.widget.TextView;
 
+import androidx.core.graphics.Insets;
+import androidx.core.view.ViewCompat;
+import androidx.core.view.WindowInsetsCompat;
+
 import com.getcapacitor.BridgeActivity;
 import com.google.android.gms.auth.api.signin.GoogleSignIn;
 import com.google.android.gms.auth.api.signin.GoogleSignInAccount;
@@ -41,7 +45,7 @@ import java.util.List;
 import java.util.Map;
 
 public class MainActivity extends BridgeActivity {
-    private static final String DEFAULT_DRIVER_URL = "https://trashed.app/driver?source=trashed-driver-app";
+    private static final String DEFAULT_DRIVER_URL = "https://trashed.app/app?source=trashed-app";
     private static final int GOOGLE_SIGN_IN_REQUEST = 6107;
     private static final String SESSION_COOKIE = "next-auth.session-token";
     private static final String SECURE_SESSION_COOKIE = "__Secure-next-auth.session-token";
@@ -59,6 +63,14 @@ public class MainActivity extends BridgeActivity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        // Android 16 enforces edge-to-edge; keep both native login and WebView inside the safe area.
+        View content = findViewById(android.R.id.content);
+        ViewCompat.setOnApplyWindowInsetsListener(content, (view, windowInsets) -> {
+            Insets insets = windowInsets.getInsets(WindowInsetsCompat.Type.systemBars() | WindowInsetsCompat.Type.displayCutout());
+            view.setPadding(insets.left, insets.top, insets.right, insets.bottom);
+            return windowInsets;
+        });
+        ViewCompat.requestApplyInsets(content);
         authConfig = readAuthConfig();
         WebView webView = getBridge().getWebView();
         CookieManager cookieManager = CookieManager.getInstance();
@@ -89,7 +101,7 @@ public class MainActivity extends BridgeActivity {
         logo.setGravity(Gravity.CENTER);
         container.addView(logo, matchWrapParams());
 
-        TextView subtitle = text("Driver Portal", 12, Color.rgb(148, 163, 184), Typeface.BOLD);
+        TextView subtitle = text("Vendors & Drivers", 12, Color.rgb(148, 163, 184), Typeface.BOLD);
         subtitle.setGravity(Gravity.CENTER);
         subtitle.setLetterSpacing(0.18f);
         container.addView(subtitle, matchWrapParams());
@@ -102,11 +114,11 @@ public class MainActivity extends BridgeActivity {
         cardParams.setMargins(0, dp(28), 0, 0);
         container.addView(card, cardParams);
 
-        TextView title = text("Driver Sign In", 26, Color.WHITE, Typeface.BOLD);
+        TextView title = text("Sign in to Trashed", 26, Color.WHITE, Typeface.BOLD);
         title.setGravity(Gravity.CENTER);
         card.addView(title, matchWrapParams());
 
-        TextView body = text("Sign in to open routes, dispatch, and vendor tools without leaving the app.", 15, Color.rgb(203, 213, 225), Typeface.NORMAL);
+        TextView body = text("Manage your business, orders, routes, and team.", 15, Color.rgb(203, 213, 225), Typeface.NORMAL);
         body.setGravity(Gravity.CENTER);
         body.setPadding(0, dp(10), 0, dp(18));
         card.addView(body, matchWrapParams());
