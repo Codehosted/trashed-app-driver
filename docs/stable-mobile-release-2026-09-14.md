@@ -1,6 +1,6 @@
 # Trashed vendor + driver release — 2026-09-14
 
-**Status: local implementation verified; not deployed, submitted, or release-ready.**
+**Status: release candidates prepared; no production deployment or store submission. Release gates remain open.**
 
 ## Delivered locally
 
@@ -10,7 +10,7 @@
 - iOS WebView constrained to native safe areas; Android system-bar/cutout padding retained. Larger flat driver controls and flat purple/white launcher artwork replace the gradient identity.
 - Customer phone links open the device's phone confirmation/dialer. No CallKit, incoming VoIP, direct-call permission, or automatic call-completion claim. This matches George's clarification.
 - Vendor push/inbox fanout covers managed Trisha/Telnyx call results, order approval events, and route changes. Ordinary outgoing phone calls do not generate an automatic result event. Fresh recipient access checks, event deduplication, shared-device token transfer, and revoke-before-logout are covered by tests.
-- New OG-style iOS cover and walkthrough artwork use actual current simulator captures. Android artwork remains explicitly a legacy draft, not a current native screenshot.
+- New OG-style iOS cover and walkthrough artwork use actual current simulator captures. The Android cover now uses a visually verified current native login capture, replacing the legacy draft; all store assets still require release approval.
 
 ## Verification
 
@@ -50,7 +50,7 @@ iPhone 17 Pro Max, iOS 26.5, native development wrapper loading `http://localhos
 - All development interaction used port 3000 and the isolated local `trashed_ios_review_20260910` database. Existing synthetic customers/orders were not changed. A disposable local-only QA manager was added; real account credentials were not changed.
 - `scripts/local-mobile-dev.mjs` loads development env files before stripping outbound/provider credentials and rejecting non-local databases. The development server remains available on port 3000.
 - iOS and Android generated configs were restored to `https://trashed.app/app?source=trashed-app` after retaining development artifacts. The installed simulator build intentionally still uses localhost.
-- Unrelated pre-existing dirty work in both repositories was preserved. The original checkouts remain uncommitted; isolated candidate branch state is tracked separately. Nothing was deployed or uploaded to either store.
+- Unrelated pre-existing dirty work in both repositories was preserved. The original checkouts remain uncommitted; isolated candidate branch state is tracked separately. No production deployment or store upload occurred. The draft website preview deployment is documented below.
 
 ## Remaining release gates — do not skip
 
@@ -58,7 +58,7 @@ iPhone 17 Pro Max, iOS 26.5, native development wrapper loading `http://localhos
 2. Use an approved local development connection to port 3000 on the physical device. Verify safe areas, keyboard, VoiceOver, onboarding persistence, and outgoing dialer number; cancel without placing a call.
 3. Run the permitted local order approval scenario **only on George's device against port 3000**. No production test orders.
 4. Prove iOS/Android push delivery, foreground/background/terminated behavior, notification tap routing, and logout revocation with an explicitly approved test device. Provider acceptance alone is insufficient. Do not switch production APNs environment to accommodate a development token.
-5. Run Android runtime checks and replace the legacy Android art with current native screenshots. Review and approve both store sets and listing copy.
+5. Review and approve both store sets and listing copy. Android runtime checks below cover login, native safe areas, and the outgoing-dialer boundary; signed-in Android navigation, keyboard, and accessibility still need verification.
 6. Validate/build the isolated release candidate, deploy web first, and rerun production smoke until `/app` passes. Then produce signed store builds, submit, and verify provider review/publication state separately.
 
 Details: [native contract](native-experience-verification.md), [store review packet](../app-store-assets/2026-09/README.md), and the paired website's `docs/mobile-vendor-release-verification.md`.
@@ -78,4 +78,17 @@ A shared GET-only production `/app` preflight now gates iOS TestFlight upload an
 
 Apple's public lookup currently reports **Trashed Driver 1.0.2**, released 2026-09-14 at 14:38:27 UTC, bundle `com.trashed.driver` ([listing](https://apps.apple.com/us/app/trashed-driver/id6756239268)). This confirms publication of the previous app, not this candidate. Before merging the native candidate, choose a new marketing version/build number and update the existing TestFlight default; its current 1.0.2 default must not be mistaken for the next release. Google Play current state still needs an authenticated refresh.
 
-The isolated web build completed compilation, TypeScript, static generation and 35 native libvips trace checks. The only later runtime-source change was role-neutral Google account-recovery wording, covered by its passing seven-test entry suite; a fresh provider build of the final commit remains a release gate. No deployment uses this local development-configured artifact.
+The isolated web build completed compilation, TypeScript, static generation and 35 native libvips trace checks. The only later runtime-source change was role-neutral Google account-recovery wording, covered by its passing seven-test entry suite. Vercel subsequently built that exact final web commit successfully; runtime results are below. No deployment uses this local development-configured artifact.
+
+
+## Deployed preview and final Android follow-up — 20:12 UTC
+
+- Draft web PR: https://github.com/Codehosted/trashed-app/pull/589; native PR: https://github.com/Codehosted/trashed-app-driver/pull/29. Neither is merged.
+- Vercel deployment `dpl_7CDoxZ1aWTbDNAkTrhbamK4phcrL` is READY for exact web commit `3009d3b9e34682b756f803c038214893bfbe50a3`. Build success is not runtime readiness: nine unauthenticated, fixed-preview-host GET checks returned eight expected results, but `/app` returned **500**. Provider runtime logs identify NextAuth **NO_SECRET**. Approval was requested for a new branch-only preview sign-in secret; no authentication settings were changed.
+- The normal Vercel preview build invoked its existing migration check. Logs show `Pending migrations: []` and `No pending migrations to apply`; no new migration was applied. A future rebuild must not be described as migration-free. Local isolated builds still avoid the migration command.
+- Android visual review exposed white status icons on a white safe-area strip. The actual native content frame is now dark `#020617`, with white status/navigation icons; existing insets and WebView bounds are unchanged. No screenshot retouching was used.
+- **Final Android API36 runtime: 3/3 passed in 22.176 seconds.** Measured system-bar/cutout clearance and frame/icon appearance; native empty-login validation; actual Capacitor WebView synthetic phone link opening the populated system dialer. This supersedes, not adds to, the earlier two-test runtime run.
+- Dialer evidence: exactly one `android.intent.action.VIEW` for `tel:+12025550123`; active app `com.google.android.dialer`; `CALL_PHONE` neither requested nor granted; zero blocked/unexpected intents. The Call button was never pressed. This proves the Android WebView-to-dialer boundary, not an authenticated customer flow, physical iPhone behavior, or call completion.
+- Current native login and idle dialer screenshots were visually reviewed by the root release task. Evidence/hashes: `artifacts/native-experience/android/dialer/AndroidDialerTest-results.json`; capture provenance: `native-login-provenance.json` in the same folder. The login capture predates the synthetic fixture and contains no account or customer data.
+- The emulator was read-only, with snapshots disabled, and was closed gracefully. Packaged test backend was verified as `http://localhost:3000/app?source=trashed-app`; generated working files were restored to the production URL afterward. No account sign-in, order creation, or call occurred in this Android test.
+- Production routing and both stores remain on their previous releases. Physical-device/signing access, real push delivery, the permitted physical-device local order test, final store versions/artwork approval, production web smoke, and signed store publication remain required.

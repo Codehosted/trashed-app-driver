@@ -62,8 +62,8 @@ dumpster,rental,hauling,dispatch,driver,route,vendor,roll off,inventory,customer
 - Validate iOS and Android native dialer handoff on real devices.
 - Verify vendor call, order-approval, and route-change push receipt and inbox
   persistence using the approved test device/local instance.
-- Current iOS Customers and walkthrough review panels are available. Capture
-  current driver and Android screens before submission; the legacy Android
-  portrait is not a release screenshot. Never reuse iOS chrome on Google Play.
+- Current iOS Customers/walkthrough panels and a current Android native-login
+  review panel are available. Capture additional signed-in Android and driver
+  workflows before submission. Never reuse iOS chrome on Google Play.
 - Confirm permissions/privacy disclosures from the final native builds; this
   listing does not replace either store's privacy/data-safety declarations.

@@ -17,17 +17,21 @@ invented completed orders. Source UI is resized proportionally and kept whole.
   captured and visually reviewed by the root release task against
   `http://localhost:3000/vendor/dashboard`, September 14 at 15:10 EDT.
   Source verified; still a release-review draft, not store-approved.
-- `android-cover-draft-1080x1920.png` — Android-size concept, the same legacy
-  **chrome-free web UI**, not an iOS device screenshot.
+- `android-cover-review-1080x1920.png` — current native Android sign-in screen,
+  captured on a disposable API 36 emulator September 14 at 16:11:01 EDT. The
+  packaged app uses `http://localhost:3000/app?source=trashed-app`. The actual
+  native status/navigation contrast was corrected before capture; no image
+  retouch, authentication, orders, or phone navigation preceded the screenshot.
 - `feature-graphic-1024x500.png` — clean brand/copy/icon graphic; no UI claims.
 - `manifest.json` — exact inputs, source/output SHA-256, dimensions, pixel
   format, provenance, generation inputs, and review status.
 
-The remaining Android concept source is the previously committed
-`app-store-assets/sources/ios-6.9/driver-route-map.png` (390×844), documented in
-`app-store-assets/README.md` as a bare web capture. Its legacy UI is **not proof
-of this release**. A visible DRAFT label stays on the Android concept cover.
-The legacy iOS concept was replaced with the current Customers capture above.
+Both platform covers now use current, reviewed local native captures. The
+Android cover describes sign-in, not an authenticated dashboard. The original
+legacy concept covers were replaced; the historical chrome-free web capture
+`app-store-assets/sources/ios-6.9/driver-route-map.png` remains unchanged for
+provenance-validation tests, not as release artwork. All outputs remain
+review-required drafts until separately approved for store submission.
 The older file named `03-vendor-dashboard-webview.png` was inspected and is
 actually a login page; it was deliberately not used.
 

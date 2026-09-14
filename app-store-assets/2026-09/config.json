@@ -19,14 +19,26 @@
     },
     {
       "platform": "android",
-      "output": "android-cover-draft-1080x1920.png",
+      "output": "android-cover-review-1080x1920.png",
+      "headline": [
+        "Your account.",
+        "Your team.",
+        "One app."
+      ],
+      "subtitle": "Sign in as a vendor or driver.",
       "source": {
-        "file": "app-store-assets/sources/ios-6.9/driver-route-map.png",
-        "sha256": "19befefaf2bb8fc2dc5d6b5743ebb802cd5b566a7ddce4f892d180f9d7ec18f4",
-        "platform": "web",
-        "noPlatformChrome": true,
-        "status": "legacy-draft",
-        "provenance": "Committed chrome-free 390x844 driver map capture documented in app-store-assets/README.md. Legacy UI, not evidence of current release. Visually reviewed 2026-09-14."
+        "file": "app-store-assets/sources/2026-09/android-native-login.png",
+        "sha256": "bd898d34a82ae806b3a29053589653178fef900789848e9e6b667b2042477516",
+        "platform": "android",
+        "status": "verified-current",
+        "capturedAt": "2026-09-14T16:11:01-04:00",
+        "reviewedBy": "Codex root release task and artwork subagent; independently visually inspected corrected native login",
+        "captureUrl": "http://localhost:3000/app?source=trashed-app",
+        "captureMethod": "Android instrumentation UiAutomation.takeScreenshot after native title assertion, before synthetic fixture",
+        "appPackage": "com.trashed.driver",
+        "androidApi": 36,
+        "installedApkSha256": "b809f8d59764133081fef42fc1e956330fdab690996e93fabd08afd84fe8e663",
+        "provenance": "Untouched native Trashed login on disposable TrashedReleaseApi36 emulator. Packaged application uses the approved localhost development instance. Native dark status/navigation frame and white system icons corrected in application source, then captured and independently reviewed. No authentication, orders, phone navigation, or image retouch before this capture. Source review is not Google Play approval."
       }
     },
     {
