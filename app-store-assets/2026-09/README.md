@@ -11,11 +11,19 @@ invented completed orders. Source UI is resized proportionally and kept whole.
 
 The nested framed Customers/login covers below were not selected as the product-showcase direction. New direction: an edge-to-edge map, an enlarged route card, and a driver marker with its context window open. No outer purple mats or device border.
 
-- [Map-led showcase — driver marker and context window](concepts/map-route-showcase-v5.png)
-- [Exact built-in imagegen edit prompt](concepts/map-route-showcase-v5-prompt.md)
-- [Dimensions, hash, source roles, and limitations](concepts/map-route-showcase-v5-manifest.json)
+- [Map-led showcase — Danny and chat context](concepts/map-route-showcase-v6.png)
+- [Exact built-in imagegen edit prompt](concepts/map-route-showcase-v6-prompt.md)
+- [Dimensions, hash, source roles, and limitations](concepts/map-route-showcase-v6-manifest.json)
 
-This is an **AI-composed marketing concept**, not a native capture or proof of live activity. Its route vocabulary comes from the existing map asset. The current 851×1848 preview still needs creative approval and final store exports; it is deliberately separate from the verified-capture manifest. V5 keeps the corrected black wordmark and purple symbol directly on the map, without a logo tile. The added DD driver marker opens a driver-chat context window based on the current app component, using only demo identity and an empty conversation. No app UI, orders, or messages changed. Earlier versions and prompts remain preserved, including the black-wordmark-only v4. Older framed assets are retained for provenance, not silently replaced with generated UI.
+This is an **AI-composed marketing concept**, not a native capture or proof of live activity. Its route vocabulary comes from the existing map asset. The current 851×1848 preview still needs creative approval and final store exports; it is deliberately separate from the verified-capture manifest. V6 keeps the corrected black wordmark and purple symbol directly on the map, without a logo tile. The driver is named Danny as requested, using the existing project avatar and two illustrative chat bubbles. The exchange is sample artwork, not a sent conversation. No app UI, orders, or messages changed. Earlier versions and prompts remain preserved. Older framed assets are retained for provenance, not silently replaced with generated UI.
+
+## Trisha companion artwork
+
+- [Trisha — messaging, Call Center, Digital Assistant](concepts/trisha-mobile-showcase-v4.png)
+- [Latest built-in imagegen edit prompt](concepts/trisha-mobile-showcase-v4-prompt.md)
+- [Dimensions, hash, references, and limitations](concepts/trisha-mobile-showcase-v4-manifest.json)
+
+The existing Trisha avatar anchors this companion concept. Feature labels use lighter, staggered typography; the smaller Customer messaging label sits beside its bubble icon. The bold purple “all in your phone.” styling remains the payoff. Her shirt has a Trisha nametag with the brand symbol. Current preview is 851×1847; earlier versions and their prompts remain available. This is generated marketing artwork, not native UI or evidence that any call/message occurred. Creative approval and final store exports are still required.
 
 ## Outputs
 

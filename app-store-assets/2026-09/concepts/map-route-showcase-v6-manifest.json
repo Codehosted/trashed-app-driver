@@ -1,0 +1,38 @@
+{
+  "createdAt": "2026-09-14T21:18:52.893Z",
+  "mode": "built-in image_gen",
+  "selectedOutput": "map-route-showcase-v6.png",
+  "sha256": "89974c18a898f81edbb6100263229de7eb549689bdb3dc8e2246037acdda7e5e",
+  "width": 851,
+  "height": 1848,
+  "status": "generated-concept-review-required",
+  "isActualAppScreenshot": false,
+  "storeUploaded": false,
+  "appCodeChanged": false,
+  "editScope": "Name driver Danny, show avatar and two illustrative chat bubbles.",
+  "supersedes": "map-route-showcase-v5.png",
+  "sampleConversation": [
+    "Heading to my next stop.",
+    "Thanks, Danny. Drive safe."
+  ],
+  "messagesSent": 0,
+  "ordersCreated": 0,
+  "references": [
+    {
+      "file": "map-route-showcase-v5.png",
+      "sha256": "b32ed162d6bf9c2f8f4564a98d6a5bb8add904d6cb924f47773862e3405c220e",
+      "role": "Edit target"
+    },
+    {
+      "file": "references/danny-avatar-source.webp",
+      "sha256": "13760e1b482fa648471a688701527df4f66084da01b180c41f9468e90859e287",
+      "role": "Existing project avatar, named Danny by user"
+    }
+  ],
+  "promptSet": "map-route-showcase-v6-prompt.md",
+  "limitations": [
+    "AI-composed marketing artwork, not actual app/runtime evidence",
+    "Typography, color, avatar and surrounding pixels are visually matched rather than guaranteed pixel-exact",
+    "Needs creative approval and final store-size exports; separate from verified-capture manifest"
+  ]
+}
