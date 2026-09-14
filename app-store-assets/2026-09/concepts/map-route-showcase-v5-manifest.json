@@ -1,0 +1,52 @@
+{
+  "createdAt": "2026-09-14T21:07:55.032Z",
+  "mode": "built-in image_gen",
+  "selectedOutput": "map-route-showcase-v5.png",
+  "sha256": "b32ed162d6bf9c2f8f4564a98d6a5bb8add904d6cb924f47773862e3405c220e",
+  "width": 851,
+  "height": 1848,
+  "status": "generated-concept-review-required",
+  "isActualAppScreenshot": false,
+  "storeUploaded": false,
+  "appCodeChanged": false,
+  "supersedes": "map-route-showcase-v4.png",
+  "editScope": "Add driver initials marker and connected open driver-chat context popup; retain black wordmark, purple symbol, no logo backdrop.",
+  "references": [
+    {
+      "file": "map-route-showcase-v4.png",
+      "sha256": "8afc0c7499e9c1170979f018417cc3ecca54809bf6f9ea7c88d454c5da1f86aa",
+      "role": "Edit target; black-wordmark version retained"
+    },
+    {
+      "file": "references/driver-speed-marker-source.png",
+      "sha256": "83d7a2ac9c645e3aed2164b877127f90b130dd632f3d57b312969a72b88c41ed",
+      "role": "Existing website marketing asset; marker styling only, not speed or runtime evidence"
+    }
+  ],
+  "componentReference": {
+    "file": "/Users/georgebyers/GitHub/trashed-app/components/vendor/dispatch/overhaul/map/LeafletMap.tsx",
+    "sha256": "2c11fb39df79d3e3b2b62f7a8633b19fc2ff62dc364490762c24af4077e0962f",
+    "symbols": [
+      "DriverChatPopup",
+      "LiveDriverMarker"
+    ],
+    "role": "Current popup field/actions reference; no runtime changes"
+  },
+  "demoContent": {
+    "driver": "Demo Driver",
+    "initials": "DD",
+    "status": "online · 1 route assigned",
+    "conversation": "No messages yet.",
+    "composer": "Message driver…",
+    "realCustomerData": false,
+    "messagesSent": 0,
+    "ordersCreated": 0
+  },
+  "promptSet": "map-route-showcase-v5-prompt.md",
+  "limitations": [
+    "AI-composed illustrative artwork, not an actual screenshot or current live state",
+    "Stop 2 and nearby route geometry shifted slightly in the generated edit; all three stops and route summary retained",
+    "Approximate visual reproduction, not pixel-exact component rendering",
+    "Needs creative approval and final store-size exports; separate from verified-capture manifest"
+  ]
+}

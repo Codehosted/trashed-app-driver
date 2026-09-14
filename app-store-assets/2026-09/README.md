@@ -9,13 +9,13 @@ invented completed orders. Source UI is resized proportionally and kept whole.
 
 ## Revised showcase direction — September 14 feedback
 
-The nested framed Customers/login covers below were not selected as the product-showcase direction. New direction: an edge-to-edge map, a single enlarged route card, no outer purple mats or device border.
+The nested framed Customers/login covers below were not selected as the product-showcase direction. New direction: an edge-to-edge map, an enlarged route card, and a driver marker with its context window open. No outer purple mats or device border.
 
-- [Map-led showcase concept — corrected logo](concepts/map-route-showcase-v3.png)
-- [Exact built-in imagegen logo-edit prompt](concepts/map-route-showcase-v3-prompt.md)
-- [Dimensions, hash, source roles, and limitations](concepts/map-route-showcase-v3-manifest.json)
+- [Map-led showcase — driver marker and context window](concepts/map-route-showcase-v5.png)
+- [Exact built-in imagegen edit prompt](concepts/map-route-showcase-v5-prompt.md)
+- [Dimensions, hash, source roles, and limitations](concepts/map-route-showcase-v5-manifest.json)
 
-This is an **AI-composed marketing concept**, not a native capture or proof of live activity. Its route vocabulary comes from the existing map asset. The current 851×1848 preview still needs creative approval and final store exports; it is deliberately separate from the verified-capture manifest. V3 corrects the wordmark letter shape and uses primary-colored lettering/symbol directly on the map with no logo tile. V2 and its prompts remain preserved for comparison. Older framed assets are retained for provenance, not silently replaced with generated UI.
+This is an **AI-composed marketing concept**, not a native capture or proof of live activity. Its route vocabulary comes from the existing map asset. The current 851×1848 preview still needs creative approval and final store exports; it is deliberately separate from the verified-capture manifest. V5 keeps the corrected black wordmark and purple symbol directly on the map, without a logo tile. The added DD driver marker opens a driver-chat context window based on the current app component, using only demo identity and an empty conversation. No app UI, orders, or messages changed. Earlier versions and prompts remain preserved, including the black-wordmark-only v4. Older framed assets are retained for provenance, not silently replaced with generated UI.
 
 ## Outputs
 
