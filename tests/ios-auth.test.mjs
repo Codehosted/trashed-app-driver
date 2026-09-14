@@ -35,7 +35,7 @@ describe('iOS equivalent Apple login', () => {
     assert.match(controller, /No new account will be created/);
     assert.match(controller, /Cancel linking Apple/);
     assert.match(controller, /pendingAppleCredential == nil \? config\.loginURL : config\.appleLoginURL/);
-    assert.match(controller, /private func presentNativeLogin[^}]*pendingAppleCredential = nil/);
+    assert.match(controller, /private func presentNativeLogin[^]*?guard onboardingReady, nativeOnboardingController == nil else \{ return \}\s*pendingAppleCredential = nil/);
     assert.match(controller, /isAppleSubmitting \|\| appleLinkPending/);
   });
 

@@ -1,0 +1,26 @@
+[
+  {
+    "label": "Your business, wherever you work",
+    "title": "One Trashed app. Your whole team.",
+    "body": "Vendors manage their business. Drivers run their routes. Sign in with your existing Trashed account to access the tools available to your role.",
+    "detail": "Orders · customers · inventory · dispatch"
+  },
+  {
+    "label": "From the office to the jobsite",
+    "title": "Keep every stop connected.",
+    "body": "Open assigned routes, review stop details, and send updates to dispatch. Driver location sharing starts only after you choose to go online and grant permission.",
+    "detail": "Your routes. Your team. One shared view."
+  },
+  {
+    "label": "Stay close to your customers",
+    "title": "Calls belong on your phone.",
+    "body": "Open your business calls and their details from the vendor workspace. Customer phone links use your device’s phone app.",
+    "detail": "Call history and follow-up, alongside your orders"
+  },
+  {
+    "label": "Only updates that matter",
+    "title": "Know what needs your attention.",
+    "body": "Allow notifications for call results, orders that need approval, and route updates. You can change notification permissions anytime in your device settings.",
+    "detail": "Call results · order approvals · route updates"
+  }
+]

@@ -10,6 +10,7 @@ import android.view.View;
 import android.view.ViewGroup;
 import android.view.inputmethod.InputMethodManager;
 import android.content.Context;
+import android.content.SharedPreferences;
 import android.webkit.CookieManager;
 import android.webkit.WebView;
 import android.widget.Button;
@@ -24,8 +25,10 @@ import androidx.core.graphics.Insets;
 import androidx.core.view.ViewCompat;
 import androidx.core.view.WindowCompat;
 import androidx.core.view.WindowInsetsCompat;
+import androidx.activity.OnBackPressedCallback;
 
 import com.getcapacitor.BridgeActivity;
+import com.getcapacitor.CapacitorWebView;
 import com.google.android.gms.auth.api.signin.GoogleSignIn;
 import com.google.android.gms.auth.api.signin.GoogleSignInAccount;
 import com.google.android.gms.auth.api.signin.GoogleSignInClient;
@@ -50,8 +53,21 @@ public class MainActivity extends BridgeActivity {
     private static final int GOOGLE_SIGN_IN_REQUEST = 6107;
     private static final String SESSION_COOKIE = "next-auth.session-token";
     private static final String SECURE_SESSION_COOKIE = "__Secure-next-auth.session-token";
+    static final String ONBOARDING_PREFERENCES = "trashed-native";
+    static final String ONBOARDING_VERSION_KEY = "onboarding-version";
+    static final String ONBOARDING_MARKER = "TrashedOnboarding/1";
+    static final String[][] ONBOARDING_PAGES = {
+        { "Your business, wherever you work", "One Trashed app. Your whole team.", "Vendors manage their business. Drivers run their routes. Sign in with your existing Trashed account to access the tools available to your role.", "Orders · customers · inventory · dispatch" },
+        { "From the office to the jobsite", "Keep every stop connected.", "Open assigned routes, review stop details, and send updates to dispatch. Driver location sharing starts only after you choose to go online and grant permission.", "Your routes. Your team. One shared view." },
+        { "Stay close to your customers", "Calls belong on your phone.", "Open your business calls and their details from the vendor workspace. Customer phone links use your device’s phone app.", "Call history and follow-up, alongside your orders" },
+        { "Only updates that matter", "Know what needs your attention.", "Allow notifications for call results, orders that need approval, and route updates. You can change notification permissions anytime in your device settings.", "Call results · order approvals · route updates" },
+    };
 
     private FrameLayout loginOverlay;
+    private FrameLayout onboardingOverlay;
+    private OnBackPressedCallback onboardingBack;
+    private int onboardingStep;
+    private boolean onboardingReady;
     private EditText emailField;
     private EditText passwordField;
     private Button googleButton;
@@ -60,6 +76,37 @@ public class MainActivity extends BridgeActivity {
     private TextView errorText;
     private AuthConfig authConfig;
     private GoogleSignInClient googleClient;
+
+    // One-time bootstrap gate only. Once open, retain Capacitor's normal URL policy/client.
+    static final class OnboardingWebView extends CapacitorWebView {
+        boolean appNavigationEnabled;
+
+        OnboardingWebView(Context context) { super(context, null); }
+
+        @Override
+        public void loadUrl(String url) {
+            if (appNavigationEnabled) super.loadUrl(url);
+        }
+
+        @Override
+        public void loadUrl(String url, Map<String, String> headers) {
+            if (appNavigationEnabled) super.loadUrl(url, headers);
+        }
+    }
+
+    @Override
+    protected void load() {
+        WebView original = findViewById(com.getcapacitor.android.R.id.webview);
+        ViewGroup parent = (ViewGroup) original.getParent();
+        int index = parent.indexOfChild(original);
+        OnboardingWebView gated = new OnboardingWebView(this);
+        gated.setId(original.getId());
+        ViewGroup.LayoutParams params = original.getLayoutParams();
+        parent.removeView(original);
+        parent.addView(gated, index, params);
+        original.destroy();
+        super.load();
+    }
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -81,13 +128,107 @@ public class MainActivity extends BridgeActivity {
         cookieManager.setAcceptCookie(true);
         cookieManager.setAcceptThirdPartyCookies(webView, true);
 
-        if (!hasSessionCookie(cookieManager, authConfig.origin)) {
-            webView.stopLoading();
-            showNativeLogin();
+        onboardingBack = new OnBackPressedCallback(true) {
+            @Override public void handleOnBackPressed() {
+                if (onboardingStep > 0) { onboardingStep--; showNativeOnboarding(null); }
+                else finish();
+            }
+        };
+        getOnBackPressedDispatcher().addCallback(this, onboardingBack);
+        if (onboardingPreferences().getInt(ONBOARDING_VERSION_KEY, 0) >= 1) resumeAfterOnboarding();
+        else showNativeOnboarding(null);
+    }
+
+    private SharedPreferences onboardingPreferences() {
+        return getSharedPreferences(ONBOARDING_PREFERENCES, MODE_PRIVATE);
+    }
+
+    static String completedUserAgent(String original) {
+        return java.util.Arrays.asList(original.split("\\s+")).contains(ONBOARDING_MARKER)
+            ? original : original + " " + ONBOARDING_MARKER;
+    }
+
+    private void showNativeOnboarding(String error) {
+        if (onboardingOverlay != null) ((ViewGroup) onboardingOverlay.getParent()).removeView(onboardingOverlay);
+        onboardingOverlay = new FrameLayout(this);
+        onboardingOverlay.setBackgroundColor(Color.rgb(2, 6, 23));
+        LinearLayout column = new LinearLayout(this);
+        column.setOrientation(LinearLayout.VERTICAL);
+        column.setPadding(dp(24), dp(24), dp(24), dp(20));
+        onboardingOverlay.addView(column, fullFrameParams());
+        column.addView(text("Trashed", 24, Color.WHITE, Typeface.BOLD), matchWrapParams());
+        ScrollView scroll = new ScrollView(this);
+        column.addView(scroll, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1));
+        LinearLayout page = new LinearLayout(this);
+        page.setOrientation(LinearLayout.VERTICAL);
+        page.setPadding(0, dp(36), 0, dp(24));
+        scroll.addView(page, matchWrapParams());
+        page.addView(text(String.format(java.util.Locale.US, "%02d", onboardingStep + 1), 60, Color.rgb(148, 163, 184), Typeface.NORMAL));
+        String[] copy = ONBOARDING_PAGES[onboardingStep];
+        for (int index = 0; index < copy.length; index++) {
+            TextView paragraph = text(copy[index], index == 1 ? 32 : 16,
+                index == 1 || index == 2 ? Color.WHITE : Color.rgb(148, 163, 184),
+                index == 1 ? Typeface.BOLD : Typeface.NORMAL);
+            paragraph.setPadding(0, dp(22), 0, 0);
+            page.addView(paragraph, matchWrapParams());
         }
+        column.addView(text((onboardingStep + 1) + " of 4", 14, Color.rgb(148, 163, 184), Typeface.NORMAL));
+        if (error != null) column.addView(text(error, 14, Color.rgb(252, 165, 165), Typeface.NORMAL));
+        LinearLayout actions = new LinearLayout(this);
+        actions.setGravity(Gravity.CENTER_VERTICAL);
+        actions.setPadding(0, dp(16), 0, 0);
+        Button back = new Button(this);
+        back.setText(onboardingStep == 0 ? "Skip" : "Back");
+        back.setAllCaps(false);
+        back.setOnClickListener(view -> {
+            if (onboardingStep == 0) completeNativeOnboarding();
+            else { onboardingStep--; showNativeOnboarding(null); }
+        });
+        actions.addView(back, new LinearLayout.LayoutParams(0, dp(54), 1));
+        Button next = new Button(this);
+        next.setText(onboardingStep == 3 ? "Get started" : "Next");
+        next.setAllCaps(false);
+        next.setTextColor(Color.WHITE);
+        next.setBackgroundColor(Color.rgb(18, 107, 66));
+        next.setOnClickListener(view -> {
+            if (onboardingStep == 3) completeNativeOnboarding();
+            else { onboardingStep++; showNativeOnboarding(null); }
+        });
+        LinearLayout.LayoutParams nextParams = new LinearLayout.LayoutParams(0, dp(54), 1);
+        nextParams.setMargins(dp(16), 0, 0, 0);
+        actions.addView(next, nextParams);
+        column.addView(actions, matchWrapParams());
+        addContentView(onboardingOverlay, fullFrameParams());
+    }
+
+    private void completeNativeOnboarding() {
+        if (!onboardingPreferences().edit().putInt(ONBOARDING_VERSION_KEY, 1).commit()) {
+            showNativeOnboarding("Unable to save your preference. Please try again.");
+            return;
+        }
+        resumeAfterOnboarding();
+    }
+
+    private void resumeAfterOnboarding() {
+        if (onboardingPreferences().getInt(ONBOARDING_VERSION_KEY, 0) < 1) return;
+        OnboardingWebView webView = (OnboardingWebView) getBridge().getWebView();
+        String original = webView.getSettings().getUserAgentString();
+        if (original == null || original.isEmpty()) {
+            showNativeOnboarding("Unable to prepare the app. Please try again.");
+            return;
+        }
+        webView.getSettings().setUserAgentString(completedUserAgent(original));
+        onboardingReady = true;
+        webView.appNavigationEnabled = true;
+        onboardingBack.setEnabled(false);
+        if (onboardingOverlay != null) ((ViewGroup) onboardingOverlay.getParent()).removeView(onboardingOverlay);
+        onboardingOverlay = null;
+        if (hasSessionCookie(CookieManager.getInstance(), authConfig.origin)) webView.loadUrl(authConfig.driverUrl);
+        else showNativeLogin();
     }
 
     private void showNativeLogin() {
+        if (!onboardingReady || onboardingOverlay != null) return;
         loginOverlay = new FrameLayout(this);
         loginOverlay.setBackgroundColor(Color.rgb(2, 6, 23));
 

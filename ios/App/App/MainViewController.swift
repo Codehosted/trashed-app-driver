@@ -13,6 +13,49 @@ private let driverSessionCookieNames = [
     "__Secure-authjs.session-token",
 ]
 
+private struct NativeOnboardingPage {
+    let label: String
+    let title: String
+    let body: String
+    let detail: String
+}
+
+private enum NativeOnboarding {
+    static let preferenceKey = "trashed.native.onboarding.version"
+    static let version = 1
+    static let marker = "TrashedOnboarding/1"
+    static let pages = [
+        NativeOnboardingPage(label: "Your business, wherever you work", title: "One Trashed app. Your whole team.", body: "Vendors manage their business. Drivers run their routes. Sign in with your existing Trashed account to access the tools available to your role.", detail: "Orders · customers · inventory · dispatch"),
+        NativeOnboardingPage(label: "From the office to the jobsite", title: "Keep every stop connected.", body: "Open assigned routes, review stop details, and send updates to dispatch. Driver location sharing starts only after you choose to go online and grant permission.", detail: "Your routes. Your team. One shared view."),
+        NativeOnboardingPage(label: "Stay close to your customers", title: "Calls belong on your phone.", body: "Open your business calls and their details from the vendor workspace. Customer phone links use your device’s phone app.", detail: "Call history and follow-up, alongside your orders"),
+        NativeOnboardingPage(label: "Only updates that matter", title: "Know what needs your attention.", body: "Allow notifications for call results, orders that need approval, and route updates. You can change notification permissions anytime in your device settings.", detail: "Call results · order approvals · route updates"),
+    ]
+
+    static func isComplete(_ defaults: UserDefaults = .standard) -> Bool {
+        defaults.integer(forKey: preferenceKey) >= version
+    }
+
+    static func complete(_ defaults: UserDefaults = .standard) {
+        defaults.set(version, forKey: preferenceKey)
+    }
+
+    static func completedUserAgent(_ original: String) -> String {
+        original.split(whereSeparator: { $0.isWhitespace }).contains(Substring(marker))
+            ? original : original + " " + marker
+    }
+}
+
+// Capacitor starts its first request during superclass initialization. Do not
+// load website code (or its permission prompts) until the native intro is done.
+private final class OnboardingWebView: WKWebView {
+    var appNavigationEnabled = false
+
+    override func load(_ request: URLRequest) -> WKNavigation? {
+        guard appNavigationEnabled else { return nil }
+        return super.load(request)
+    }
+}
+
 private enum DriverTheme: String {
     case dark
     case light
@@ -68,8 +111,14 @@ private struct NativeAppleCredential {
 
 class MainViewController: CAPBridgeViewController {
     private var nativeLoginController: UIHostingController<NativeDriverLoginView>?
+    private var nativeOnboardingController: UIHostingController<NativeAppOnboardingView>?
+    private var onboardingReady = false
     private var loginURLObservation: NSKeyValueObservation?
     private var pendingAppleCredential: NativeAppleCredential?
+
+    override func webView(with frame: CGRect, configuration: WKWebViewConfiguration) -> WKWebView {
+        OnboardingWebView(frame: frame, configuration: configuration)
+    }
 
     override func capacitorDidLoad() {
         super.capacitorDidLoad()
@@ -136,6 +185,7 @@ class MainViewController: CAPBridgeViewController {
         navigationController?.setToolbarHidden(true, animated: false)
         loginURLObservation = webView?.observe(\.url, options: [.new]) { [weak self] webView, _ in
             guard let self = self, let url = webView.url else { return }
+            guard self.onboardingReady else { return }
             let config = self.makeDriverAuthConfig()
             guard url.scheme == config.origin.scheme,
                   url.host == config.origin.host,
@@ -149,7 +199,17 @@ class MainViewController: CAPBridgeViewController {
             webView.stopLoading()
             self.presentNativeLogin(config)
         }
-        showNativeLoginIfNeeded()
+        // This local blank page supplies the original WebKit UA without a network request.
+        webView?.loadHTMLString("<html><body></body></html>", baseURL: nil)
+        if NativeOnboarding.isComplete() {
+            prepareCompletedOnboarding { [weak self] error in
+                guard let self = self else { return }
+                if error == nil { self.showNativeLoginIfNeeded() }
+                else { self.presentNativeOnboarding() }
+            }
+        } else {
+            presentNativeOnboarding()
+        }
     }
 
     override var prefersStatusBarHidden: Bool {
@@ -172,8 +232,54 @@ class MainViewController: CAPBridgeViewController {
         traitCollection.userInterfaceStyle == .light ? .light : .dark
     }
 
+    private func presentNativeOnboarding() {
+        guard nativeOnboardingController == nil else { return }
+        let intro = NativeAppOnboardingView { [weak self] completion in
+            NativeOnboarding.complete()
+            self?.prepareCompletedOnboarding { error in
+                completion(error)
+                guard error == nil, let self = self else { return }
+                self.nativeOnboardingController?.willMove(toParent: nil)
+                self.nativeOnboardingController?.view.removeFromSuperview()
+                self.nativeOnboardingController?.removeFromParent()
+                self.nativeOnboardingController = nil
+                self.showNativeLoginIfNeeded()
+            }
+        }
+        let controller = UIHostingController(rootView: intro)
+        addChild(controller)
+        controller.view.translatesAutoresizingMaskIntoConstraints = false
+        view.addSubview(controller.view)
+        NSLayoutConstraint.activate([
+            controller.view.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+            controller.view.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+            controller.view.topAnchor.constraint(equalTo: view.topAnchor),
+            controller.view.bottomAnchor.constraint(equalTo: view.bottomAnchor),
+        ])
+        controller.didMove(toParent: self)
+        nativeOnboardingController = controller
+    }
+
+    private func prepareCompletedOnboarding(completion: @escaping (String?) -> Void) {
+        guard NativeOnboarding.isComplete(), let webView = webView as? OnboardingWebView else {
+            completion("Unable to prepare the app. Please try again.")
+            return
+        }
+        webView.evaluateJavaScript("navigator.userAgent") { [weak self] result, _ in
+            guard let self = self, let original = result as? String, !original.isEmpty else {
+                completion("Unable to prepare the app. Please try again.")
+                return
+            }
+            // Preserve the entire system/configured UA. This token affects walkthrough UI only.
+            webView.customUserAgent = NativeOnboarding.completedUserAgent(original)
+            self.onboardingReady = true
+            webView.appNavigationEnabled = true
+            completion(nil)
+        }
+    }
+
     private func showNativeLoginIfNeeded() {
-        guard let webView = webView else { return }
+        guard onboardingReady, let webView = webView else { return }
         let config = makeDriverAuthConfig()
 
         webView.stopLoading()
@@ -183,7 +289,7 @@ class MainViewController: CAPBridgeViewController {
 
         webView.configuration.websiteDataStore.httpCookieStore.getAllCookies { [weak self] cookies in
             DispatchQueue.main.async {
-                guard let self = self else { return }
+                guard let self = self, self.onboardingReady, self.nativeOnboardingController == nil else { return }
                 if self.hasSessionCookie(in: cookies, for: config) {
                     self.removeNativeLogin()
                     self.loadDriverApp(config)
@@ -210,6 +316,7 @@ class MainViewController: CAPBridgeViewController {
     }
 
     private func presentNativeLogin(_ config: DriverAuthConfig) {
+        guard onboardingReady, nativeOnboardingController == nil else { return }
         pendingAppleCredential = nil
         removeNativeLogin()
 
@@ -255,6 +362,7 @@ class MainViewController: CAPBridgeViewController {
     }
 
     private func loadDriverApp(_ config: DriverAuthConfig) {
+        guard onboardingReady, nativeOnboardingController == nil else { return }
         webView?.isHidden = false
         webView?.load(URLRequest(url: config.driverURL(theme: currentDriverTheme)))
     }
@@ -574,6 +682,79 @@ class MainViewController: CAPBridgeViewController {
         return message
     }
 
+}
+
+private struct NativeAppOnboardingView: View {
+    let finish: (@escaping (String?) -> Void) -> Void
+    @State private var step = 0
+    @State private var preparing = false
+    @State private var errorMessage: String?
+
+    var body: some View {
+        let page = NativeOnboarding.pages[step]
+        VStack(alignment: .leading, spacing: 24) {
+            Text("Trashed")
+                .font(.title2.bold())
+                .accessibilityIdentifier("native-onboarding-brand")
+            ScrollView {
+                VStack(alignment: .leading, spacing: 24) {
+                    Image(systemName: ["building.2", "map", "phone", "bell"][step])
+                        .font(.system(size: 60, weight: .light))
+                        .padding(.vertical, 20)
+                        .accessibilityHidden(true)
+                    Text(page.label).font(.subheadline.weight(.semibold)).foregroundColor(.secondary)
+                    Text(page.title)
+                        .font(.largeTitle.bold())
+                        .accessibilityIdentifier("native-onboarding-title")
+                    Text(page.body).font(.body).fixedSize(horizontal: false, vertical: true)
+                    Text(page.detail).font(.subheadline).foregroundColor(.secondary)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+            }
+            Text("\(step + 1) of \(NativeOnboarding.pages.count)")
+                .font(.subheadline)
+                .foregroundColor(.secondary)
+                .accessibilityIdentifier("native-onboarding-progress")
+            if let errorMessage {
+                Text(errorMessage).font(.subheadline).foregroundColor(.red)
+            }
+            HStack {
+                Button {
+                    if step == 0 { complete() } else { step -= 1 }
+                } label: {
+                    Text(step == 0 ? "Skip" : "Back")
+                        .frame(minWidth: 64, minHeight: 44)
+                        .contentShape(Rectangle())
+                }
+                .disabled(preparing)
+                Spacer()
+                Button {
+                    if step == 3 { complete() } else { step += 1 }
+                } label: {
+                    Text(preparing ? "Preparing..." : step == 3 ? "Get started" : "Next")
+                        .padding(.horizontal, 18)
+                        .frame(minHeight: 48)
+                        .contentShape(Rectangle())
+                }
+                .background(Color(red: 0.07, green: 0.42, blue: 0.26))
+                .foregroundColor(.white)
+                .cornerRadius(12)
+                .disabled(preparing)
+                .accessibilityIdentifier("native-onboarding-next")
+            }
+        }
+        .padding(24)
+        .background(Color(UIColor.systemBackground).edgesIgnoringSafeArea(.all))
+    }
+
+    private func complete() {
+        preparing = true
+        errorMessage = nil
+        finish { error in
+            preparing = false
+            errorMessage = error
+        }
+    }
 }
 
 private struct NativeDriverLoginView: View {

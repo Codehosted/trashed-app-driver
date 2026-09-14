@@ -59,6 +59,7 @@ public class AndroidDialerTest {
             String json = new String(config.readAllBytes(), java.nio.charset.StandardCharsets.UTF_8);
             assertEquals(LOCAL_APP, new JSONObject(json).getJSONObject("server").getString("url"));
         }
+        AndroidOnboardingTest.prepareLocalState(true);
         PackageInfo installed = context.getPackageManager().getPackageInfo(context.getPackageName(), PackageManager.GET_PERMISSIONS);
         assertFalse(Arrays.asList(installed.requestedPermissions).contains(Manifest.permission.CALL_PHONE));
         assertEquals(PackageManager.PERMISSION_DENIED, context.checkSelfPermission(Manifest.permission.CALL_PHONE));
