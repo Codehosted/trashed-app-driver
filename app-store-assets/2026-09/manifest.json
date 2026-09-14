@@ -14,7 +14,7 @@
     "pango": "1.58.2"
   },
   "generatedFromConfig": "app-store-assets/2026-09/config.json",
-  "configSha256": "48fb95c70d6c1f53baaaec0b7de93396ba4a4b32857ab8207ae5ae48b8592588",
+  "configSha256": "aea3d1ff4ed798d8f81552ba5819c0c87c255185b16949baa5bfa52f7be51036",
   "generatorSha256": "eaa0041d0ab86b08a7afa242004685bc18c3c256a7cecbe0c54cb4346e91fb70",
   "font": {
     "file": "app-store-assets/2026-09/fonts/Poppins-Bold.ttf",
@@ -57,7 +57,7 @@
       "height": 1920,
       "colorType": 2,
       "hasAlpha": false,
-      "sha256": "5f6db0a43921658e9b397aed67e21fc5828509808cadd1e5e699ee15094c0813",
+      "sha256": "8cd7c241aab980b984cc8c535596237677f70e549b14fc0a555eb6d6058de86d",
       "status": "review-required",
       "source": {
         "file": "app-store-assets/sources/2026-09/android-native-login.png",

@@ -62,3 +62,11 @@ test('PNG inspection rejects invalid bytes and notices alpha',()=>{
   assert.equal(pngInfo(bytes).hasAlpha,true);
   assert.equal(sha256(sourceBytes),source.sha256);
 });
+
+test('Android store caption explains business value without shrinking the text',()=>{
+  const config=JSON.parse(read('app-store-assets/2026-09/config.json'));
+  const android=config.screenshots.find(asset=>asset.platform==='android');
+  assert.equal(android.subtitle,'Manage your waste services business\non-the-go with AI features.');
+  assert.equal(android.subtitle.split('\n').length,2);
+  assert.doesNotMatch(android.subtitle,/Sign in as a vendor or driver/);
+});
