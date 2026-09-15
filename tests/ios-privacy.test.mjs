@@ -13,6 +13,17 @@ const validate = (path) => spawnSync('python3', ['scripts/validate-ios-privacy.p
 });
 
 describe('iOS media capture privacy', () => {
+  it('explains driver-online location sharing without implying an active route is required', () => {
+    const purposes = {
+      NSLocationWhenInUseUsageDescription: 'Trashed uses your location while you are online as a driver so dispatch can see your position and you can find nearby stops.',
+      NSLocationAlwaysAndWhenInUseUsageDescription: 'Trashed shares your location with dispatch while you are online as a driver, including when the app is in the background.',
+    };
+    for (const [key, expected] of Object.entries(purposes)) {
+      const actual = source.match(new RegExp(`<key>${key}</key>\\s*<string>([^<]*)</string>`))?.[1];
+      assert.equal(actual, expected);
+    }
+  });
+
   it('declares camera, photo-library, and microphone access in the shipping app', () => {
     const result = validate('ios/App/App/Info.plist');
     assert.equal(result.status, 0, result.stderr);
