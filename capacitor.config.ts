@@ -7,6 +7,8 @@ const serverUrl = process.env.TRASHED_WEB_URL ?? 'https://trashed.app';
 const config: CapacitorConfig = {
   appId: 'com.trashed.driver',
   appName: 'Trashed',
+  // Capacitor debug bridges log full plugin arguments, including exported transcripts.
+  loggingBehavior: 'none',
   // webDir points at the Vite dist — only used when serverUrl is not set (local native testing)
   webDir: 'dist',
   server: {

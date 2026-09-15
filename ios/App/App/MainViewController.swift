@@ -122,6 +122,7 @@ class MainViewController: CAPBridgeViewController {
 
     override func capacitorDidLoad() {
         super.capacitorDidLoad()
+        bridge?.registerPluginInstance(TrashedFileExportPlugin())
         guard let webView = webView else { return }
 
         // A native boundary protects every website screen and modal, not just

@@ -110,6 +110,7 @@ public class MainActivity extends BridgeActivity {
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
+        registerPlugin(TrashedFileExportPlugin.class);
         super.onCreate(savedInstanceState);
         // Android 16 enforces edge-to-edge; keep both native login and WebView inside the safe area.
         View content = findViewById(android.R.id.content);
