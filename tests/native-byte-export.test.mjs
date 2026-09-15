@@ -8,6 +8,16 @@ const root = new URL('..', import.meta.url).pathname;
 const read = path => readFileSync(join(root, path), 'utf8');
 const swift = read('ios/App/App/TrashedFileExportPlugin.swift');
 const java = read('android/app/src/main/java/com/trashed/driver/TrashedFileExportPlugin.java');
+const imagePairs = [
+  ['image/png', 'png'], ['image/jpeg', 'jpg'], ['image/jpeg', 'jpeg'], ['image/jpeg', 'jpe'],
+  ['image/gif', 'gif'], ['image/webp', 'webp'], ['image/avif', 'avif'], ['image/apng', 'apng'], ['image/apng', 'png'],
+  ['image/svg+xml', 'svg'], ['image/bmp', 'bmp'], ['image/x-ms-bmp', 'bmp'], ['image/tiff', 'tif'], ['image/tiff', 'tiff'],
+  ['image/x-icon', 'ico'], ['image/vnd.microsoft.icon', 'ico'], ['image/heic', 'heic'], ['image/heic-sequence', 'heic'],
+  ['image/heif', 'heif'], ['image/heif-sequence', 'heif'], ['image/jxl', 'jxl'],
+];
+// Deterministic 1x1 RGBA PNG; byte-for-byte save only, no native image execution/decoding.
+const pngFixture = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR4nGNIMF3xHwAEcwI97J5RyAAAAABJRU5ErkJggg==';
+
 function run(binary, args) {
   const result = spawnSync(binary, args, { encoding: 'utf8', timeout: 60000 });
   assert.equal(result.status, 0, result.stderr || result.stdout);
@@ -25,6 +35,15 @@ test('compiled Swift byte policy and real disk spool preserve bytes and enforce 
     do {
       assert(ByteExportPolicy.metadataError(filename: "recording.mp3", mimeType: "audio/mpeg") == nil)
       assert(ByteExportPolicy.metadataError(filename: "recording.wav", mimeType: "audio/wav") == nil)
+      ${imagePairs.map(([mime, ext]) => `assert(ByteExportPolicy.metadataError(filename: "image.${ext}", mimeType: "${mime}") == nil)
+      assert(ByteExportPolicy.metadataError(filename: "image.txt", mimeType: "${mime}") == "INVALID_FILENAME")`).join('\n      ')}
+      for mime in ["image/*", "image/unknown", "text/html", "IMAGE/PNG", "image/png; charset=utf-8"] {
+        assert(ByteExportPolicy.metadataError(filename: "image.png", mimeType: mime) == "INVALID_MIME")
+      }
+      for name in ["../image.png", "image..png", "image.JPG", "image.gif", "image.png/child", "image.svg.html"] {
+        assert(ByteExportPolicy.metadataError(filename: name, mimeType: "image/png") == "INVALID_FILENAME")
+      }
+
       for name in ["../x.wav", ".x.wav", "a..wav", "x.wav\\n", "résumé.wav", "a/b.wav", "a\\\\b.wav", String(repeating: "a", count: 117) + ".wav"] {
         assert(ByteExportPolicy.metadataError(filename: name, mimeType: "audio/wav") == "INVALID_FILENAME")
       }
@@ -37,6 +56,13 @@ test('compiled Swift byte policy and real disk spool preserve bytes and enforce 
       assert(ByteExportPolicy.decode(bytes.base64EncodedString()) == bytes)
       assert(ByteExportPolicy.decode(Data(repeating: 1, count: ByteExportPolicy.maxChunk + 1).base64EncodedString()) == nil)
       let root = URL(fileURLWithPath: ${JSON.stringify(temp)}).appendingPathComponent("spools")
+      let png = Data(base64Encoded: "${pngFixture}")!
+      assert(png.count == 70)
+      let image = try ByteExportSpool(root: root, filename: "synthetic_chat_image.png", expectedBytes: png.count)
+      try image.append(offset: 0, bytes: Data(png.prefix(17)))
+      try image.append(offset: 17, bytes: Data(png.dropFirst(17))); try image.seal()
+      let savedPNG = try Data(contentsOf: image.file); assert(savedPNG == png)
+      image.cleanup(); assert(!FileManager.default.fileExists(atPath: image.directory.path))
       let spool = try ByteExportSpool(root: root, filename: "synthetic.wav", expectedBytes: bytes.count + 3)
       let tail = Data([0, 255, 1]); try spool.append(offset: 0, bytes: bytes)
       fails { try spool.append(offset: 0, bytes: tail) }; fails { try spool.seal() }
@@ -75,6 +101,11 @@ test('compiled Java byte policy and real disk spool preserve bytes and enforce l
         public static void main(String[] args) throws Exception {
           assert ByteExportPolicy.metadataError("recording.mp3", "audio/mpeg") == null;
           assert ByteExportPolicy.metadataError("recording.wav", "audio/wav") == null;
+          ${imagePairs.map(([mime, ext]) => `assert ByteExportPolicy.metadataError("image.${ext}", "${mime}") == null;
+          assert "INVALID_FILENAME".equals(ByteExportPolicy.metadataError("image.txt", "${mime}"));`).join('\n          ')}
+          for (String mime : new String[]{"image/*", "image/unknown", "text/html", "IMAGE/PNG", "image/png; charset=utf-8"}) assert "INVALID_MIME".equals(ByteExportPolicy.metadataError("image.png", mime));
+          for (String name : new String[]{"../image.png", "image..png", "image.JPG", "image.gif", "image.png/child", "image.svg.html"}) assert "INVALID_FILENAME".equals(ByteExportPolicy.metadataError(name, "image/png"));
+
           for (String name : new String[]{"../x.wav", ".x.wav", "a..wav", "x.wav\\n", "résumé.wav", "a/b.wav", "a\\\\b.wav", "a".repeat(117)+".wav"}) assert "INVALID_FILENAME".equals(ByteExportPolicy.metadataError(name, "audio/wav"));
           assert "INVALID_MIME".equals(ByteExportPolicy.metadataError("x.pdf", "application/pdf"));
           assert "INVALID_FILENAME".equals(ByteExportPolicy.metadataError("x.mp3", "audio/wav"));
@@ -85,6 +116,10 @@ test('compiled Java byte policy and real disk spool preserve bytes and enforce l
           assert Arrays.equals(bytes, ByteExportPolicy.decode(Base64.getEncoder().encodeToString(bytes)));
           assert ByteExportPolicy.decode(Base64.getEncoder().encodeToString(new byte[ByteExportPolicy.MAX_CHUNK+1])) == null;
           File root = new File(${JSON.stringify(temp)}, "spools");
+          byte[] png = Base64.getDecoder().decode("${pngFixture}"); assert png.length == 70;
+          ByteExportPolicy.Spool image = new ByteExportPolicy.Spool(root, "synthetic_chat_image.png", "image/png", (long)png.length);
+          image.append(0, Arrays.copyOf(png, 17)); image.append(17, Arrays.copyOfRange(png, 17, png.length)); image.seal();
+          assert Arrays.equals(png, Files.readAllBytes(image.file.toPath())); image.cleanup(); assert !image.directory.exists();
           ByteExportPolicy.Spool spool = new ByteExportPolicy.Spool(root, "synthetic.wav", "audio/wav", (long)bytes.length+3);
           byte[] tail = new byte[]{0, (byte)255, 1}; spool.append(0, bytes);
           fails(() -> spool.append(0, tail)); fails(() -> spool.seal());

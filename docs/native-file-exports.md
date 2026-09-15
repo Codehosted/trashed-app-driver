@@ -21,7 +21,7 @@ Evidence directory: `artifacts/native-experience/text-export/`; root reports `io
 
 Recording exports now use normal browser-authenticated streaming into a bounded write-only native byte sink in the candidate source. Native cookie extraction, authenticated native HTTP, arbitrary URL proxies, whole-file Base64 and generic filesystem plugins are not part of the design. Implementation and device evidence must pass before this is called complete.
 
-The shared chat preview still has a separate pending-local-image Blob download consumer. Existing remote invoice/attachment links use ordinary HTTP system-browser behavior; that needs runtime verification, not an assumption that text/recording tests cover every vendor export. No store upload or production release is established by these local file tests.
+The shared chat preview now retains the selected image File and sends its bytes through the same native sink. Existing remote invoice/attachment links retain ordinary HTTP system-browser behavior; that needs runtime verification, not an assumption that text/recording tests cover every vendor export. No store upload or production release is established by these local file tests.
 
 
 ## Recording byte sink — candidate implementation
@@ -40,3 +40,13 @@ Native `begin`, `write`, `finish`, and idempotent `cancel` maintain one export s
 - The revised local WAV fixture is 96,044 bytes (six seconds), crossing the 64 KiB boundary. Its HTTP response was verified with SHA-256 `71d93ef76e5ff6087d522277e83309f1d8d790e9b756324dec73d216ea57cc75`. Expected saved filename: `recording_local-recording-preview.wav`.
 
 Native reports: `artifacts/native-experience/byte-export/implementation-results.json`; web fixture/HTTP reports live in the paired-worktree parent. No real recording, call, order, message, or provider push was created or downloaded during this work.
+
+## Pending chat image export — candidate implementation
+
+The actual shared ChatThread retains the selected File for its preview. Native Download streams that File without a fetch, native URL, cookie, filesystem-read capability, or send-message action. Browser Blob downloads and existing remote attachment links are unchanged. Progress, cancellation, retry errors and preview-close/unmount cleanup are covered. Image and recording exports share a single web-side operation lock as well as the existing native lock.
+
+The native metadata policy adds 21 MIME/extension pairs covering PNG, JPEG, GIF, WebP, AVIF, APNG, SVG, BMP, TIFF, ICO, HEIC, HEIF and JXL. Unsupported types fail explicitly. The image consumer is limited to 10 MiB; the existing 64 KiB chunk and 256 MiB native staging bounds, safe basename rules and explicit destination picker are unchanged. Native code neither decodes nor executes image content.
+
+Verification: **106/106 full native tests**, including compiled Swift/Java policy checks and exact 70-byte PNG disk staging, pass. Current iOS Simulator and Android debug builds both pass and package `localhost:3000/app` with payload logging disabled; source resource configurations were restored to production. Report: `artifacts/native-experience/image-export/implementation-results.json`.
+
+Web integration passes **451/451 tests across 51 files** plus the final TypeScript gate. The development-only `/previews/components/image-file-export` page exercises actual ChatThread with a 73,782-byte synthetic BMP (SHA-256 `c217345e462fff2eab70105169d892b0a9856514870f343b2a11a3ece80a1b91`), crossing the chunk boundary. Sending has no implementation. These are compiled/mocked/component results, **not actual native image picker or visual proof**. Mac lock still prevents that check; neither platform's new build was installed or launched by the compilation gate.

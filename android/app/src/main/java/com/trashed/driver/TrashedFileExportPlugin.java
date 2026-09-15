@@ -89,7 +89,7 @@ public class TrashedFileExportPlugin extends Plugin {
                 call.reject("Invalid export options.", "INVALID_OPTIONS"); return;
             }
             String error = ByteExportPolicy.metadataError(call.getString("filename"), call.getString("mimeType"));
-            if (error != null) { call.reject("Use a valid MP3 or WAV filename and media type.", error); return; }
+            if (error != null) { call.reject("Use a supported audio or image filename and media type.", error); return; }
             if (!navigationListenerRegistered) {
                 // Builder replaces its listener list after plugin.load(); register only after construction.
                 bridge.addWebViewListener(navigationListener);

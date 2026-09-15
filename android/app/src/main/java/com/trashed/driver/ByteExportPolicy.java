@@ -18,8 +18,25 @@ final class ByteExportPolicy {
     }
 
     static String metadataError(String filename, String mimeType) {
-        String extension = "audio/mpeg".equals(mimeType) ? "mp3" : "audio/wav".equals(mimeType) ? "wav" : null;
-        if (extension == null) return "INVALID_MIME";
+        String extension;
+        switch (mimeType == null ? "" : mimeType) {
+            case "audio/mpeg": extension = "mp3"; break;
+            case "audio/wav": extension = "wav"; break;
+            case "image/png": extension = "png"; break;
+            case "image/jpeg": extension = "(?:jpg|jpeg|jpe)"; break;
+            case "image/gif": extension = "gif"; break;
+            case "image/webp": extension = "webp"; break;
+            case "image/avif": extension = "avif"; break;
+            case "image/apng": extension = "(?:apng|png)"; break;
+            case "image/svg+xml": extension = "svg"; break;
+            case "image/bmp": case "image/x-ms-bmp": extension = "bmp"; break;
+            case "image/tiff": extension = "(?:tif|tiff)"; break;
+            case "image/x-icon": case "image/vnd.microsoft.icon": extension = "ico"; break;
+            case "image/heic": case "image/heic-sequence": extension = "heic"; break;
+            case "image/heif": case "image/heif-sequence": extension = "heif"; break;
+            case "image/jxl": extension = "jxl"; break;
+            default: return "INVALID_MIME";
+        }
         if (filename == null || filename.length() > 120 || filename.contains("..")
             || !filename.matches("[A-Za-z0-9][A-Za-z0-9 ._-]*\\." + extension)) return "INVALID_FILENAME";
         return null;

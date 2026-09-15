@@ -38,7 +38,24 @@ enum ByteExportPolicy {
 
     static func metadataError(filename: String?, mimeType: String?) -> String? {
         let ext: String
-        switch mimeType { case "audio/mpeg": ext = "mp3"; case "audio/wav": ext = "wav"; default: return "INVALID_MIME" }
+        switch mimeType {
+        case "audio/mpeg": ext = "mp3"
+        case "audio/wav": ext = "wav"
+        case "image/png": ext = "png"
+        case "image/jpeg": ext = "(?:jpg|jpeg|jpe)"
+        case "image/gif": ext = "gif"
+        case "image/webp": ext = "webp"
+        case "image/avif": ext = "avif"
+        case "image/apng": ext = "(?:apng|png)"
+        case "image/svg+xml": ext = "svg"
+        case "image/bmp", "image/x-ms-bmp": ext = "bmp"
+        case "image/tiff": ext = "(?:tif|tiff)"
+        case "image/x-icon", "image/vnd.microsoft.icon": ext = "ico"
+        case "image/heic", "image/heic-sequence": ext = "heic"
+        case "image/heif", "image/heif-sequence": ext = "heif"
+        case "image/jxl": ext = "jxl"
+        default: return "INVALID_MIME"
+        }
         guard let filename = filename, filename.utf8.count <= 120, !filename.contains(".."),
               filename.range(of: "^[A-Za-z0-9][A-Za-z0-9 ._-]*\\." + ext + "\\z", options: .regularExpression) != nil else { return "INVALID_FILENAME" }
         return nil
@@ -173,7 +190,7 @@ public class TrashedFileExportPlugin: CAPPlugin, CAPBridgedPlugin, UIDocumentPic
                 call.reject("Invalid export options.", "INVALID_OPTIONS"); return
             }
             if let error = ByteExportPolicy.metadataError(filename: call.getString("filename"), mimeType: call.getString("mimeType")) {
-                call.reject("Use a valid MP3 or WAV filename and media type.", error); return
+                call.reject("Use a supported audio or image filename and media type.", error); return
             }
             do {
                 let spool = try ByteExportSpool(root: self.exportRoot, filename: call.getString("filename")!, expectedBytes: expected)
