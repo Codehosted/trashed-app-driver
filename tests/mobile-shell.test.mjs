@@ -98,7 +98,7 @@ describe('mobile WebView shell contract', () => {
     assert.match(controller, /trashed-logo-mark/, 'native login should use the real Trashed logo asset');
     assert.match(controller, /@Environment\(\\\.colorScheme\)/, 'native login should follow the iOS light or dark appearance');
     assert.match(controller, /DriverLoginMapBackground\(isLightMode: isLightMode\)/, 'native login should use the same map-style background as the driver shell');
-    assert.match(controller, /Color\(red: 0\.94, green: 0\.96, blue: 0\.97\).*Color\(red: 0\.04, green: 0\.04, blue: 0\.04\)/s, 'native login background should match the driver map light and dark base colors');
+    assert.match(controller, /Color\(red: 0\.98, green: 0\.98, blue: 0\.99\).*Color\(red: 0\.08, green: 0\.07, blue: 0\.10\)/s, 'native login background should use the neutral Trashed light and dark canvas colors');
     assert.match(controller, /routePath\(in: size\)[\s\S]*StrokeStyle\(lineWidth: 13, lineCap: \.round, lineJoin: \.round\)/, 'native login background should include the driver map route surface');
     assert.match(controller, /renderingMode\(\.template\)[\s\S]*foregroundColor\(logoColor\)[\s\S]*frame\(width: 104, height: 82\)/, 'native login should render the real logo directly without a badge container');
     assert.match(controller, /components\.path = \"\/app\"/, 'native shell should start on the role-aware app route, not the marketing site or full web login');

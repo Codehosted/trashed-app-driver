@@ -14,10 +14,9 @@ private let driverSessionCookieNames = [
 ]
 
 private struct NativeOnboardingPage {
-    let label: String
     let title: String
     let body: String
-    let detail: String
+    let image: String
 }
 
 private enum NativeOnboarding {
@@ -25,10 +24,9 @@ private enum NativeOnboarding {
     static let version = 1
     static let marker = "TrashedOnboarding/1"
     static let pages = [
-        NativeOnboardingPage(label: "Your business, wherever you work", title: "One Trashed app. Your whole team.", body: "Vendors manage their business. Drivers run their routes. Sign in with your existing Trashed account to access the tools available to your role.", detail: "Orders · customers · inventory · dispatch"),
-        NativeOnboardingPage(label: "From the office to the jobsite", title: "Keep every stop connected.", body: "Open assigned routes, review stop details, and send updates to dispatch. Driver location sharing starts only after you choose to go online and grant permission.", detail: "Your routes. Your team. One shared view."),
-        NativeOnboardingPage(label: "Stay close to your customers", title: "Calls belong on your phone.", body: "Open your business calls and their details from the vendor workspace. Customer phone links use your device’s phone app.", detail: "Call history and follow-up, alongside your orders"),
-        NativeOnboardingPage(label: "Only updates that matter", title: "Know what needs your attention.", body: "Allow notifications for call results, orders that need approval, and route updates. You can change notification permissions anytime in your device settings.", detail: "Call results · order approvals · route updates"),
+        NativeOnboardingPage(title: "Your waste service business in your pocket", body: "Manage orders, customers and your team wherever work takes you.", image: "onboarding_business"),
+        NativeOnboardingPage(title: "Real-time customer chat", body: "Keep customers in the loop with direct messages and quick replies.", image: "onboarding_chat"),
+        NativeOnboardingPage(title: "Hauler and dispatch", body: "Connect haulers and dispatch with live routes and clear stop details.", image: "onboarding_dispatch"),
     ]
 
     static func isComplete(_ defaults: UserDefaults = .standard) -> Bool {
@@ -846,65 +844,127 @@ class MainViewController: CAPBridgeViewController, UIGestureRecognizerDelegate {
 
 private struct NativeAppOnboardingView: View {
     let finish: (@escaping (String?) -> Void) -> Void
+    @Environment(\.colorScheme) private var colorScheme
     @State private var step = 0
     @State private var preparing = false
     @State private var errorMessage: String?
 
+    // Match the website's flat primary; never inherit a system-green action.
+    private let primary = Color(red: 112 / 255, green: 51 / 255, blue: 1)
+    private var foreground: Color { colorScheme == .dark ? .white : Color(red: 0.13, green: 0.10, blue: 0.17) }
+    private var background: Color { colorScheme == .dark ? Color(red: 0.08, green: 0.07, blue: 0.10) : Color(red: 0.98, green: 0.98, blue: 0.99) }
+    private var muted: Color { colorScheme == .dark ? Color(red: 0.75, green: 0.72, blue: 0.80) : Color(red: 0.38, green: 0.35, blue: 0.43) }
+    private var surface: Color { colorScheme == .dark ? Color(red: 0.16, green: 0.13, blue: 0.20) : Color(red: 0.94, green: 0.92, blue: 0.98) }
+
     var body: some View {
-        let page = NativeOnboarding.pages[step]
-        VStack(alignment: .leading, spacing: 24) {
-            Text("Trashed")
-                .font(.title2.bold())
-                .accessibilityIdentifier("native-onboarding-brand")
-            ScrollView {
-                VStack(alignment: .leading, spacing: 24) {
-                    Image(systemName: ["building.2", "map", "phone", "bell"][step])
-                        .font(.system(size: 60, weight: .light))
-                        .padding(.vertical, 20)
+        GeometryReader { geometry in
+            VStack(spacing: 0) {
+                HStack(spacing: 8) {
+                    Image("onboarding_symbol")
+                        .renderingMode(.template)
+                        .resizable()
+                        .scaledToFit()
+                        .frame(width: 28, height: 28)
+                        .foregroundColor(primary)
                         .accessibilityHidden(true)
-                    Text(page.label).font(.subheadline.weight(.semibold)).foregroundColor(.secondary)
-                    Text(page.title)
-                        .font(.largeTitle.bold())
-                        .accessibilityIdentifier("native-onboarding-title")
-                    Text(page.body).font(.body).fixedSize(horizontal: false, vertical: true)
-                    Text(page.detail).font(.subheadline).foregroundColor(.secondary)
+                    Image("onboarding_wordmark")
+                        .renderingMode(.template)
+                        .resizable()
+                        .scaledToFit()
+                        .frame(width: 120, height: 28)
+                        .foregroundColor(foreground)
+                        .accessibilityLabel("Trashed")
+                        .accessibilityIdentifier("native-onboarding-brand")
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.bottom, 20)
+                ScrollView {
+                    pageContent(heroHeight: min(300, max(140, geometry.size.height * 0.38)))
+                        .padding(.bottom, 20)
+                }
+                .id(step)
+                actions
             }
-            Text("\(step + 1) of \(NativeOnboarding.pages.count)")
-                .font(.subheadline)
-                .foregroundColor(.secondary)
-                .accessibilityIdentifier("native-onboarding-progress")
-            if let errorMessage {
-                Text(errorMessage).font(.subheadline).foregroundColor(.red)
-            }
+            .padding(.horizontal, 24)
+            .padding(.top, 20)
+            .padding(.bottom, 12)
+            .frame(maxWidth: 640)
+            .frame(maxWidth: .infinity)
+        }
+        .foregroundColor(foreground)
+        .background(background.edgesIgnoringSafeArea(.all))
+    }
+
+    private func pageContent(heroHeight: CGFloat) -> some View {
+        let page = NativeOnboarding.pages[step]
+        return VStack(alignment: .leading, spacing: 14) {
+            Image(page.image)
+                .resizable()
+                .scaledToFit()
+                .frame(maxWidth: .infinity)
+                .frame(height: heroHeight)
+                .accessibilityHidden(true)
+                .accessibilityIdentifier("native-onboarding-hero")
+            Text(page.title)
+                .font(.title.bold())
+                .fixedSize(horizontal: false, vertical: true)
+                .accessibilityAddTraits(.isHeader)
+                .accessibilityIdentifier("native-onboarding-title")
+            Text(page.body)
+                .font(.body)
+                .foregroundColor(muted)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private var actions: some View {
+        VStack(spacing: 8) {
             HStack {
                 Button {
                     if step == 0 { complete() } else { step -= 1 }
                 } label: {
                     Text(step == 0 ? "Skip" : "Back")
+                        .font(.subheadline.weight(.semibold))
                         .frame(minWidth: 64, minHeight: 44)
                         .contentShape(Rectangle())
                 }
+                .buttonStyle(.plain)
                 .disabled(preparing)
+                .accessibilityIdentifier("native-onboarding-back")
                 Spacer()
-                Button {
-                    if step == 3 { complete() } else { step += 1 }
-                } label: {
-                    Text(preparing ? "Preparing..." : step == 3 ? "Get started" : "Next")
-                        .padding(.horizontal, 18)
-                        .frame(minHeight: 48)
-                        .contentShape(Rectangle())
+                HStack(spacing: 6) {
+                    ForEach(NativeOnboarding.pages.indices) { index in
+                        Capsule().fill(index == step ? primary : surface)
+                            .frame(width: index == step ? 24 : 8, height: 8)
+                    }
                 }
-                .background(Color(red: 0.07, green: 0.42, blue: 0.26))
-                .foregroundColor(.white)
-                .cornerRadius(12)
-                .disabled(preparing)
-                .accessibilityIdentifier("native-onboarding-next")
+                .accessibilityHidden(true)
+                Spacer()
+                Text("\(step + 1) of \(NativeOnboarding.pages.count)")
+                    .font(.caption)
+                    .foregroundColor(muted)
+                    .accessibilityIdentifier("native-onboarding-progress")
             }
+            if let errorMessage {
+                Text(errorMessage).font(.subheadline).foregroundColor(.red)
+            }
+            Button {
+                if step == NativeOnboarding.pages.count - 1 { complete() } else { step += 1 }
+            } label: {
+                Text(preparing ? "Preparing..." : step == NativeOnboarding.pages.count - 1 ? "Get started" : "Next")
+                    .font(.headline)
+                    .padding(.horizontal, 18)
+                    .frame(maxWidth: .infinity, minHeight: 54)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .background(primary)
+            .foregroundColor(.white)
+            .cornerRadius(14)
+            .disabled(preparing)
+            .accessibilityIdentifier("native-onboarding-next")
         }
-        .padding(24)
-        .background(Color(UIColor.systemBackground).edgesIgnoringSafeArea(.all))
     }
 
     private func complete() {
@@ -933,6 +993,8 @@ private struct NativeDriverLoginView: View {
     @State private var appleNonce: String?
     @State private var appleLinkPending = false
 
+    private let primary = Color(red: 112 / 255, green: 51 / 255, blue: 1)
+
     private var canSubmit: Bool {
         !email.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && !password.isEmpty && !isSubmitting && !isGoogleSubmitting && !isAppleSubmitting
     }
@@ -942,31 +1004,31 @@ private struct NativeDriverLoginView: View {
     }
 
     private var logoColor: Color {
-        isLightMode ? Color(red: 0.05, green: 0.08, blue: 0.13) : .white
+        isLightMode ? Color(red: 0.13, green: 0.10, blue: 0.17) : .white
     }
 
     private var primaryTextColor: Color {
-        isLightMode ? Color(red: 0.06, green: 0.09, blue: 0.16) : .white
+        isLightMode ? Color(red: 0.13, green: 0.10, blue: 0.17) : .white
     }
 
     private var secondaryTextColor: Color {
-        isLightMode ? Color(red: 0.29, green: 0.35, blue: 0.43) : .white.opacity(0.68)
+        isLightMode ? Color(red: 0.38, green: 0.35, blue: 0.43) : .white.opacity(0.68)
     }
 
     private var mutedTextColor: Color {
-        isLightMode ? Color(red: 0.43, green: 0.49, blue: 0.58) : .white.opacity(0.52)
+        isLightMode ? Color(red: 0.38, green: 0.35, blue: 0.43) : .white.opacity(0.52)
     }
 
     private var labelTextColor: Color {
-        isLightMode ? Color(red: 0.19, green: 0.24, blue: 0.33) : .white.opacity(0.82)
+        isLightMode ? Color(red: 0.13, green: 0.10, blue: 0.17) : .white.opacity(0.82)
     }
 
     private var dividerColor: Color {
-        isLightMode ? Color(red: 0.80, green: 0.84, blue: 0.90) : .white.opacity(0.16)
+        isLightMode ? Color(red: 0.85, green: 0.82, blue: 0.88) : .white.opacity(0.16)
     }
 
     private var disabledButtonColor: Color {
-        isLightMode ? Color(red: 0.71, green: 0.76, blue: 0.84) : .white.opacity(0.16)
+        isLightMode ? Color(red: 0.90, green: 0.88, blue: 0.93) : .white.opacity(0.16)
     }
 
     private var errorTextColor: Color {
@@ -978,15 +1040,11 @@ private struct NativeDriverLoginView: View {
     }
 
     private var footnoteTextColor: Color {
-        isLightMode ? Color(red: 0.43, green: 0.49, blue: 0.58) : .white.opacity(0.48)
+        isLightMode ? Color(red: 0.38, green: 0.35, blue: 0.43) : .white.opacity(0.48)
     }
 
     private var cardStrokeColor: Color {
-        isLightMode ? Color(red: 0.82, green: 0.86, blue: 0.91) : .white.opacity(0.12)
-    }
-
-    private var cardShadowColor: Color {
-        isLightMode ? Color(red: 0.15, green: 0.23, blue: 0.35).opacity(0.12) : Color.black.opacity(0.28)
+        isLightMode ? Color(red: 0.89, green: 0.86, blue: 0.92) : .white.opacity(0.12)
     }
 
     private var logoImage: Image {
@@ -1026,7 +1084,7 @@ private struct NativeDriverLoginView: View {
                         Text("Sign in to Trashed")
                             .font(.system(size: 30, weight: .bold, design: .rounded))
                             .foregroundColor(primaryTextColor)
-                        Text("Manage your business, orders, routes, and team.")
+                        Text("Manage your waste services business on-the-go with AI features")
                             .font(.system(size: 15, weight: .regular))
                             .foregroundColor(secondaryTextColor)
                             .multilineTextAlignment(.center)
@@ -1052,20 +1110,21 @@ private struct NativeDriverLoginView: View {
                             HStack(spacing: 10) {
                                 if isGoogleSubmitting {
                                     ProgressView()
-                                        .progressViewStyle(CircularProgressViewStyle(tint: Color(red: 0.08, green: 0.10, blue: 0.16)))
+                                        .progressViewStyle(CircularProgressViewStyle(tint: primaryTextColor))
                                 }
                                 Text("G")
                                     .font(.system(size: 17, weight: .bold, design: .rounded))
                                 Text(isGoogleSubmitting ? "Signing in with Google..." : "Continue with Google")
-                                    .font(.system(size: 15, weight: .semibold))
+                                    .font(.system(size: 17, weight: .medium))
                             }
-                            .frame(maxWidth: .infinity)
-                            .padding(.vertical, 14)
-                            .background(Color.white)
-                            .foregroundColor(Color(red: 0.08, green: 0.10, blue: 0.16))
+                            .padding(.horizontal, 14)
+                            .frame(maxWidth: .infinity, minHeight: 50)
+                            .background(cardBackground)
+                            .foregroundColor(primaryTextColor)
                             .cornerRadius(14)
-                            .shadow(color: cardShadowColor, radius: 10, x: 0, y: 6)
+                            .overlay(RoundedRectangle(cornerRadius: 14).stroke(dividerColor, lineWidth: 1))
                         }
+                        .buttonStyle(.plain)
                         .disabled(isSubmitting || isGoogleSubmitting || isAppleSubmitting || appleLinkPending)
                         .accessibilityIdentifier("native-driver-google-sign-in")
 
@@ -1103,7 +1162,7 @@ private struct NativeDriverLoginView: View {
                                 .padding(14)
                                 .background(fieldBackground)
                                 .foregroundColor(primaryTextColor)
-                                .accentColor(Color(red: 0.12, green: 0.74, blue: 0.45))
+                                .accentColor(primary)
                                 .accessibilityIdentifier("native-driver-email")
                         }
 
@@ -1116,7 +1175,7 @@ private struct NativeDriverLoginView: View {
                                 .padding(14)
                                 .background(fieldBackground)
                                 .foregroundColor(primaryTextColor)
-                                .accentColor(Color(red: 0.12, green: 0.74, blue: 0.45))
+                                .accentColor(primary)
                                 .accessibilityIdentifier("native-driver-password")
                         }
 
@@ -1138,14 +1197,15 @@ private struct NativeDriverLoginView: View {
                                         .progressViewStyle(CircularProgressViewStyle(tint: .white))
                                 }
                                 Text(isSubmitting ? "Signing In..." : "Sign In")
-                                    .font(.system(size: 16, weight: .bold))
+                                    .font(.system(size: 17, weight: .medium))
                             }
-                            .frame(maxWidth: .infinity)
-                            .padding(.vertical, 15)
-                            .background(canSubmit ? Color(red: 0.12, green: 0.74, blue: 0.45) : disabledButtonColor)
-                            .foregroundColor(.white)
+                            .padding(.horizontal, 14)
+                            .frame(maxWidth: .infinity, minHeight: 50)
+                            .background(canSubmit ? primary : disabledButtonColor)
+                            .foregroundColor(canSubmit ? .white : secondaryTextColor)
                             .cornerRadius(14)
                         }
+                        .buttonStyle(.plain)
                         .disabled(!canSubmit)
                         .accessibilityIdentifier("native-driver-sign-in")
                     }
@@ -1156,7 +1216,6 @@ private struct NativeDriverLoginView: View {
                         RoundedRectangle(cornerRadius: 28)
                             .stroke(cardStrokeColor, lineWidth: 1)
                     )
-                    .shadow(color: cardShadowColor, radius: 24, x: 0, y: 18)
 
                     Text("Need access? Ask your account administrator to add you. By signing in, you agree to the Trashed Terms and Privacy Policy.")
                         .font(.system(size: 12))
@@ -1172,28 +1231,15 @@ private struct NativeDriverLoginView: View {
 
     private var fieldBackground: some View {
         RoundedRectangle(cornerRadius: 14)
-            .fill(isLightMode ? Color.white : Color.white.opacity(0.08))
+            .fill(isLightMode ? Color(red: 0.98, green: 0.97, blue: 0.99) : Color(red: 0.16, green: 0.13, blue: 0.20))
             .overlay(
                 RoundedRectangle(cornerRadius: 14)
-                    .stroke(isLightMode ? Color(red: 0.79, green: 0.84, blue: 0.91) : Color.white.opacity(0.14), lineWidth: 1)
+                    .stroke(isLightMode ? Color(red: 0.85, green: 0.82, blue: 0.88) : Color.white.opacity(0.14), lineWidth: 1)
             )
     }
 
-    private var cardBackground: some View {
-        LinearGradient(
-            gradient: Gradient(colors: isLightMode
-                ? [
-                    Color.white.opacity(0.96),
-                    Color(red: 0.94, green: 0.97, blue: 1.0).opacity(0.92),
-                ]
-                : [
-                    Color.white.opacity(0.16),
-                    Color.white.opacity(0.08),
-                ]
-            ),
-            startPoint: .topLeading,
-            endPoint: .bottomTrailing
-        )
+    private var cardBackground: Color {
+        isLightMode ? .white : Color(red: 0.12, green: 0.10, blue: 0.15)
     }
 
     private func submit() {
@@ -1265,23 +1311,23 @@ private struct DriverLoginMapBackground: View {
     ]
 
     private var baseColor: Color {
-        isLightMode ? Color(red: 0.94, green: 0.96, blue: 0.97) : Color(red: 0.04, green: 0.04, blue: 0.04)
+        isLightMode ? Color(red: 0.98, green: 0.98, blue: 0.99) : Color(red: 0.08, green: 0.07, blue: 0.10)
     }
 
     private var tileRoadColor: Color {
-        isLightMode ? Color(red: 0.58, green: 0.64, blue: 0.72) : Color(red: 0.20, green: 0.24, blue: 0.31)
+        isLightMode ? Color(red: 0.72, green: 0.68, blue: 0.76) : Color(red: 0.16, green: 0.13, blue: 0.20)
     }
 
     private var routeGlowColor: Color {
-        isLightMode ? Color(red: 0.23, green: 0.51, blue: 0.96) : Color(red: 0.31, green: 0.27, blue: 0.90)
+        Color(red: 112 / 255, green: 51 / 255, blue: 1)
     }
 
     private var routeSurfaceColor: Color {
-        isLightMode ? Color(red: 0.58, green: 0.64, blue: 0.72) : Color(red: 0.12, green: 0.16, blue: 0.23)
+        isLightMode ? Color(red: 0.86, green: 0.82, blue: 0.91) : Color(red: 0.25, green: 0.20, blue: 0.29)
     }
 
     private var routeCenterColor: Color {
-        isLightMode ? .white : Color(red: 0.39, green: 0.40, blue: 0.95)
+        isLightMode ? .white : Color(red: 112 / 255, green: 51 / 255, blue: 1)
     }
 
     var body: some View {

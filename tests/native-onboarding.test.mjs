@@ -11,18 +11,18 @@ const ios = read('ios/App/App/MainViewController.swift');
 const android = read('android/app/src/main/java/com/trashed/driver/MainActivity.java');
 const pages = JSON.parse(read('tests/fixtures/native-onboarding.json'));
 
-test('both native platforms bundle the same four-page offline copy', () => {
-  assert.equal(pages.length, 4);
+test('both native platforms bundle the same three-page offline copy', () => {
+  assert.equal(pages.length, 3);
   for (const page of pages) {
-    for (const value of Object.values(page)) {
+    for (const value of [page.title, page.body]) {
       assert.ok(ios.includes(JSON.stringify(value)));
       assert.ok(android.includes(JSON.stringify(value)));
     }
   }
   assert.match(ios, /native-onboarding-title/);
-  assert.match(ios, /label: \{\s*Text\(step == 0 \? "Skip" : "Back"\)\s*\.frame\(minWidth: 64, minHeight: 44\)\s*\.contentShape\(Rectangle\(\)\)/);
-  assert.match(ios, /Text\(preparing \? "Preparing\.\.\." : step == 3 \? "Get started" : "Next"\)\s*\.padding\(\.horizontal, 18\)\s*\.frame\(minHeight: 48\)\s*\.contentShape\(Rectangle\(\)\)/);
-  assert.match(android, /onboardingStep == 3 \? "Get started" : "Next"/);
+  assert.match(ios, /label: \{\s*Text\(step == 0 \? "Skip" : "Back"\)\s*\.font\(\.subheadline.weight\(\.semibold\)\)\s*\.frame\(minWidth: 64, minHeight: 44\)\s*\.contentShape\(Rectangle\(\)\)/);
+  assert.match(ios, /Text\(preparing \? "Preparing\.\.\." : step == NativeOnboarding\.pages\.count - 1 \? "Get started" : "Next"\)\s*\.font\(\.headline\)\s*\.padding\(\.horizontal, 18\)\s*\.frame\(maxWidth: \.infinity, minHeight: 54\)\s*\.contentShape\(Rectangle\(\)\)/);
+  assert.match(android, /onboardingStep == ONBOARDING_PAGES\.length - 1 \? "Get started" : "Next"/);
 });
 
 test('native initialization blocks the actual Capacitor bootstrap entry points', () => {
@@ -57,7 +57,7 @@ test('actual Swift preference and UA functions preserve completion and all origi
       let defaults = UserDefaults(suiteName: suite)!
       defer { defaults.removePersistentDomain(forName: suite) }
       assert(!NativeOnboarding.isComplete(defaults))
-      assert(NativeOnboarding.pages.count == 4)
+      assert(NativeOnboarding.pages.count == 3)
       NativeOnboarding.complete(defaults)
       assert(NativeOnboarding.isComplete(UserDefaults(suiteName: suite)!))
       let original = "Mozilla/5.0 OtherMarker/7 Mobile/15E148"

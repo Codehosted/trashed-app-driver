@@ -17,6 +17,10 @@ import android.widget.Button;
 import android.widget.EditText;
 import android.widget.FrameLayout;
 import android.widget.LinearLayout;
+import android.widget.ImageView;
+import android.graphics.drawable.GradientDrawable;
+import android.content.res.Configuration;
+import android.content.res.ColorStateList;
 import android.widget.ProgressBar;
 import android.widget.ScrollView;
 import android.widget.TextView;
@@ -58,11 +62,12 @@ public class MainActivity extends BridgeActivity {
     static final String ONBOARDING_VERSION_KEY = "onboarding-version";
     static final String ONBOARDING_MARKER = "TrashedOnboarding/1";
     static final String[][] ONBOARDING_PAGES = {
-        { "Your business, wherever you work", "One Trashed app. Your whole team.", "Vendors manage their business. Drivers run their routes. Sign in with your existing Trashed account to access the tools available to your role.", "Orders · customers · inventory · dispatch" },
-        { "From the office to the jobsite", "Keep every stop connected.", "Open assigned routes, review stop details, and send updates to dispatch. Driver location sharing starts only after you choose to go online and grant permission.", "Your routes. Your team. One shared view." },
-        { "Stay close to your customers", "Calls belong on your phone.", "Open your business calls and their details from the vendor workspace. Customer phone links use your device’s phone app.", "Call history and follow-up, alongside your orders" },
-        { "Only updates that matter", "Know what needs your attention.", "Allow notifications for call results, orders that need approval, and route updates. You can change notification permissions anytime in your device settings.", "Call results · order approvals · route updates" },
+        { "Your waste service business in your pocket", "Manage orders, customers and your team wherever work takes you." },
+        { "Real-time customer chat", "Keep customers in the loop with direct messages and quick replies." },
+        { "Hauler and dispatch", "Connect haulers and dispatch with live routes and clear stop details." },
     };
+    static final int ONBOARDING_PRIMARY = Color.rgb(112, 51, 255);
+    static final int[] ONBOARDING_IMAGES = { R.drawable.onboarding_business, R.drawable.onboarding_chat, R.drawable.onboarding_dispatch };
 
     private FrameLayout loginOverlay;
     private FrameLayout onboardingOverlay;
@@ -228,55 +233,117 @@ public class MainActivity extends BridgeActivity {
         historyBackAvailable = false;
         historyBack.setEnabled(false);
         if (onboardingOverlay != null) ((ViewGroup) onboardingOverlay.getParent()).removeView(onboardingOverlay);
+        boolean dark = (getResources().getConfiguration().uiMode & Configuration.UI_MODE_NIGHT_MASK) == Configuration.UI_MODE_NIGHT_YES;
+        int foreground = dark ? Color.WHITE : Color.rgb(33, 26, 43);
+        int muted = dark ? Color.rgb(191, 184, 204) : Color.rgb(98, 89, 110);
+        int surface = dark ? Color.rgb(41, 33, 51) : Color.rgb(240, 235, 250);
         onboardingOverlay = new FrameLayout(this);
-        onboardingOverlay.setBackgroundColor(Color.rgb(2, 6, 23));
+        onboardingOverlay.setTag("native-onboarding");
+        onboardingOverlay.setBackgroundColor(dark ? Color.rgb(20, 18, 26) : Color.rgb(250, 250, 252));
         LinearLayout column = new LinearLayout(this);
         column.setOrientation(LinearLayout.VERTICAL);
-        column.setPadding(dp(24), dp(24), dp(24), dp(20));
+        column.setPadding(dp(24), dp(20), dp(24), dp(12));
         onboardingOverlay.addView(column, fullFrameParams());
-        column.addView(text("Trashed", 24, Color.WHITE, Typeface.BOLD), matchWrapParams());
+        LinearLayout brand = new LinearLayout(this);
+        brand.setGravity(Gravity.CENTER_VERTICAL);
+        ImageView symbol = new ImageView(this);
+        symbol.setTag("native-onboarding-symbol");
+        symbol.setImageResource(R.drawable.onboarding_symbol);
+        symbol.setImageTintList(ColorStateList.valueOf(ONBOARDING_PRIMARY));
+        symbol.setScaleType(ImageView.ScaleType.FIT_CENTER);
+        symbol.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_NO);
+        LinearLayout.LayoutParams symbolParams = new LinearLayout.LayoutParams(dp(28), dp(28));
+        symbolParams.setMarginEnd(dp(8));
+        brand.addView(symbol, symbolParams);
+        ImageView wordmark = new ImageView(this);
+        wordmark.setImageResource(R.drawable.onboarding_wordmark);
+        wordmark.setColorFilter(foreground);
+        wordmark.setScaleType(ImageView.ScaleType.FIT_START);
+        wordmark.setContentDescription("Trashed");
+        brand.addView(wordmark, new LinearLayout.LayoutParams(dp(120), dp(28)));
+        LinearLayout.LayoutParams brandParams = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, dp(28));
+        brandParams.bottomMargin = dp(20);
+        column.addView(brand, brandParams);
         ScrollView scroll = new ScrollView(this);
+        scroll.setFillViewport(false);
         column.addView(scroll, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1));
         LinearLayout page = new LinearLayout(this);
         page.setOrientation(LinearLayout.VERTICAL);
-        page.setPadding(0, dp(36), 0, dp(24));
+        page.setPadding(0, 0, 0, dp(20));
         scroll.addView(page, matchWrapParams());
-        page.addView(text(String.format(java.util.Locale.US, "%02d", onboardingStep + 1), 60, Color.rgb(148, 163, 184), Typeface.NORMAL));
+        ImageView hero = new ImageView(this);
+        hero.setTag("native-onboarding-hero");
+        hero.setImageResource(ONBOARDING_IMAGES[onboardingStep]);
+        hero.setScaleType(ImageView.ScaleType.FIT_CENTER);
+        hero.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_NO);
+        int heroHeight = Math.max(140, Math.min(300, Math.round(getResources().getConfiguration().screenHeightDp * 0.33f)));
+        page.addView(hero, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(heroHeight)));
         String[] copy = ONBOARDING_PAGES[onboardingStep];
         for (int index = 0; index < copy.length; index++) {
-            TextView paragraph = text(copy[index], index == 1 ? 32 : 16,
-                index == 1 || index == 2 ? Color.WHITE : Color.rgb(148, 163, 184),
-                index == 1 ? Typeface.BOLD : Typeface.NORMAL);
-            paragraph.setPadding(0, dp(22), 0, 0);
+            int color = index == 0 ? foreground : muted;
+            TextView paragraph = text(copy[index], index == 0 ? 30 : 16,
+                color, index == 0 ? Typeface.BOLD : Typeface.NORMAL);
+            paragraph.setPadding(0, dp(index == 0 ? 22 : 14), 0, 0);
+            if (index == 0) ViewCompat.setAccessibilityHeading(paragraph, true);
             page.addView(paragraph, matchWrapParams());
         }
-        column.addView(text((onboardingStep + 1) + " of 4", 14, Color.rgb(148, 163, 184), Typeface.NORMAL));
-        if (error != null) column.addView(text(error, 14, Color.rgb(252, 165, 165), Typeface.NORMAL));
-        LinearLayout actions = new LinearLayout(this);
-        actions.setGravity(Gravity.CENTER_VERTICAL);
-        actions.setPadding(0, dp(16), 0, 0);
+        LinearLayout progress = new LinearLayout(this);
+        progress.setGravity(Gravity.CENTER_VERTICAL);
         Button back = new Button(this);
         back.setText(onboardingStep == 0 ? "Skip" : "Back");
+        back.setTag("native-onboarding-back");
         back.setAllCaps(false);
+        back.setTextColor(foreground);
+        back.setBackgroundColor(Color.TRANSPARENT);
+        back.setElevation(0);
+        back.setStateListAnimator(null);
+        back.setMinHeight(dp(48));
+        back.setMinimumHeight(dp(48));
         back.setOnClickListener(view -> {
             if (onboardingStep == 0) completeNativeOnboarding();
             else { onboardingStep--; showNativeOnboarding(null); }
         });
-        actions.addView(back, new LinearLayout.LayoutParams(0, dp(54), 1));
+        progress.addView(back, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+        LinearLayout dots = new LinearLayout(this);
+        dots.setGravity(Gravity.CENTER);
+        dots.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_NO_HIDE_DESCENDANTS);
+        for (int index = 0; index < ONBOARDING_PAGES.length; index++) {
+            View dot = new View(this);
+            dot.setBackground(onboardingFill(index == onboardingStep ? ONBOARDING_PRIMARY : surface, 4));
+            LinearLayout.LayoutParams dotParams = new LinearLayout.LayoutParams(dp(index == onboardingStep ? 24 : 8), dp(8));
+            dotParams.setMargins(dp(3), 0, dp(3), 0);
+            dots.addView(dot, dotParams);
+        }
+        progress.addView(dots, new LinearLayout.LayoutParams(0, dp(48), 1));
+        progress.addView(text((onboardingStep + 1) + " of " + ONBOARDING_PAGES.length, 12, muted, Typeface.NORMAL));
+        column.addView(progress, matchWrapParams());
+        if (error != null) column.addView(text(error, 14, dark ? Color.rgb(252, 165, 165) : Color.rgb(153, 27, 27), Typeface.NORMAL));
         Button next = new Button(this);
-        next.setText(onboardingStep == 3 ? "Get started" : "Next");
+        next.setText(onboardingStep == ONBOARDING_PAGES.length - 1 ? "Get started" : "Next");
+        next.setTag("native-onboarding-next");
         next.setAllCaps(false);
         next.setTextColor(Color.WHITE);
-        next.setBackgroundColor(Color.rgb(18, 107, 66));
+        next.setTextSize(17);
+        next.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
+        next.setMinHeight(dp(54));
+        next.setMinimumHeight(dp(54));
+        next.setBackgroundTintList(null);
+        next.setElevation(0);
+        next.setStateListAnimator(null);
+        next.setBackground(onboardingFill(ONBOARDING_PRIMARY, 14));
         next.setOnClickListener(view -> {
-            if (onboardingStep == 3) completeNativeOnboarding();
+            if (onboardingStep == ONBOARDING_PAGES.length - 1) completeNativeOnboarding();
             else { onboardingStep++; showNativeOnboarding(null); }
         });
-        LinearLayout.LayoutParams nextParams = new LinearLayout.LayoutParams(0, dp(54), 1);
-        nextParams.setMargins(dp(16), 0, 0, 0);
-        actions.addView(next, nextParams);
-        column.addView(actions, matchWrapParams());
+        column.addView(next, matchWrapParams());
         addContentView(onboardingOverlay, fullFrameParams());
+    }
+
+    private GradientDrawable onboardingFill(int color, int radius) {
+        GradientDrawable drawable = new GradientDrawable();
+        drawable.setColor(color); // A single flat fill, never a gradient.
+        drawable.setCornerRadius(dp(radius));
+        return drawable;
     }
 
     private void completeNativeOnboarding() {
@@ -311,8 +378,14 @@ public class MainActivity extends BridgeActivity {
         workspaceHistory.reset();
         historyBackAvailable = false;
         historyBack.setEnabled(false);
+        boolean dark = (getResources().getConfiguration().uiMode & Configuration.UI_MODE_NIGHT_MASK) == Configuration.UI_MODE_NIGHT_YES;
+        int foreground = dark ? Color.WHITE : Color.rgb(33, 26, 43);
+        int muted = dark ? Color.rgb(191, 184, 204) : Color.rgb(98, 89, 110);
+        int surface = dark ? Color.rgb(31, 26, 38) : Color.WHITE;
+        int border = dark ? Color.rgb(70, 59, 82) : Color.rgb(217, 209, 224);
+        int disabled = dark ? Color.rgb(61, 52, 70) : Color.rgb(230, 224, 237);
         loginOverlay = new FrameLayout(this);
-        loginOverlay.setBackgroundColor(Color.rgb(2, 6, 23));
+        loginOverlay.setBackgroundColor(dark ? Color.rgb(20, 18, 26) : Color.rgb(250, 250, 252));
 
         ScrollView scrollView = new ScrollView(this);
         scrollView.setFillViewport(true);
@@ -324,11 +397,11 @@ public class MainActivity extends BridgeActivity {
         container.setPadding(dp(24), dp(40), dp(24), dp(40));
         scrollView.addView(container, new ScrollView.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
 
-        TextView logo = text("trashed", 36, Color.WHITE, Typeface.BOLD);
+        TextView logo = text("trashed", 36, foreground, Typeface.BOLD);
         logo.setGravity(Gravity.CENTER);
         container.addView(logo, matchWrapParams());
 
-        TextView subtitle = text("Vendors & Drivers", 12, Color.rgb(148, 163, 184), Typeface.BOLD);
+        TextView subtitle = text("Vendors & Drivers", 12, muted, Typeface.BOLD);
         subtitle.setGravity(Gravity.CENTER);
         subtitle.setLetterSpacing(0.18f);
         container.addView(subtitle, matchWrapParams());
@@ -336,70 +409,79 @@ public class MainActivity extends BridgeActivity {
         LinearLayout card = new LinearLayout(this);
         card.setOrientation(LinearLayout.VERTICAL);
         card.setPadding(dp(22), dp(22), dp(22), dp(22));
-        card.setBackgroundColor(Color.rgb(15, 23, 42));
+        card.setBackgroundColor(surface);
         LinearLayout.LayoutParams cardParams = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
         cardParams.setMargins(0, dp(28), 0, 0);
         container.addView(card, cardParams);
 
-        TextView title = text("Sign in to Trashed", 26, Color.WHITE, Typeface.BOLD);
+        TextView title = text("Sign in to Trashed", 26, foreground, Typeface.BOLD);
         title.setGravity(Gravity.CENTER);
         card.addView(title, matchWrapParams());
 
-        TextView body = text("Manage your business, orders, routes, and team.", 15, Color.rgb(203, 213, 225), Typeface.NORMAL);
+        TextView body = text("Manage your waste services business on-the-go with AI features", 15, muted, Typeface.NORMAL);
         body.setGravity(Gravity.CENTER);
         body.setPadding(0, dp(10), 0, dp(18));
         card.addView(body, matchWrapParams());
 
         googleButton = new Button(this);
         googleButton.setText(R.string.continue_with_google);
-        googleButton.setTextColor(Color.rgb(15, 23, 42));
-        googleButton.setTextSize(16);
+        googleButton.setTextColor(foreground);
+        googleButton.setTextSize(17);
         googleButton.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
         googleButton.setAllCaps(false);
-        googleButton.setBackgroundColor(Color.WHITE);
+        googleButton.setBackgroundTintList(null);
+        googleButton.setElevation(0);
+        googleButton.setStateListAnimator(null);
+        GradientDrawable googleFill = onboardingFill(surface, 14);
+        googleFill.setStroke(dp(1), border);
+        googleButton.setBackground(googleFill);
         googleButton.setOnClickListener(view -> submitGoogleLogin());
-        LinearLayout.LayoutParams googleParams = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(54));
+        LinearLayout.LayoutParams googleParams = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(50));
         googleParams.setMargins(0, 0, 0, dp(12));
         card.addView(googleButton, googleParams);
 
-        TextView divider = text("OR SIGN IN WITH EMAIL", 12, Color.rgb(148, 163, 184), Typeface.BOLD);
+        TextView divider = text("OR SIGN IN WITH EMAIL", 12, muted, Typeface.BOLD);
         divider.setGravity(Gravity.CENTER);
         divider.setLetterSpacing(0.12f);
         divider.setPadding(0, 0, 0, dp(8));
         card.addView(divider, matchWrapParams());
 
-        emailField = input("Email address", false);
+        emailField = input("Email address", false, dark);
         card.addView(emailField, fieldParams());
 
-        passwordField = input("Password", true);
+        passwordField = input("Password", true, dark);
         card.addView(passwordField, fieldParams());
 
         signInButton = new Button(this);
         signInButton.setText(R.string.sign_in);
-        signInButton.setTextColor(Color.WHITE);
-        signInButton.setTextSize(16);
+        signInButton.setTextColor(new ColorStateList(new int[][] { { -android.R.attr.state_enabled }, {} }, new int[] { muted, Color.WHITE }));
+        signInButton.setTextSize(17);
         signInButton.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
         signInButton.setAllCaps(false);
-        signInButton.setBackgroundColor(Color.rgb(79, 70, 229));
+        signInButton.setElevation(0);
+        signInButton.setStateListAnimator(null);
+        signInButton.setBackground(onboardingFill(ONBOARDING_PRIMARY, 14));
+        signInButton.setBackgroundTintList(new ColorStateList(new int[][] { { -android.R.attr.state_enabled }, {} }, new int[] { disabled, ONBOARDING_PRIMARY }));
         signInButton.setOnClickListener(view -> submitNativeLogin());
-        LinearLayout.LayoutParams buttonParams = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(54));
+        LinearLayout.LayoutParams buttonParams = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(50));
         buttonParams.setMargins(0, dp(12), 0, 0);
         card.addView(signInButton, buttonParams);
 
         progressBar = new ProgressBar(this);
+        progressBar.setIndeterminateTintList(ColorStateList.valueOf(ONBOARDING_PRIMARY));
         progressBar.setVisibility(View.GONE);
         LinearLayout.LayoutParams progressParams = new LinearLayout.LayoutParams(dp(36), dp(36));
         progressParams.gravity = Gravity.CENTER_HORIZONTAL;
         progressParams.setMargins(0, dp(16), 0, 0);
         card.addView(progressBar, progressParams);
 
-        errorText = text("", 13, Color.rgb(252, 165, 165), Typeface.BOLD);
+        errorText = text("", 13, dark ? Color.rgb(252, 165, 165) : Color.rgb(153, 27, 27), Typeface.BOLD);
         errorText.setGravity(Gravity.CENTER);
         errorText.setVisibility(View.GONE);
         errorText.setPadding(0, dp(14), 0, 0);
         card.addView(errorText, matchWrapParams());
 
-        TextView googleNote = text("Google sign-in uses the native Android account flow so OAuth never bounces out to Chrome.", 12, Color.rgb(148, 163, 184), Typeface.NORMAL);
+        TextView googleNote = text("Google sign-in uses the native Android account flow so OAuth never bounces out to Chrome.", 12, muted, Typeface.NORMAL);
         googleNote.setGravity(Gravity.CENTER);
         googleNote.setPadding(0, dp(18), 0, 0);
         card.addView(googleNote, matchWrapParams());
@@ -685,15 +767,18 @@ public class MainActivity extends BridgeActivity {
         if (manager != null && focus != null) manager.hideSoftInputFromWindow(focus.getWindowToken(), 0);
     }
 
-    private EditText input(String hint, boolean password) {
+    private EditText input(String hint, boolean password, boolean dark) {
         EditText field = new EditText(this);
         field.setHint(hint);
-        field.setTextColor(Color.WHITE);
-        field.setHintTextColor(Color.rgb(100, 116, 139));
+        field.setTextColor(dark ? Color.WHITE : Color.rgb(33, 26, 43));
+        field.setHintTextColor(dark ? Color.rgb(191, 184, 204) : Color.rgb(98, 89, 110));
         field.setTextSize(16);
         field.setSingleLine(true);
         field.setPadding(dp(14), 0, dp(14), 0);
-        field.setBackgroundColor(Color.rgb(30, 41, 59));
+        GradientDrawable fill = onboardingFill(dark ? Color.rgb(41, 33, 51) : Color.rgb(250, 247, 252), 14);
+        fill.setStroke(dp(1), dark ? Color.rgb(70, 59, 82) : Color.rgb(217, 209, 224));
+        field.setBackgroundTintList(null);
+        field.setBackground(fill);
         field.setInputType(password ? InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_PASSWORD : InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_EMAIL_ADDRESS);
         return field;
     }

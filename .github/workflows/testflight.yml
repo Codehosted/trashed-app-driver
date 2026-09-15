@@ -6,7 +6,7 @@ on:
       marketing_version:
         description: App Store marketing version
         required: false
-        default: "1.0.2"
+        default: "1.0.3"
       build_number:
         description: Optional explicit build number. Defaults to UTC timestamp.
         required: false
@@ -39,7 +39,7 @@ jobs:
     permissions:
       contents: read
     env:
-      MARKETING_VERSION: ${{ github.event.inputs.marketing_version || '1.0.2' }}
+      MARKETING_VERSION: ${{ github.event.inputs.marketing_version || '1.0.3' }}
       BUILD_NUMBER: ${{ github.event.inputs.build_number }}
       TRASHED_WEB_URL: https://trashed.app
       DEVELOPMENT_TEAM_ID: 3BYF8CNWS2

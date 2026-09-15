@@ -7,6 +7,7 @@ import static androidx.test.espresso.assertion.ViewAssertions.matches;
 import static androidx.test.espresso.matcher.ViewMatchers.isDisplayed;
 import static androidx.test.espresso.matcher.ViewMatchers.isCompletelyDisplayed;
 import static androidx.test.espresso.matcher.ViewMatchers.withText;
+import static androidx.test.espresso.matcher.ViewMatchers.withContentDescription;
 import static org.junit.Assert.*;
 
 import android.Manifest;
@@ -15,6 +16,10 @@ import android.content.SharedPreferences;
 import android.graphics.Bitmap;
 import android.graphics.Color;
 import android.graphics.drawable.ColorDrawable;
+import android.graphics.drawable.GradientDrawable;
+import android.widget.Button;
+import android.widget.ImageView;
+import android.content.res.Configuration;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Handler;
@@ -70,13 +75,36 @@ public class AndroidOnboardingTest {
     }
 
     private void captureIntro(ActivityScenario<MainActivity> scenario, int page) throws Exception {
-        onView(withText("Trashed")).check(matches(isCompletelyDisplayed()));
-        onView(withText((page + 1) + " of 4")).check(matches(isCompletelyDisplayed()));
+        onView(withContentDescription("Trashed")).check(matches(isCompletelyDisplayed()));
+        onView(withText((page + 1) + " of 3")).check(matches(isCompletelyDisplayed()));
         onView(withText(page == 0 ? "Skip" : "Back")).check(matches(isCompletelyDisplayed()));
-        onView(withText(page == 3 ? "Get started" : "Next")).check(matches(isCompletelyDisplayed()));
+        onView(withText(page == MainActivity.ONBOARDING_PAGES.length - 1 ? "Get started" : "Next")).check(matches(isCompletelyDisplayed()));
         CountDownLatch drawn = new CountDownLatch(1);
         scenario.onActivity(activity -> {
             View decor = activity.getWindow().getDecorView();
+            View intro = decor.findViewWithTag("native-onboarding");
+            boolean dark = (activity.getResources().getConfiguration().uiMode & Configuration.UI_MODE_NIGHT_MASK) == Configuration.UI_MODE_NIGHT_YES;
+            assertEquals(dark ? Color.rgb(20, 18, 26) : Color.rgb(250, 250, 252),
+                ((ColorDrawable) intro.getBackground()).getColor());
+            ImageView symbol = decor.findViewWithTag("native-onboarding-symbol");
+            assertNotNull("Approved symbol is beside the wordmark", symbol.getDrawable());
+            assertEquals(MainActivity.ONBOARDING_PRIMARY, symbol.getImageTintList().getDefaultColor());
+            int symbolSize = Math.round(28 * activity.getResources().getDisplayMetrics().density);
+            assertEquals(symbolSize, symbol.getWidth());
+            assertEquals(symbolSize, symbol.getHeight());
+            assertEquals(Math.round(8 * activity.getResources().getDisplayMetrics().density),
+                ((android.widget.LinearLayout.LayoutParams) symbol.getLayoutParams()).getMarginEnd());
+            ImageView hero = decor.findViewWithTag("native-onboarding-hero");
+            assertNotNull("Each page has a bundled illustration", hero.getDrawable());
+            assertTrue("Hero has visible measured area", hero.getWidth() > 0 && hero.getHeight() > 0);
+            assertEquals(ImageView.ScaleType.FIT_CENTER, hero.getScaleType());
+            assertNull("Illustration is unframed on the canvas", hero.getBackground());
+            Button next = decor.findViewWithTag("native-onboarding-next");
+            assertEquals(MainActivity.ONBOARDING_PRIMARY, ((GradientDrawable) next.getBackground()).getColor().getDefaultColor());
+            assertNull("Action is flat, not a gradient", ((GradientDrawable) next.getBackground()).getColors());
+            assertEquals(Color.WHITE, next.getCurrentTextColor());
+            assertTrue(next.getHeight() >= 48 * activity.getResources().getDisplayMetrics().density);
+            assertTrue(next.getWidth() > intro.getWidth() / 2);
             assertEquals(Color.rgb(2, 6, 23),
                 ((ColorDrawable) activity.findViewById(android.R.id.content).getBackground()).getColor());
             assertFalse(WindowCompat.getInsetsController(activity.getWindow(), decor).isAppearanceLightStatusBars());
@@ -113,6 +141,30 @@ public class AndroidOnboardingTest {
         }
     }
 
+    private void assertLoginActions() {
+        java.util.concurrent.atomic.AtomicInteger width = new java.util.concurrent.atomic.AtomicInteger();
+        onView(withText("Continue with Google")).check((view, error) -> {
+            if (error != null) throw error;
+            Button button = (Button) view;
+            width.set(button.getWidth());
+            assertEquals(Math.round(50 * button.getResources().getDisplayMetrics().density), button.getHeight());
+            assertEquals(0f, button.getElevation(), 0f);
+            assertNull(button.getStateListAnimator());
+            assertEquals(Math.round(14 * button.getResources().getDisplayMetrics().density),
+                ((GradientDrawable) button.getBackground()).getCornerRadius(), 0f);
+        });
+        onView(withText("Sign In")).check((view, error) -> {
+            if (error != null) throw error;
+            Button button = (Button) view;
+            assertEquals(width.get(), button.getWidth());
+            assertEquals(Math.round(50 * button.getResources().getDisplayMetrics().density), button.getHeight());
+            assertEquals(0f, button.getElevation(), 0f);
+            assertNull(button.getStateListAnimator());
+            assertEquals(MainActivity.ONBOARDING_PRIMARY, button.getBackgroundTintList().getDefaultColor());
+            assertEquals(Color.WHITE, button.getCurrentTextColor());
+        });
+    }
+
     private ActivityScenario<MainActivity> launch() {
         ActivityScenario<MainActivity> scenario = ActivityScenario.launch(MainActivity.class);
         scenario.onActivity(activity -> activity.getWindow().addFlags(
@@ -138,16 +190,16 @@ public class AndroidOnboardingTest {
 
     @Test public void freshIntroSupportsBackAndRecreationThenPersistsCompletion() throws Exception {
         try (ActivityScenario<MainActivity> scenario = launch()) {
-            onView(withText(MainActivity.ONBOARDING_PAGES[0][1])).check(matches(isDisplayed()));
+            onView(withText(MainActivity.ONBOARDING_PAGES[0][0])).check(matches(isDisplayed()));
             assertBootstrapBlocked(scenario);
             captureIntro(scenario, 0);
             onView(withText("Next")).perform(click());
-            onView(withText(MainActivity.ONBOARDING_PAGES[1][1])).check(matches(isDisplayed()));
+            onView(withText(MainActivity.ONBOARDING_PAGES[1][0])).check(matches(isDisplayed()));
             onView(withText("Back")).perform(click());
-            onView(withText("1 of 4")).check(matches(isDisplayed()));
+            onView(withText("1 of 3")).check(matches(isDisplayed()));
             onView(withText("Next")).perform(click());
             scenario.recreate();
-            onView(withText("1 of 4")).check(matches(isDisplayed()));
+            onView(withText("1 of 3")).check(matches(isDisplayed()));
             assertBootstrapBlocked(scenario);
             AtomicReference<String> original = new AtomicReference<>();
             scenario.onActivity(activity -> {
@@ -155,14 +207,15 @@ public class AndroidOnboardingTest {
                 original.set(webView.getSettings().getUserAgentString() + " ExistingMarker/7");
                 webView.getSettings().setUserAgentString(original.get());
             });
-            for (int page = 1; page < 4; page++) {
+            for (int page = 1; page < MainActivity.ONBOARDING_PAGES.length; page++) {
                 onView(withText("Next")).perform(click());
-                onView(withText(MainActivity.ONBOARDING_PAGES[page][1])).check(matches(isDisplayed()));
+                onView(withText(MainActivity.ONBOARDING_PAGES[page][0])).check(matches(isDisplayed()));
                 captureIntro(scenario, page);
             }
             assertEquals(0, preferences().getInt(MainActivity.ONBOARDING_VERSION_KEY, 0));
             onView(withText("Get started")).perform(click());
             onView(withText("Sign in to Trashed")).check(matches(isDisplayed()));
+            assertLoginActions();
             assertEquals(1, preferences().getInt(MainActivity.ONBOARDING_VERSION_KEY, 0));
             scenario.onActivity(activity -> assertEquals(original.get() + " " + MainActivity.ONBOARDING_MARKER,
                 activity.getBridge().getWebView().getSettings().getUserAgentString()));
@@ -184,6 +237,7 @@ public class AndroidOnboardingTest {
             assertBootstrapBlocked(scenario);
             onView(withText("Skip")).perform(click());
             onView(withText("Sign in to Trashed")).check(matches(isDisplayed()));
+            assertLoginActions();
             assertEquals(1, preferences().getInt(MainActivity.ONBOARDING_VERSION_KEY, 0));
             assertEquals(microphoneBefore, context.checkSelfPermission(Manifest.permission.RECORD_AUDIO));
             assertEquals(locationBefore, context.checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION));
@@ -201,7 +255,7 @@ public class AndroidOnboardingTest {
         CookieManager.getInstance().flush();
         assertTrue(CookieManager.getInstance().getCookie(LOCAL_APP).contains("synthetic-onboarding-fixture"));
         try (ActivityScenario<MainActivity> scenario = launch()) {
-            onView(withText("1 of 4")).check(matches(isDisplayed()));
+            onView(withText("1 of 3")).check(matches(isDisplayed()));
             assertBootstrapBlocked(scenario);
             assertTrue("Retained fixture must survive Capacitor initialization",
                 CookieManager.getInstance().getCookie(LOCAL_APP).contains("synthetic-onboarding-fixture"));

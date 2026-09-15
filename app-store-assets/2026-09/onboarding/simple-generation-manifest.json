@@ -1,0 +1,39 @@
+{
+  "createdAt": "2026-09-15T18:54:29.447Z",
+  "generator": "built-in image_gen",
+  "purpose": "Simple three-page native onboarding, supersedes complex four-image draft",
+  "prompts": [
+    {
+      "key": "business",
+      "prompt": "Create a very simple, meaningful landscape 3:2 mobile onboarding illustration, 1536x1024. The user rejected busy dashboard collages. Only ONE main idea and at most 2-3 visual objects. Minimal premium editorial illustration, softly dimensional but MATTE, clean crisp silhouettes, very subtle light and shadow, NOT glossy/plastic, not cartoonish, no elaborate scene. Trashed brand: saturated flat purple #7033FF, white, a little pale lilac; plain near-white #FAF9FC canvas. Large clear centered composition with generous whitespace. NO text, logo lettering, headlines, numbers, badges, sparkles, decorative scattered shapes, UI cards, complex background, skyline, people, or gradients in the background. Designed to be instantly understandable at small phone size; native text lives outside the image. Idea: your waste-service business in your pocket. A SINGLE simple white smartphone partly tucked into a white work-shirt chest pocket, shown straight-on with a slight natural angle. Just the pocket area, not an entire shirt/person/body. Use restrained pale lilac outlines/seams to make the pocket clear. The phone screen is solid purple with ONE simple white roll-off dumpster pictogram centered, nothing else on screen. Two objects only: pocket and phone. Phone is elegant flat modern not photorealistic. Keep the pocket large and the meaning immediate. No money or charts."
+    },
+    {
+      "key": "chat",
+      "prompt": "Create a very simple, meaningful landscape 3:2 mobile onboarding illustration, 1536x1024. The user rejected busy dashboard collages. Only ONE main idea and at most 2-3 visual objects. Minimal premium editorial illustration, softly dimensional but MATTE, clean crisp silhouettes, very subtle light and shadow, NOT glossy/plastic, not cartoonish, no elaborate scene. Trashed brand: saturated flat purple #7033FF, white, a little pale lilac; plain near-white #FAF9FC canvas. Large clear centered composition with generous whitespace. NO text, logo lettering, headlines, numbers, badges, sparkles, decorative scattered shapes, UI cards, complex background, skyline, people, or gradients in the background. Designed to be instantly understandable at small phone size; native text lives outside the image. Idea: real-time customer chat. Exactly TWO large friendly rounded chat bubbles with clear speech tails, slightly offset and lightly overlapping. Foreground bubble saturated purple with three white dots as a typing indicator. Rear bubble white with a thin purple edge and two short pale-lilac line strokes suggesting a customer's message. NO avatars, faces, phones, extra symbols or extra cards. Balanced simple two-shape composition, no complex perspective."
+    },
+    {
+      "key": "dispatch",
+      "prompt": "Create a very simple, meaningful landscape 3:2 mobile onboarding illustration, 1536x1024. The user rejected busy dashboard collages. Only ONE main idea and at most 2-3 visual objects. Minimal premium editorial illustration, softly dimensional but MATTE, clean crisp silhouettes, very subtle light and shadow, NOT glossy/plastic, not cartoonish, no elaborate scene. Trashed brand: saturated flat purple #7033FF, white, a little pale lilac; plain near-white #FAF9FC canvas. Large clear centered composition with generous whitespace. NO text, logo lettering, headlines, numbers, badges, sparkles, decorative scattered shapes, UI cards, complex background, skyline, people, or gradients in the background. Designed to be instantly understandable at small phone size; native text lives outside the image. Idea: hauler and dispatch. ONE simple white-cab purple roll-off waste truck in clean side/three-quarter view, and ONE short smooth purple route line underneath/behind it joining TWO plain circular stop points. Truck carries an EMPTY purple open-top roll-off dumpster, no trash/debris clutter. Limit truck details to essential silhouette, dark wheels and cab window, smooth matte body, no branding/text. No street map, buildings, avatar, notification card, location pin, phone, labels, numbers, or other objects. Instantly legible hauler plus planned route."
+    }
+  ],
+  "sources": [
+    {
+      "key": "business",
+      "path": "/Users/georgebyers/.codex/generated_images/01a0a13f-a74d-7000-b13a-6ba186cbb9bb/exec-d4de98be-6999-4854-99df-0812610d498e.png",
+      "sha256": "9c3fdd04ce8c71c3d48c84d717a40c6d143109384b4a23020d925f3be422ebbc",
+      "bytes": 2178974
+    },
+    {
+      "key": "chat",
+      "path": "/Users/georgebyers/.codex/generated_images/01a0a13f-a74d-7000-b13a-6ba186cbb9bb/exec-66ed9f1b-1e50-4836-8765-329573cd4bd2.png",
+      "sha256": "4015d4ce834c63608446135bd0087cb71f78c16e8854d20c956170d351be8f29",
+      "bytes": 1042303
+    },
+    {
+      "key": "dispatch",
+      "path": "/Users/georgebyers/.codex/generated_images/01a0a13f-a74d-7000-b13a-6ba186cbb9bb/exec-db097445-04bc-4192-8773-27012a832e39.png",
+      "sha256": "6deb3613fc0aaad044790101af4a2a6d2168965989883ba50f157b36776b77e8",
+      "bytes": 1259590
+    }
+  ]
+}
