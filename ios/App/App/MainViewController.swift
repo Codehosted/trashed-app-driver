@@ -56,6 +56,49 @@ private final class OnboardingWebView: WKWebView {
     }
 }
 
+private struct NativeWorkspaceHistory {
+    private var floor: Int?
+    private var awaitingWorkspace = false
+
+    mutating func reset() { floor = nil; awaitingWorkspace = false }
+    mutating func beginSession() { reset(); awaitingWorkspace = true }
+
+    mutating func update(index: Int, workspace: Bool, committed: Bool) {
+        if awaitingWorkspace && workspace && committed && index >= 0 {
+            floor = index
+            awaitingWorkspace = false
+        } else if let floor = floor, index < floor { reset() }
+    }
+
+    func canGoBack(index: Int, current: URL?, back: URL?, origin: URL, visible: Bool) -> Bool {
+        guard visible, let floor = floor, index > floor else { return false }
+        return Self.isWorkspaceURL(current, origin: origin) && Self.isWorkspaceURL(back, origin: origin)
+    }
+
+    static func isBackSwipe(x: Double, y: Double) -> Bool { x >= 64 && x > abs(y) * 1.5 }
+
+    static func isAuthenticationURL(_ url: URL?) -> Bool {
+        guard let path = url?.path else { return false }
+        return path == "/app/login" || path == "/partners/login" || path.hasPrefix("/api/auth/")
+    }
+
+    static func isSameOriginURL(_ url: URL?, origin: URL) -> Bool {
+        guard let url = url, let scheme = origin.scheme, ["http", "https"].contains(scheme),
+              let host = origin.host, url.scheme == scheme, url.host?.lowercased() == host.lowercased(),
+              url.user == nil, url.password == nil, origin.user == nil, origin.password == nil,
+              (url.port ?? (scheme == "https" ? 443 : 80)) == (origin.port ?? (scheme == "https" ? 443 : 80)),
+              let path = URLComponents(url: url, resolvingAgainstBaseURL: false)?.percentEncodedPath.removingPercentEncoding,
+              !path.contains("\\"), !path.split(separator: "/").contains(where: { $0 == "." || $0 == ".." }) else { return false }
+        return true
+    }
+
+    static func isWorkspaceURL(_ url: URL?, origin: URL) -> Bool {
+        guard isSameOriginURL(url, origin: origin), let url = url,
+              let path = URLComponents(url: url, resolvingAgainstBaseURL: false)?.percentEncodedPath.removingPercentEncoding else { return false }
+        return ["/vendor", "/driver", "/calls", "/admin"].contains { path == $0 || path.hasPrefix($0 + "/") }
+    }
+}
+
 private enum DriverTheme: String {
     case dark
     case light
@@ -114,6 +157,18 @@ class MainViewController: CAPBridgeViewController {
     private var nativeOnboardingController: UIHostingController<NativeAppOnboardingView>?
     private var onboardingReady = false
     private var loginURLObservation: NSKeyValueObservation?
+    private var historyObservations: [NSKeyValueObservation] = []
+    private var workspaceHistory = NativeWorkspaceHistory()
+    private var historyEdgeGesture: UIScreenEdgePanGestureRecognizer?
+    private var historyGestureStart: (item: WKBackForwardListItem, url: URL)?
+    private var historyBackCheckPending = false
+    private static let dismissWebDialog = """
+    (() => {
+      if (!document.querySelector('[role=dialog][data-state=open], [role=alertdialog][data-state=open]')) return false;
+      document.dispatchEvent(new KeyboardEvent('keydown', {key:'Escape', code:'Escape', bubbles:true, cancelable:true}));
+      return true;
+    })()
+    """
     private var pendingAppleCredential: NativeAppleCredential?
 
     override func webView(with frame: CGRect, configuration: WKWebViewConfiguration) -> WKWebView {
@@ -184,8 +239,21 @@ class MainViewController: CAPBridgeViewController {
         webView?.scrollView.bounces = false
         navigationController?.setNavigationBarHidden(true, animated: false)
         navigationController?.setToolbarHidden(true, animated: false)
+        if let webView = webView {
+            webView.allowsBackForwardNavigationGestures = false
+            let edge = UIScreenEdgePanGestureRecognizer(target: self, action: #selector(handleHistoryEdge(_:)))
+            edge.edges = .left
+            edge.isEnabled = false
+            view.addGestureRecognizer(edge)
+            historyEdgeGesture = edge
+            historyObservations = [
+                webView.observe(\.canGoBack, options: [.new]) { [weak self] _, _ in self?.updateHistoryGestures() },
+                webView.observe(\.isLoading, options: [.new]) { [weak self] _, _ in self?.updateHistoryGestures() },
+            ]
+        }
         loginURLObservation = webView?.observe(\.url, options: [.new]) { [weak self] webView, _ in
             guard let self = self, let url = webView.url else { return }
+            self.updateHistoryGestures()
             guard self.onboardingReady else { return }
             let config = self.makeDriverAuthConfig()
             guard url.scheme == config.origin.scheme,
@@ -233,7 +301,58 @@ class MainViewController: CAPBridgeViewController {
         traitCollection.userInterfaceStyle == .light ? .light : .dark
     }
 
+    private func updateHistoryGestures() {
+        // Read the finalized history list after the URL/loading KVO notification (including pushState/popstate).
+        DispatchQueue.main.async { [weak self] in
+            guard let self = self, let webView = self.webView else { return }
+            let origin = self.makeDriverAuthConfig().origin
+            let visible = self.onboardingReady && self.nativeOnboardingController == nil && self.nativeLoginController == nil
+            let history = webView.backForwardList
+            if NativeWorkspaceHistory.isAuthenticationURL(webView.url) { self.workspaceHistory.beginSession() }
+            self.workspaceHistory.update(index: history.backList.count,
+                workspace: visible && NativeWorkspaceHistory.isWorkspaceURL(webView.url, origin: origin), committed: !webView.isLoading)
+            self.historyEdgeGesture?.isEnabled = visible && !webView.isLoading
+                && NativeWorkspaceHistory.isSameOriginURL(webView.url, origin: origin)
+                && !NativeWorkspaceHistory.isAuthenticationURL(webView.url)
+        }
+    }
+
+    @objc private func handleHistoryEdge(_ gesture: UIScreenEdgePanGestureRecognizer) {
+        guard let webView = webView else { return }
+        let history = webView.backForwardList
+        if gesture.state == .began {
+            if let item = history.currentItem, let url = webView.url { historyGestureStart = (item, url) }
+            return
+        }
+        guard gesture.state == .ended else {
+            if gesture.state == .cancelled || gesture.state == .failed { historyGestureStart = nil }
+            return
+        }
+        defer { historyGestureStart = nil }
+        let delta = gesture.translation(in: view)
+        guard let start = historyGestureStart, !historyBackCheckPending,
+              NativeWorkspaceHistory.isBackSwipe(x: Double(delta.x), y: Double(delta.y)),
+              history.currentItem === start.item, webView.url == start.url else { return }
+        let target = history.backItem
+        historyBackCheckPending = true
+        webView.evaluateJavaScript(Self.dismissWebDialog) { [weak self] result, error in
+            guard let self = self else { return }
+            self.historyBackCheckPending = false
+            // The script may finish after navigation, session expiry, or a native overlay appears.
+            let visible = self.onboardingReady && self.nativeOnboardingController == nil && self.nativeLoginController == nil
+            guard error == nil, result as? Bool == false, visible, !webView.isLoading,
+                  webView.url == start.url, history.currentItem === start.item,
+                  let target = target, history.backItem === target,
+                  self.workspaceHistory.canGoBack(index: history.backList.count, current: webView.url,
+                    back: target.url, origin: self.makeDriverAuthConfig().origin, visible: visible) else { return }
+            webView.go(to: target) // Exact validated item; standard swipe skipping is deliberately disabled.
+        }
+    }
+
     private func presentNativeOnboarding() {
+        workspaceHistory.reset()
+        webView?.allowsBackForwardNavigationGestures = false
+        historyEdgeGesture?.isEnabled = false
         guard nativeOnboardingController == nil else { return }
         let intro = NativeAppOnboardingView { [weak self] completion in
             NativeOnboarding.complete()
@@ -318,6 +437,9 @@ class MainViewController: CAPBridgeViewController {
 
     private func presentNativeLogin(_ config: DriverAuthConfig) {
         guard onboardingReady, nativeOnboardingController == nil else { return }
+        workspaceHistory.reset()
+        webView?.allowsBackForwardNavigationGestures = false
+        historyEdgeGesture?.isEnabled = false
         pendingAppleCredential = nil
         removeNativeLogin()
 
@@ -364,6 +486,9 @@ class MainViewController: CAPBridgeViewController {
 
     private func loadDriverApp(_ config: DriverAuthConfig) {
         guard onboardingReady, nativeOnboardingController == nil else { return }
+        workspaceHistory.beginSession()
+        webView?.allowsBackForwardNavigationGestures = false
+        historyEdgeGesture?.isEnabled = false
         webView?.isHidden = false
         webView?.load(URLRequest(url: config.driverURL(theme: currentDriverTheme)))
     }

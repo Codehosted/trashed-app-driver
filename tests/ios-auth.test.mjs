@@ -35,7 +35,17 @@ describe('iOS equivalent Apple login', () => {
     assert.match(controller, /No new account will be created/);
     assert.match(controller, /Cancel linking Apple/);
     assert.match(controller, /pendingAppleCredential == nil \? config\.loginURL : config\.appleLoginURL/);
-    assert.match(controller, /private func presentNativeLogin[^]*?guard onboardingReady, nativeOnboardingController == nil else \{ return \}\s*pendingAppleCredential = nil/);
+    const loginStart = controller.indexOf('private func presentNativeLogin(');
+    const loginEnd = controller.indexOf('private func removeNativeLogin(', loginStart);
+    assert.ok(loginStart >= 0 && loginEnd > loginStart);
+    const presentLogin = controller.slice(loginStart, loginEnd);
+    const guardIndex = presentLogin.indexOf('guard onboardingReady, nativeOnboardingController == nil else { return }');
+    const clearIndex = presentLogin.indexOf('pendingAppleCredential = nil');
+    const removeIndex = presentLogin.indexOf('removeNativeLogin()');
+    const rebuildIndex = presentLogin.indexOf('let loginView = NativeDriverLoginView(');
+    assert.ok(guardIndex >= 0 && clearIndex > guardIndex);
+    assert.ok(removeIndex > clearIndex && rebuildIndex > removeIndex,
+      'Clear any pending Apple credential before reconstructing native login');
     assert.match(controller, /isAppleSubmitting \|\| appleLinkPending/);
   });
 

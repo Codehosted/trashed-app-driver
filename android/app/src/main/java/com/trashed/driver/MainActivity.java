@@ -28,6 +28,7 @@ import androidx.core.view.WindowInsetsCompat;
 import androidx.activity.OnBackPressedCallback;
 
 import com.getcapacitor.BridgeActivity;
+import com.getcapacitor.BridgeWebViewClient;
 import com.getcapacitor.CapacitorWebView;
 import com.google.android.gms.auth.api.signin.GoogleSignIn;
 import com.google.android.gms.auth.api.signin.GoogleSignInAccount;
@@ -66,6 +67,16 @@ public class MainActivity extends BridgeActivity {
     private FrameLayout loginOverlay;
     private FrameLayout onboardingOverlay;
     private OnBackPressedCallback onboardingBack;
+    private OnBackPressedCallback historyBack;
+    private boolean historyBackAvailable;
+    private boolean backCheckPending;
+    // Radix dialogs handle Escape themselves (including vetoes); never click a destructive action.
+    static final String EXACT_HISTORY_BACK = "if (location.href === %s && history.length === %d) history.go(-1);";
+    static final String DISMISS_WEB_DIALOG = "(() => {"
+        + "if (!document.querySelector('[role=dialog][data-state=open], [role=alertdialog][data-state=open]')) return false;"
+        + "document.dispatchEvent(new KeyboardEvent('keydown', {key:'Escape', code:'Escape', bubbles:true, cancelable:true}));"
+        + "return true; })()";
+    private final NativeWorkspaceHistory workspaceHistory = new NativeWorkspaceHistory();
     private int onboardingStep;
     private boolean onboardingReady;
     private EditText emailField;
@@ -129,6 +140,54 @@ public class MainActivity extends BridgeActivity {
         cookieManager.setAcceptCookie(true);
         cookieManager.setAcceptThirdPartyCookies(webView, true);
 
+        historyBack = new OnBackPressedCallback(false) {
+            @Override public void handleOnBackPressed() {
+                if (backCheckPending) return;
+                WebView view = getBridge().getWebView();
+                String requestedURL = view.getUrl();
+                android.webkit.WebBackForwardList requestedHistory = view.copyBackForwardList();
+                int requestedIndex = requestedHistory.getCurrentIndex();
+                int requestedLength = requestedHistory.getSize();
+                String requestedBack = requestedIndex > 0 ? requestedHistory.getItemAtIndex(requestedIndex - 1).getUrl() : null;
+                backCheckPending = true;
+                view.evaluateJavascript(DISMISS_WEB_DIALOG, result -> {
+                    backCheckPending = false;
+                    updateWorkspaceHistory(false);
+                    // Navigation/auth may change while JavaScript runs. Never pop the next page.
+                    android.webkit.WebBackForwardList currentHistory = view.copyBackForwardList();
+                    if (!isEnabled() || !java.util.Objects.equals(requestedURL, view.getUrl())
+                        || currentHistory.getCurrentIndex() != requestedIndex || currentHistory.getSize() != requestedLength
+                        || (requestedIndex > 0 && !java.util.Objects.equals(requestedBack,
+                            currentHistory.getItemAtIndex(requestedIndex - 1).getUrl()))) return;
+                    if (!"false".equals(result)) return; // An open dialog or failed check consumes Back.
+                    if (historyBackAvailable) {
+                        // Android WebView's native offset API also skips unactivated entries.
+                        // Renderer history.go is exact; recheck the document before executing it.
+                        String script = String.format(java.util.Locale.ROOT, EXACT_HISTORY_BACK,
+                            JSONObject.quote(requestedURL), requestedLength);
+                        view.evaluateJavascript(script, null);
+                    } else {
+                        setEnabled(false);
+                        getOnBackPressedDispatcher().onBackPressed();
+                        updateWorkspaceHistory(false);
+                    }
+                });
+            }
+        };
+        getOnBackPressedDispatcher().addCallback(this, historyBack);
+        // Add history notifications only; inherit all Capacitor URL/intent/plugin navigation behavior.
+        getBridge().setWebViewClient(new BridgeWebViewClient(getBridge()) {
+            @Override public void doUpdateVisitedHistory(WebView view, String url, boolean isReload) {
+                super.doUpdateVisitedHistory(view, url, isReload);
+                updateWorkspaceHistory(view.getProgress() == 100);
+            }
+
+            @Override public void onPageFinished(WebView view, String url) {
+                super.onPageFinished(view, url);
+                updateWorkspaceHistory(view.getProgress() == 100);
+            }
+        });
+
         onboardingBack = new OnBackPressedCallback(true) {
             @Override public void handleOnBackPressed() {
                 if (onboardingStep > 0) { onboardingStep--; showNativeOnboarding(null); }
@@ -144,12 +203,30 @@ public class MainActivity extends BridgeActivity {
         return getSharedPreferences(ONBOARDING_PREFERENCES, MODE_PRIVATE);
     }
 
+    private void updateWorkspaceHistory(boolean committed) {
+        WebView webView = getBridge().getWebView();
+        android.webkit.WebBackForwardList history = webView.copyBackForwardList();
+        int index = history.getCurrentIndex();
+        boolean visible = onboardingReady && onboardingOverlay == null && loginOverlay == null;
+        boolean workspace = visible && NativeWorkspaceHistory.isWorkspaceURL(webView.getUrl(), authConfig.origin);
+        if (NativeWorkspaceHistory.isAuthenticationURL(webView.getUrl())) workspaceHistory.beginSession();
+        workspaceHistory.update(index, workspace, committed);
+        historyBackAvailable = workspace && workspaceHistory.canGoBack(index) && index > 0
+            && NativeWorkspaceHistory.isWorkspaceURL(history.getItemAtIndex(index - 1).getUrl(), authConfig.origin);
+        // Public help/legal pages can host the same app drawer; history itself stays workspace-only.
+        historyBack.setEnabled(visible && NativeWorkspaceHistory.isSameOriginURL(webView.getUrl(), authConfig.origin)
+            && !NativeWorkspaceHistory.isAuthenticationURL(webView.getUrl()));
+    }
+
     static String completedUserAgent(String original) {
         return java.util.Arrays.asList(original.split("\\s+")).contains(ONBOARDING_MARKER)
             ? original : original + " " + ONBOARDING_MARKER;
     }
 
     private void showNativeOnboarding(String error) {
+        workspaceHistory.reset();
+        historyBackAvailable = false;
+        historyBack.setEnabled(false);
         if (onboardingOverlay != null) ((ViewGroup) onboardingOverlay.getParent()).removeView(onboardingOverlay);
         onboardingOverlay = new FrameLayout(this);
         onboardingOverlay.setBackgroundColor(Color.rgb(2, 6, 23));
@@ -224,12 +301,16 @@ public class MainActivity extends BridgeActivity {
         onboardingBack.setEnabled(false);
         if (onboardingOverlay != null) ((ViewGroup) onboardingOverlay.getParent()).removeView(onboardingOverlay);
         onboardingOverlay = null;
+        workspaceHistory.beginSession();
         if (hasSessionCookie(CookieManager.getInstance(), authConfig.origin)) webView.loadUrl(authConfig.driverUrl);
         else showNativeLogin();
     }
 
     private void showNativeLogin() {
         if (!onboardingReady || onboardingOverlay != null) return;
+        workspaceHistory.reset();
+        historyBackAvailable = false;
+        historyBack.setEnabled(false);
         loginOverlay = new FrameLayout(this);
         loginOverlay.setBackgroundColor(Color.rgb(2, 6, 23));
 
@@ -511,6 +592,7 @@ public class MainActivity extends BridgeActivity {
         ViewGroup parent = (ViewGroup) loginOverlay.getParent();
         if (parent != null) parent.removeView(loginOverlay);
         loginOverlay = null;
+        workspaceHistory.beginSession();
     }
 
     private boolean hasSessionCookie(CookieManager cookieManager, String origin) {
