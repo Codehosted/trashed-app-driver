@@ -38,8 +38,6 @@ if [[ "$MODE" == release ]]; then
   : "${TRASHED_ANDROID_KEY_PASSWORD:?missing TRASHED_ANDROID_KEY_PASSWORD}"
   export TRASHED_REQUIRE_SIGNING=true
   ./gradlew --no-daemon --stacktrace testReleaseUnitTest lintRelease assembleRelease bundleRelease
-  TRASHED_ANDROID_RELEASE_MANIFEST="$ROOT_DIR/android/app/build/intermediates/merged_manifests/release/processReleaseManifest/AndroidManifest.xml" \
-    node --test "$ROOT_DIR/tests/android-release.test.mjs"
 else
   unset TRASHED_ANDROID_KEYSTORE TRASHED_ANDROID_KEY_ALIAS TRASHED_ANDROID_KEYSTORE_PASSWORD TRASHED_ANDROID_KEY_PASSWORD TRASHED_REQUIRE_SIGNING
   ./gradlew --no-daemon --stacktrace testDebugUnitTest lintDebug assembleDebug
@@ -60,6 +58,11 @@ if [[ "$MODE" == release ]]; then
     APKSIGNER_BIN="$(find "$ANDROID_SDK_ROOT/build-tools" -mindepth 2 -maxdepth 2 -type f -name apksigner -print | sort -V | tail -1)"
   fi
   [[ -x "$APKSIGNER_BIN" ]] || { echo 'apksigner is required to verify release APKs' >&2; exit 1; }
+  AAPT2_BIN="$(dirname "$APKSIGNER_BIN")/aapt2"
+  [[ -x "$AAPT2_BIN" ]] || { echo 'aapt2 is required to verify release feature requirements' >&2; exit 1; }
+  TRASHED_ANDROID_RELEASE_MANIFEST="$ROOT_DIR/android/app/build/intermediates/merged_manifests/release/processReleaseManifest/AndroidManifest.xml" \
+    TRASHED_ANDROID_RELEASE_APK="$ROOT_DIR/$APK" TRASHED_ANDROID_AAPT2="$AAPT2_BIN" \
+    node --test "$ROOT_DIR/tests/android-release.test.mjs"
   export PATH="$(dirname "$APKSIGNER_BIN"):$PATH"
   apksigner verify --verbose --print-certs "$APK"
   jarsigner -verify -verbose -certs "$AAB" >/dev/null
