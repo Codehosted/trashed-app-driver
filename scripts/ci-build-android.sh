@@ -38,6 +38,8 @@ if [[ "$MODE" == release ]]; then
   : "${TRASHED_ANDROID_KEY_PASSWORD:?missing TRASHED_ANDROID_KEY_PASSWORD}"
   export TRASHED_REQUIRE_SIGNING=true
   ./gradlew --no-daemon --stacktrace testReleaseUnitTest lintRelease assembleRelease bundleRelease
+  TRASHED_ANDROID_RELEASE_MANIFEST="$ROOT_DIR/android/app/build/intermediates/merged_manifests/release/processReleaseManifest/AndroidManifest.xml" \
+    node --test "$ROOT_DIR/tests/android-release.test.mjs"
 else
   unset TRASHED_ANDROID_KEYSTORE TRASHED_ANDROID_KEY_ALIAS TRASHED_ANDROID_KEYSTORE_PASSWORD TRASHED_ANDROID_KEY_PASSWORD TRASHED_REQUIRE_SIGNING
   ./gradlew --no-daemon --stacktrace testDebugUnitTest lintDebug assembleDebug

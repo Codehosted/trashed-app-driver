@@ -31,3 +31,29 @@ test('release script rejects missing version metadata before installing or build
     assert.equal(result.stdout, '');
   }
 });
+
+function assertGpsOptional(manifest) {
+  const gps = [...manifest.matchAll(/<uses-feature\b[^>]*>/g)]
+    .map(([element]) => element)
+    .filter((element) => /android:name="android\.hardware\.location\.gps"/.test(element));
+  assert.equal(gps.length, 1, 'GPS must be explicitly declared once');
+  assert.match(gps[0], /android:required="false"/, 'vendor devices must not require GPS hardware');
+}
+
+test('general vendor app overrides the driver plugin GPS hardware requirement', () => {
+  const manifest = read('android/app/src/main/AndroidManifest.xml');
+  assertGpsOptional(manifest);
+  assert.match(manifest, /<uses-feature\b[^>]*android:name="android\.hardware\.location\.gps"[^>]*tools:replace="android:required"/);
+  assert.match(read('scripts/ci-build-android.sh'), /TRASHED_ANDROID_RELEASE_MANIFEST="\$ROOT_DIR\/android\/app\/build\/intermediates\/merged_manifests\/release\/processReleaseManifest\/AndroidManifest\.xml"\s*\\\s*node --test "\$ROOT_DIR\/tests\/android-release\.test\.mjs"/);
+  assert.throws(() => assertGpsOptional('<uses-feature android:name="android.hardware.location.gps" />'));
+  assert.throws(() => assertGpsOptional('<uses-feature android:name="android.hardware.location.gps" android:required="true" />'));
+});
+
+test('actual merged release manifest keeps GPS optional', {
+  skip: process.env.TRASHED_ANDROID_RELEASE_MANIFEST ? false : 'set TRASHED_ANDROID_RELEASE_MANIFEST after the release build',
+}, () => {
+  const manifest = readFileSync(process.env.TRASHED_ANDROID_RELEASE_MANIFEST, 'utf8');
+  assert.match(manifest, /package="com\.trashed\.driver"/);
+  assert.doesNotMatch(manifest, /android:debuggable="true"/);
+  assertGpsOptional(manifest);
+});
