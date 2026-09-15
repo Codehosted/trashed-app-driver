@@ -1,0 +1,38 @@
+{
+  "createdAt": "2026-09-14T21:01:13.604357+00:00",
+  "mode": "built-in image_gen",
+  "selectedOutput": "map-route-showcase-v3.png",
+  "sha256": "51d848477ea38dc04a3eeb58380dc25200e2b9e0a9f33c89b55e19fc3b2ff132",
+  "width": 851,
+  "height": 1848,
+  "status": "generated-concept-review-required",
+  "isActualAppScreenshot": false,
+  "storeUploaded": false,
+  "appCodeChanged": false,
+  "supersedes": "map-route-showcase-v2.png",
+  "editScope": "Upper-left brand lockup only: corrected lowercase a using existing Poppins Bold letter shapes; primary-colored standalone symbol and wordmark without background tile.",
+  "references": [
+    {
+      "file": "map-route-showcase-v2.png",
+      "sha256": "29faebd9704ff1417b9791bc1f7ab2d0ee8ed22d3d52ef911abd780bc420b4f8",
+      "role": "Edit target; preserved original version"
+    },
+    {
+      "file": "references/trashed-symbol-source.png",
+      "sha256": "142af07dee9315c42f091add904a32093a09eac0a6511f73a8dd22124f59fed3",
+      "role": "Unchanged real brand symbol copied from paired website public/images/trash_evolved_logo_black.png"
+    },
+    {
+      "file": "references/trashed-wordmark-poppins-bold.png",
+      "sha256": "7eb227bbc7550121cec0abaea74dfea2885f15d0af977ccc1a9d9d7c2bed7e4b",
+      "role": "Transparent typography reference rendered from the existing bundled store Poppins Bold font; not a new official brand asset"
+    }
+  ],
+  "promptSet": "map-route-showcase-v3-prompt.md",
+  "limitations": [
+    "AI-composed marketing concept, not navigational/cartographic or live product evidence",
+    "Typography and color are visually matched, not guaranteed pixel-exact vector reproduction",
+    "Logo has no separate backdrop; the entire artwork remains an opaque map composition",
+    "Needs creative approval and final store-size exports; not substituted into verified-capture manifest"
+  ]
+}

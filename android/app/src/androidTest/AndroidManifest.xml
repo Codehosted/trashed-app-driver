@@ -1,0 +1,8 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <application>
+        <!-- Separate test APK UID requires export; provider also checks emulator + exact test/target UIDs. -->
+        <provider android:name="com.trashed.driver.ByteExportTestProvider"
+            android:authorities="com.trashed.driver.test.byteexports"
+            android:exported="true" />
+    </application>
+</manifest>

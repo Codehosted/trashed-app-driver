@@ -43,8 +43,10 @@ if ! printf '%s' "$APPLE_AUTH_CONFIG" | python3 -c 'import json, sys; config = j
   exit 3
 fi
 
+node scripts/check-mobile-backend.mjs
+
 BUILD_NUMBER="${BUILD_NUMBER:-$(date +%Y%m%d%H%M)}"
-MARKETING_VERSION="${MARKETING_VERSION:-1.0.2}"
+MARKETING_VERSION="${MARKETING_VERSION:-1.0.3}"
 TEAM_ID="${DEVELOPMENT_TEAM_ID:-3BYF8CNWS2}"
 BUNDLE_ID="${BUNDLE_ID:-com.trashed.driver}"
 PROFILE_NAME="${PROVISIONING_PROFILE_SPECIFIER:-*[expo] com.trashed.driver AppStore 2025-12-07T19:19:09.367Z}"

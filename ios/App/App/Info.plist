@@ -5,7 +5,7 @@
 	<key>CFBundleDevelopmentRegion</key>
 	<string>en</string>
 	<key>CFBundleDisplayName</key>
-        <string>Trashed Driver</string>
+        <string>Trashed</string>
 	<key>CFBundleExecutable</key>
 	<string>$(EXECUTABLE_NAME)</string>
 	<key>CFBundleIdentifier</key>
@@ -63,13 +63,15 @@
 	<key>UIViewControllerBasedStatusBarAppearance</key>
 	<true/>
 	<key>NSCameraUsageDescription</key>
-	<string>Trashed Driver uses your camera to take photos of stops, completed work, and dumpsite tickets.</string>
+	<string>Trashed uses your camera to take photos of stops, completed work, and dumpsite tickets.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
-	<string>Trashed Driver lets you choose photos to attach to stops, dumpsite tickets, and dispatch messages.</string>
+	<string>Trashed lets you choose photos to attach to stops, dumpsite tickets, and dispatch messages.</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>Trashed uses your microphone when you choose to speak with Trisha or record a voice note during a call.</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
-	<string>Trashed Driver uses your location to update active route progress and show nearby stops.</string>
+	<string>Trashed uses your location while you are online as a driver so dispatch can see your position and you can find nearby stops.</string>
 	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
-	<string>Trashed Driver uses background location while a route is active so dispatchers can track delivery and pickup progress.</string>
+	<string>Trashed shares your location with dispatch while you are online as a driver, including when the app is in the background.</string>
 	<key>UIBackgroundModes</key>
 	<array>
 		<string>location</string>

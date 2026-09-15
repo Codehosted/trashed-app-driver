@@ -1,0 +1,11 @@
+# Smaller messaging label and Trisha nametag — v4
+
+Mode: built-in image_gen. App-store artwork only.
+
+Use case: precise-object-edit.
+Image1 is the Trisha app-store artwork edit target. Image2 is the real Trashed symbol, supporting logo reference only.
+Apply exactly these two changes:
+1. Make ONLY "Customer messaging." about 20% smaller, retaining its current thinner geometric sans-serif font, near-black color, words/punctuation, and left alignment. Keep it on one line. Move the EXISTING purple outlined chat-bubble icon directly beside this smaller label on the SAME row, just after the period with a neat short gap. Scale the icon down proportionally to approximately the line height so it reads as a companion glyph, not a huge ornament. Leave enough right-edge margin. Remove the icon from its old position beside Call Center and restore plain warm-white background there. Exactly one chat-bubble icon.
+2. Add a tasteful small physical name badge on Trisha's white polo shirt, on her left chest (viewer-right), fully visible above the bottom crop. It should look attached to the fabric, not a floating UI card: a simple slim matte-white nametag with a subtle edge/shadow and gentle perspective following the shirt. The badge contains the exact Trashed symbol from image2 rendered purple on the left and the name "Trisha" in crisp BLACK text on the right. Spell T-r-i-s-h-a exactly. Keep the badge readable but subordinate to her face. Do not add a lanyard or obscure her collar/buttons. No extra writing on the shirt.
+
+EVERYTHING ELSE IS LOCKED: "Call Center." and "Digital Assistant—" retain exact existing font, size, alignment and placement. The purple payoff "all in your phone." must remain exactly as it is—same text including lowercase and period, purple color, bold typeface, weight, size, position, baseline and letter spacing. Retain the top BLACK "trashed" wordmark and purple standalone symbol without background. Preserve Trisha's identity, face, hair, expression, headset, body and existing shirt apart from the badge; preserve portrait crop, scale, background and lower-right purple voice-wave glyph. No other new objects, layout changes, decorative panels, frames, gradients or text.

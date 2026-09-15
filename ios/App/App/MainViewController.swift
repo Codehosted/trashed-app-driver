@@ -13,6 +13,96 @@ private let driverSessionCookieNames = [
     "__Secure-authjs.session-token",
 ]
 
+private struct NativeOnboardingPage {
+    let title: String
+    let body: String
+    let image: String
+}
+
+private enum NativeOnboarding {
+    static let preferenceKey = "trashed.native.onboarding.version"
+    static let version = 1
+    static let marker = "TrashedOnboarding/1"
+    static let pages = [
+        NativeOnboardingPage(title: "Your waste service business in your pocket", body: "Manage orders, customers and your team wherever work takes you.", image: "onboarding_business"),
+        NativeOnboardingPage(title: "Real-time customer chat", body: "Keep customers in the loop with direct messages and quick replies.", image: "onboarding_chat"),
+        NativeOnboardingPage(title: "Hauler and dispatch", body: "Connect haulers and dispatch with live routes and clear stop details.", image: "onboarding_dispatch"),
+    ]
+
+    static func isComplete(_ defaults: UserDefaults = .standard) -> Bool {
+        defaults.integer(forKey: preferenceKey) >= version
+    }
+
+    static func complete(_ defaults: UserDefaults = .standard) {
+        defaults.set(version, forKey: preferenceKey)
+    }
+
+    static func completedUserAgent(_ original: String) -> String {
+        original.split(whereSeparator: { $0.isWhitespace }).contains(Substring(marker))
+            ? original : original + " " + marker
+    }
+}
+
+// Capacitor starts its first request during superclass initialization. Do not
+// load website code (or its permission prompts) until the native intro is done.
+private final class OnboardingWebView: WKWebView {
+    var appNavigationEnabled = false
+
+    override func load(_ request: URLRequest) -> WKNavigation? {
+        guard appNavigationEnabled else { return nil }
+        return super.load(request)
+    }
+}
+
+private struct NativeWorkspaceHistory {
+    private var floor: Int?
+    private var awaitingWorkspace = false
+
+    mutating func reset() { floor = nil; awaitingWorkspace = false }
+    mutating func beginSession() { reset(); awaitingWorkspace = true }
+
+    mutating func update(index: Int, workspace: Bool, committed: Bool) {
+        if awaitingWorkspace && workspace && committed && index >= 0 {
+            floor = index
+            awaitingWorkspace = false
+        } else if let floor = floor, index < floor { reset() }
+    }
+
+    func canGoBack(index: Int, current: URL?, back: URL?, origin: URL, visible: Bool) -> Bool {
+        guard visible, let floor = floor, index > floor else { return false }
+        return Self.isWorkspaceURL(current, origin: origin) && Self.isWorkspaceURL(back, origin: origin)
+    }
+
+    static func isBackSwipe(x: Double, y: Double) -> Bool { x >= 64 && x > abs(y) * 1.5 }
+
+    static func isBackSwipeStart(x: Double) -> Bool { x >= 0 && x <= 24 }
+
+    static func canBeginBackSwipe(startX: Double, x: Double, y: Double, touches: Int) -> Bool {
+        touches == 1 && isBackSwipeStart(x: startX) && x > 0 && x > abs(y) * 1.5
+    }
+
+    static func isAuthenticationURL(_ url: URL?) -> Bool {
+        guard let path = url?.path else { return false }
+        return path == "/app/login" || path == "/partners/login" || path.hasPrefix("/api/auth/")
+    }
+
+    static func isSameOriginURL(_ url: URL?, origin: URL) -> Bool {
+        guard let url = url, let scheme = origin.scheme, ["http", "https"].contains(scheme),
+              let host = origin.host, url.scheme == scheme, url.host?.lowercased() == host.lowercased(),
+              url.user == nil, url.password == nil, origin.user == nil, origin.password == nil,
+              (url.port ?? (scheme == "https" ? 443 : 80)) == (origin.port ?? (scheme == "https" ? 443 : 80)),
+              let path = URLComponents(url: url, resolvingAgainstBaseURL: false)?.percentEncodedPath.removingPercentEncoding,
+              !path.contains("\\"), !path.split(separator: "/").contains(where: { $0 == "." || $0 == ".." }) else { return false }
+        return true
+    }
+
+    static func isWorkspaceURL(_ url: URL?, origin: URL) -> Bool {
+        guard isSameOriginURL(url, origin: origin), let url = url,
+              let path = URLComponents(url: url, resolvingAgainstBaseURL: false)?.percentEncodedPath.removingPercentEncoding else { return false }
+        return ["/vendor", "/driver", "/calls", "/admin"].contains { path == $0 || path.hasPrefix($0 + "/") }
+    }
+}
+
 private enum DriverTheme: String {
     case dark
     case light
@@ -26,7 +116,7 @@ private struct DriverAuthConfig {
     }
 
     static func driverPath(theme: DriverTheme) -> String {
-        "/driver?source=trashed-driver-app&theme=\(theme.rawValue)"
+        "/app?source=trashed-app&theme=\(theme.rawValue)"
     }
 
     func driverURL(theme: DriverTheme) -> URL {
@@ -66,24 +156,53 @@ private struct NativeAppleCredential {
     let nonce: String
 }
 
-class MainViewController: CAPBridgeViewController {
+class MainViewController: CAPBridgeViewController, UIGestureRecognizerDelegate {
     private var nativeLoginController: UIHostingController<NativeDriverLoginView>?
+    private var nativeOnboardingController: UIHostingController<NativeAppOnboardingView>?
+    private var onboardingReady = false
     private var loginURLObservation: NSKeyValueObservation?
+    private var historyObservations: [NSKeyValueObservation] = []
+    private var workspaceHistory = NativeWorkspaceHistory()
+    private var historyEdgeGesture: UIPanGestureRecognizer?
+    private var historyGestureStart: (item: WKBackForwardListItem, url: URL)?
+    private var historyBackCheckPending = false
+    private static let dismissWebDialog = """
+    (() => {
+      if (!document.querySelector('[role=dialog][data-state=open], [role=alertdialog][data-state=open]')) return false;
+      document.dispatchEvent(new KeyboardEvent('keydown', {key:'Escape', code:'Escape', bubbles:true, cancelable:true}));
+      return true;
+    })()
+    """
     private var pendingAppleCredential: NativeAppleCredential?
 
-    override func webViewConfiguration(for instanceConfiguration: InstanceConfiguration) -> WKWebViewConfiguration {
-        let configuration = super.webViewConfiguration(for: instanceConfiguration)
-        configuration.userContentController.addUserScript(WKUserScript(
-            source: Self.driverSafeAreaScript,
-            injectionTime: .atDocumentEnd,
-            forMainFrameOnly: true
-        ))
-        return configuration
+    override func webView(with frame: CGRect, configuration: WKWebViewConfiguration) -> WKWebView {
+        OnboardingWebView(frame: frame, configuration: configuration)
+    }
+
+    override func capacitorDidLoad() {
+        super.capacitorDidLoad()
+        bridge?.registerPluginInstance(TrashedFileExportPlugin())
+        guard let webView = webView else { return }
+
+        // A native boundary protects every website screen and modal, not just
+        // driver controls with a particular CSS class. The status bar stays visible.
+        let container = UIView(frame: view.bounds)
+        container.backgroundColor = .systemBackground
+        view = container
+        webView.translatesAutoresizingMaskIntoConstraints = false
+        webView.scrollView.contentInsetAdjustmentBehavior = .never
+        container.addSubview(webView)
+        NSLayoutConstraint.activate([
+            webView.leadingAnchor.constraint(equalTo: container.safeAreaLayoutGuide.leadingAnchor),
+            webView.trailingAnchor.constraint(equalTo: container.safeAreaLayoutGuide.trailingAnchor),
+            webView.topAnchor.constraint(equalTo: container.safeAreaLayoutGuide.topAnchor),
+            webView.bottomAnchor.constraint(equalTo: container.safeAreaLayoutGuide.bottomAnchor),
+        ])
     }
 
     override func instanceDescriptor() -> InstanceDescriptor {
         let descriptor = super.instanceDescriptor()
-        let serverURL = descriptor.serverURL ?? bundledServerURLString() ?? "https://trashed.app/driver?source=trashed-driver-app"
+        let serverURL = descriptor.serverURL ?? bundledServerURLString() ?? "https://trashed.app/app?source=trashed-app"
         descriptor.serverURL = driverURLString(from: serverURL, theme: currentDriverTheme)
         return descriptor
     }
@@ -110,9 +229,9 @@ class MainViewController: CAPBridgeViewController {
             return serverURL
         }
 
-        components.path = "/driver"
+        components.path = "/app"
         components.queryItems = [
-            URLQueryItem(name: "source", value: "trashed-driver-app"),
+            URLQueryItem(name: "source", value: "trashed-app"),
             URLQueryItem(name: "theme", value: theme.rawValue),
         ]
         return components.url?.absoluteString ?? serverURL
@@ -124,8 +243,25 @@ class MainViewController: CAPBridgeViewController {
         webView?.scrollView.bounces = false
         navigationController?.setNavigationBarHidden(true, animated: false)
         navigationController?.setToolbarHidden(true, animated: false)
+        if let webView = webView {
+            webView.allowsBackForwardNavigationGestures = false
+            let edge = UIPanGestureRecognizer(target: self, action: #selector(handleHistoryEdge(_:)))
+            edge.maximumNumberOfTouches = 1
+            edge.delegate = self
+            edge.isEnabled = false
+            view.addGestureRecognizer(edge)
+            // Center/vertical gestures fail our edge gate and keep normal WebView scrolling.
+            webView.scrollView.panGestureRecognizer.require(toFail: edge)
+            historyEdgeGesture = edge
+            historyObservations = [
+                webView.observe(\.canGoBack, options: [.new]) { [weak self] _, _ in self?.updateHistoryGestures() },
+                webView.observe(\.isLoading, options: [.new]) { [weak self] _, _ in self?.updateHistoryGestures() },
+            ]
+        }
         loginURLObservation = webView?.observe(\.url, options: [.new]) { [weak self] webView, _ in
             guard let self = self, let url = webView.url else { return }
+            self.updateHistoryGestures()
+            guard self.onboardingReady else { return }
             let config = self.makeDriverAuthConfig()
             guard url.scheme == config.origin.scheme,
                   url.host == config.origin.host,
@@ -139,7 +275,17 @@ class MainViewController: CAPBridgeViewController {
             webView.stopLoading()
             self.presentNativeLogin(config)
         }
-        showNativeLoginIfNeeded()
+        // This local blank page supplies the original WebKit UA without a network request.
+        webView?.loadHTMLString("<html><body></body></html>", baseURL: nil)
+        if NativeOnboarding.isComplete() {
+            prepareCompletedOnboarding { [weak self] error in
+                guard let self = self else { return }
+                if error == nil { self.showNativeLoginIfNeeded() }
+                else { self.presentNativeOnboarding() }
+            }
+        } else {
+            presentNativeOnboarding()
+        }
     }
 
     override var prefersStatusBarHidden: Bool {
@@ -162,8 +308,130 @@ class MainViewController: CAPBridgeViewController {
         traitCollection.userInterfaceStyle == .light ? .light : .dark
     }
 
-    private func showNativeLoginIfNeeded() {
+    private func updateHistoryGestures() {
+        // Read the finalized history list after the URL/loading KVO notification (including pushState/popstate).
+        DispatchQueue.main.async { [weak self] in
+            guard let self = self, let webView = self.webView else { return }
+            let origin = self.makeDriverAuthConfig().origin
+            let visible = self.onboardingReady && self.nativeOnboardingController == nil && self.nativeLoginController == nil
+            let history = webView.backForwardList
+            if NativeWorkspaceHistory.isAuthenticationURL(webView.url) { self.workspaceHistory.beginSession() }
+            self.workspaceHistory.update(index: history.backList.count,
+                workspace: visible && NativeWorkspaceHistory.isWorkspaceURL(webView.url, origin: origin), committed: !webView.isLoading)
+            self.historyEdgeGesture?.isEnabled = visible && !webView.isLoading
+                && NativeWorkspaceHistory.isSameOriginURL(webView.url, origin: origin)
+                && !NativeWorkspaceHistory.isAuthenticationURL(webView.url)
+        }
+    }
+
+    func gestureRecognizer(_ gestureRecognizer: UIGestureRecognizer, shouldRecognizeSimultaneouslyWith otherGestureRecognizer: UIGestureRecognizer) -> Bool {
+        guard gestureRecognizer === historyEdgeGesture, let webView = webView,
+              otherGestureRecognizer.view?.isDescendant(of: webView) == true else { return false }
+        // WebKit's DOM touch/scroll-lock recognizers must not swallow an admitted
+        // native edge Back. Ordinary manipulation gestures keep their precedence.
+        return !(otherGestureRecognizer is UIPanGestureRecognizer
+            || otherGestureRecognizer is UIPinchGestureRecognizer
+            || otherGestureRecognizer is UIRotationGestureRecognizer
+            || otherGestureRecognizer is UITapGestureRecognizer
+            || otherGestureRecognizer is UILongPressGestureRecognizer)
+    }
+
+    func gestureRecognizer(_ gestureRecognizer: UIGestureRecognizer, shouldReceive touch: UITouch) -> Bool {
+        guard gestureRecognizer === historyEdgeGesture else { return true }
+        return touch.type == .direct && NativeWorkspaceHistory.isBackSwipeStart(x: Double(touch.location(in: view).x))
+    }
+
+    func gestureRecognizerShouldBegin(_ gestureRecognizer: UIGestureRecognizer) -> Bool {
+        guard gestureRecognizer === historyEdgeGesture, let pan = gestureRecognizer as? UIPanGestureRecognizer else { return true }
+        let delta = pan.translation(in: view)
+        let startX = pan.location(in: view).x - delta.x
+        return NativeWorkspaceHistory.canBeginBackSwipe(startX: Double(startX), x: Double(delta.x),
+            y: Double(delta.y), touches: pan.numberOfTouches)
+    }
+
+    @objc private func handleHistoryEdge(_ gesture: UIPanGestureRecognizer) {
         guard let webView = webView else { return }
+        let history = webView.backForwardList
+        if gesture.state == .began {
+            if let item = history.currentItem, let url = webView.url { historyGestureStart = (item, url) }
+            return
+        }
+        guard gesture.state == .ended else {
+            if gesture.state == .cancelled || gesture.state == .failed { historyGestureStart = nil }
+            return
+        }
+        defer { historyGestureStart = nil }
+        let delta = gesture.translation(in: view)
+        guard let start = historyGestureStart, !historyBackCheckPending,
+              NativeWorkspaceHistory.isBackSwipe(x: Double(delta.x), y: Double(delta.y)),
+              history.currentItem === start.item, webView.url == start.url else { return }
+        let target = history.backItem
+        historyBackCheckPending = true
+        webView.evaluateJavaScript(Self.dismissWebDialog) { [weak self] result, error in
+            guard let self = self else { return }
+            self.historyBackCheckPending = false
+            // The script may finish after navigation, session expiry, or a native overlay appears.
+            let visible = self.onboardingReady && self.nativeOnboardingController == nil && self.nativeLoginController == nil
+            guard error == nil, result as? Bool == false, visible, !webView.isLoading,
+                  webView.url == start.url, history.currentItem === start.item,
+                  let target = target, history.backItem === target,
+                  self.workspaceHistory.canGoBack(index: history.backList.count, current: webView.url,
+                    back: target.url, origin: self.makeDriverAuthConfig().origin, visible: visible) else { return }
+            webView.go(to: target) // Exact validated item; standard swipe skipping is deliberately disabled.
+        }
+    }
+
+    private func presentNativeOnboarding() {
+        workspaceHistory.reset()
+        webView?.allowsBackForwardNavigationGestures = false
+        historyEdgeGesture?.isEnabled = false
+        guard nativeOnboardingController == nil else { return }
+        let intro = NativeAppOnboardingView { [weak self] completion in
+            NativeOnboarding.complete()
+            self?.prepareCompletedOnboarding { error in
+                completion(error)
+                guard error == nil, let self = self else { return }
+                self.nativeOnboardingController?.willMove(toParent: nil)
+                self.nativeOnboardingController?.view.removeFromSuperview()
+                self.nativeOnboardingController?.removeFromParent()
+                self.nativeOnboardingController = nil
+                self.showNativeLoginIfNeeded()
+            }
+        }
+        let controller = UIHostingController(rootView: intro)
+        addChild(controller)
+        controller.view.translatesAutoresizingMaskIntoConstraints = false
+        view.addSubview(controller.view)
+        NSLayoutConstraint.activate([
+            controller.view.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+            controller.view.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+            controller.view.topAnchor.constraint(equalTo: view.topAnchor),
+            controller.view.bottomAnchor.constraint(equalTo: view.bottomAnchor),
+        ])
+        controller.didMove(toParent: self)
+        nativeOnboardingController = controller
+    }
+
+    private func prepareCompletedOnboarding(completion: @escaping (String?) -> Void) {
+        guard NativeOnboarding.isComplete(), let webView = webView as? OnboardingWebView else {
+            completion("Unable to prepare the app. Please try again.")
+            return
+        }
+        webView.evaluateJavaScript("navigator.userAgent") { [weak self] result, _ in
+            guard let self = self, let original = result as? String, !original.isEmpty else {
+                completion("Unable to prepare the app. Please try again.")
+                return
+            }
+            // Preserve the entire system/configured UA. This token affects walkthrough UI only.
+            webView.customUserAgent = NativeOnboarding.completedUserAgent(original)
+            self.onboardingReady = true
+            webView.appNavigationEnabled = true
+            completion(nil)
+        }
+    }
+
+    private func showNativeLoginIfNeeded() {
+        guard onboardingReady, let webView = webView else { return }
         let config = makeDriverAuthConfig()
 
         webView.stopLoading()
@@ -173,7 +441,7 @@ class MainViewController: CAPBridgeViewController {
 
         webView.configuration.websiteDataStore.httpCookieStore.getAllCookies { [weak self] cookies in
             DispatchQueue.main.async {
-                guard let self = self else { return }
+                guard let self = self, self.onboardingReady, self.nativeOnboardingController == nil else { return }
                 if self.hasSessionCookie(in: cookies, for: config) {
                     self.removeNativeLogin()
                     self.loadDriverApp(config)
@@ -200,11 +468,14 @@ class MainViewController: CAPBridgeViewController {
     }
 
     private func presentNativeLogin(_ config: DriverAuthConfig) {
+        guard onboardingReady, nativeOnboardingController == nil else { return }
+        workspaceHistory.reset()
+        webView?.allowsBackForwardNavigationGestures = false
+        historyEdgeGesture?.isEnabled = false
         pendingAppleCredential = nil
         removeNativeLogin()
 
-        // CAPBridgeViewController's root view is the WKWebView. Hiding the WebView
-        // also hides native child views, so keep it visible and cover it instead.
+        // Keep the WebView session alive underneath the native sign-in view.
         webView?.isHidden = false
 
         let loginView = NativeDriverLoginView(
@@ -246,6 +517,10 @@ class MainViewController: CAPBridgeViewController {
     }
 
     private func loadDriverApp(_ config: DriverAuthConfig) {
+        guard onboardingReady, nativeOnboardingController == nil else { return }
+        workspaceHistory.beginSession()
+        webView?.allowsBackForwardNavigationGestures = false
+        historyEdgeGesture?.isEnabled = false
         webView?.isHidden = false
         webView?.load(URLRequest(url: config.driverURL(theme: currentDriverTheme)))
     }
@@ -565,28 +840,141 @@ class MainViewController: CAPBridgeViewController {
         return message
     }
 
-    private static let driverSafeAreaScript = """
-    (function () {
-      var viewport = document.querySelector('meta[name="viewport"]');
-      if (viewport && viewport.content.indexOf('viewport-fit=cover') === -1) {
-        viewport.content = viewport.content + ', viewport-fit=cover';
-      }
-      if (document.getElementById('trashed-ios-safe-area')) return;
+}
 
-      var style = document.createElement('style');
-      style.id = 'trashed-ios-safe-area';
-      style.textContent = [
-        ':root { --trashed-ios-safe-top: env(safe-area-inset-top, 0px); }',
-        '@supports (top: env(safe-area-inset-top)) {',
-        '  .absolute.top-0, .fixed.top-0, .sticky.top-0 { top: var(--trashed-ios-safe-top) !important; }',
-        '  .absolute.top-3, .fixed.top-3, .sticky.top-3 { top: calc(var(--trashed-ios-safe-top) + 0.75rem) !important; }',
-        '  .absolute.top-4, .fixed.top-4, .sticky.top-4 { top: calc(var(--trashed-ios-safe-top) + 1rem) !important; }',
-        '  .absolute.top-6, .fixed.top-6, .sticky.top-6 { top: calc(var(--trashed-ios-safe-top) + 1.5rem) !important; }',
-        '}'
-      ].join('\\n');
-      document.head.appendChild(style);
-    })();
-    """
+private struct NativeAppOnboardingView: View {
+    let finish: (@escaping (String?) -> Void) -> Void
+    @Environment(\.colorScheme) private var colorScheme
+    @State private var step = 0
+    @State private var preparing = false
+    @State private var errorMessage: String?
+
+    // Match the website's flat primary; never inherit a system-green action.
+    private let primary = Color(red: 112 / 255, green: 51 / 255, blue: 1)
+    private var foreground: Color { colorScheme == .dark ? .white : Color(red: 0.13, green: 0.10, blue: 0.17) }
+    private var background: Color { colorScheme == .dark ? Color(red: 0.08, green: 0.07, blue: 0.10) : Color(red: 0.98, green: 0.98, blue: 0.99) }
+    private var muted: Color { colorScheme == .dark ? Color(red: 0.75, green: 0.72, blue: 0.80) : Color(red: 0.38, green: 0.35, blue: 0.43) }
+    private var surface: Color { colorScheme == .dark ? Color(red: 0.16, green: 0.13, blue: 0.20) : Color(red: 0.94, green: 0.92, blue: 0.98) }
+
+    var body: some View {
+        GeometryReader { geometry in
+            VStack(spacing: 0) {
+                HStack(spacing: 8) {
+                    Image("onboarding_symbol")
+                        .renderingMode(.template)
+                        .resizable()
+                        .scaledToFit()
+                        .frame(width: 28, height: 28)
+                        .foregroundColor(primary)
+                        .accessibilityHidden(true)
+                    Image("onboarding_wordmark")
+                        .renderingMode(.template)
+                        .resizable()
+                        .scaledToFit()
+                        .frame(width: 120, height: 28)
+                        .foregroundColor(foreground)
+                        .accessibilityLabel("Trashed")
+                        .accessibilityIdentifier("native-onboarding-brand")
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.bottom, 20)
+                ScrollView {
+                    pageContent(heroHeight: min(300, max(140, geometry.size.height * 0.38)))
+                        .padding(.bottom, 20)
+                }
+                .id(step)
+                actions
+            }
+            .padding(.horizontal, 24)
+            .padding(.top, 20)
+            .padding(.bottom, 12)
+            .frame(maxWidth: 640)
+            .frame(maxWidth: .infinity)
+        }
+        .foregroundColor(foreground)
+        .background(background.edgesIgnoringSafeArea(.all))
+    }
+
+    private func pageContent(heroHeight: CGFloat) -> some View {
+        let page = NativeOnboarding.pages[step]
+        return VStack(alignment: .leading, spacing: 14) {
+            Image(page.image)
+                .resizable()
+                .scaledToFit()
+                .frame(maxWidth: .infinity)
+                .frame(height: heroHeight)
+                .accessibilityHidden(true)
+                .accessibilityIdentifier("native-onboarding-hero")
+            Text(page.title)
+                .font(.title.bold())
+                .fixedSize(horizontal: false, vertical: true)
+                .accessibilityAddTraits(.isHeader)
+                .accessibilityIdentifier("native-onboarding-title")
+            Text(page.body)
+                .font(.body)
+                .foregroundColor(muted)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private var actions: some View {
+        VStack(spacing: 8) {
+            HStack {
+                Button {
+                    if step == 0 { complete() } else { step -= 1 }
+                } label: {
+                    Text(step == 0 ? "Skip" : "Back")
+                        .font(.subheadline.weight(.semibold))
+                        .frame(minWidth: 64, minHeight: 44)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .disabled(preparing)
+                .accessibilityIdentifier("native-onboarding-back")
+                Spacer()
+                HStack(spacing: 6) {
+                    ForEach(NativeOnboarding.pages.indices) { index in
+                        Capsule().fill(index == step ? primary : surface)
+                            .frame(width: index == step ? 24 : 8, height: 8)
+                    }
+                }
+                .accessibilityHidden(true)
+                Spacer()
+                Text("\(step + 1) of \(NativeOnboarding.pages.count)")
+                    .font(.caption)
+                    .foregroundColor(muted)
+                    .accessibilityIdentifier("native-onboarding-progress")
+            }
+            if let errorMessage {
+                Text(errorMessage).font(.subheadline).foregroundColor(.red)
+            }
+            Button {
+                if step == NativeOnboarding.pages.count - 1 { complete() } else { step += 1 }
+            } label: {
+                Text(preparing ? "Preparing..." : step == NativeOnboarding.pages.count - 1 ? "Get started" : "Next")
+                    .font(.headline)
+                    .padding(.horizontal, 18)
+                    .frame(maxWidth: .infinity, minHeight: 54)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .background(primary)
+            .foregroundColor(.white)
+            .cornerRadius(14)
+            .disabled(preparing)
+            .accessibilityIdentifier("native-onboarding-next")
+        }
+    }
+
+    private func complete() {
+        preparing = true
+        errorMessage = nil
+        finish { error in
+            preparing = false
+            errorMessage = error
+        }
+    }
 }
 
 private struct NativeDriverLoginView: View {
@@ -605,6 +993,8 @@ private struct NativeDriverLoginView: View {
     @State private var appleNonce: String?
     @State private var appleLinkPending = false
 
+    private let primary = Color(red: 112 / 255, green: 51 / 255, blue: 1)
+
     private var canSubmit: Bool {
         !email.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && !password.isEmpty && !isSubmitting && !isGoogleSubmitting && !isAppleSubmitting
     }
@@ -614,31 +1004,31 @@ private struct NativeDriverLoginView: View {
     }
 
     private var logoColor: Color {
-        isLightMode ? Color(red: 0.05, green: 0.08, blue: 0.13) : .white
+        isLightMode ? Color(red: 0.13, green: 0.10, blue: 0.17) : .white
     }
 
     private var primaryTextColor: Color {
-        isLightMode ? Color(red: 0.06, green: 0.09, blue: 0.16) : .white
+        isLightMode ? Color(red: 0.13, green: 0.10, blue: 0.17) : .white
     }
 
     private var secondaryTextColor: Color {
-        isLightMode ? Color(red: 0.29, green: 0.35, blue: 0.43) : .white.opacity(0.68)
+        isLightMode ? Color(red: 0.38, green: 0.35, blue: 0.43) : .white.opacity(0.68)
     }
 
     private var mutedTextColor: Color {
-        isLightMode ? Color(red: 0.43, green: 0.49, blue: 0.58) : .white.opacity(0.52)
+        isLightMode ? Color(red: 0.38, green: 0.35, blue: 0.43) : .white.opacity(0.52)
     }
 
     private var labelTextColor: Color {
-        isLightMode ? Color(red: 0.19, green: 0.24, blue: 0.33) : .white.opacity(0.82)
+        isLightMode ? Color(red: 0.13, green: 0.10, blue: 0.17) : .white.opacity(0.82)
     }
 
     private var dividerColor: Color {
-        isLightMode ? Color(red: 0.80, green: 0.84, blue: 0.90) : .white.opacity(0.16)
+        isLightMode ? Color(red: 0.85, green: 0.82, blue: 0.88) : .white.opacity(0.16)
     }
 
     private var disabledButtonColor: Color {
-        isLightMode ? Color(red: 0.71, green: 0.76, blue: 0.84) : .white.opacity(0.16)
+        isLightMode ? Color(red: 0.90, green: 0.88, blue: 0.93) : .white.opacity(0.16)
     }
 
     private var errorTextColor: Color {
@@ -650,15 +1040,11 @@ private struct NativeDriverLoginView: View {
     }
 
     private var footnoteTextColor: Color {
-        isLightMode ? Color(red: 0.43, green: 0.49, blue: 0.58) : .white.opacity(0.48)
+        isLightMode ? Color(red: 0.38, green: 0.35, blue: 0.43) : .white.opacity(0.48)
     }
 
     private var cardStrokeColor: Color {
-        isLightMode ? Color(red: 0.82, green: 0.86, blue: 0.91) : .white.opacity(0.12)
-    }
-
-    private var cardShadowColor: Color {
-        isLightMode ? Color(red: 0.15, green: 0.23, blue: 0.35).opacity(0.12) : Color.black.opacity(0.28)
+        isLightMode ? Color(red: 0.89, green: 0.86, blue: 0.92) : .white.opacity(0.12)
     }
 
     private var logoImage: Image {
@@ -689,16 +1075,16 @@ private struct NativeDriverLoginView: View {
                             .frame(width: 104, height: 82)
                             .accessibilityHidden(true)
 
-                        Text("Trashed Driver")
+                        Text("Trashed")
                             .font(.system(size: 16, weight: .semibold, design: .rounded))
                             .foregroundColor(secondaryTextColor)
                     }
 
                     VStack(spacing: 8) {
-                        Text("Driver Sign In")
+                        Text("Sign in to Trashed")
                             .font(.system(size: 30, weight: .bold, design: .rounded))
                             .foregroundColor(primaryTextColor)
-                        Text("Sign in to open your route, stops, and dispatch messages.")
+                        Text("Manage your waste services business on-the-go with AI features")
                             .font(.system(size: 15, weight: .regular))
                             .foregroundColor(secondaryTextColor)
                             .multilineTextAlignment(.center)
@@ -724,25 +1110,26 @@ private struct NativeDriverLoginView: View {
                             HStack(spacing: 10) {
                                 if isGoogleSubmitting {
                                     ProgressView()
-                                        .progressViewStyle(CircularProgressViewStyle(tint: Color(red: 0.08, green: 0.10, blue: 0.16)))
+                                        .progressViewStyle(CircularProgressViewStyle(tint: primaryTextColor))
                                 }
                                 Text("G")
                                     .font(.system(size: 17, weight: .bold, design: .rounded))
                                 Text(isGoogleSubmitting ? "Signing in with Google..." : "Continue with Google")
-                                    .font(.system(size: 15, weight: .semibold))
+                                    .font(.system(size: 17, weight: .medium))
                             }
-                            .frame(maxWidth: .infinity)
-                            .padding(.vertical, 14)
-                            .background(Color.white)
-                            .foregroundColor(Color(red: 0.08, green: 0.10, blue: 0.16))
+                            .padding(.horizontal, 14)
+                            .frame(maxWidth: .infinity, minHeight: 50)
+                            .background(cardBackground)
+                            .foregroundColor(primaryTextColor)
                             .cornerRadius(14)
-                            .shadow(color: cardShadowColor, radius: 10, x: 0, y: 6)
+                            .overlay(RoundedRectangle(cornerRadius: 14).stroke(dividerColor, lineWidth: 1))
                         }
+                        .buttonStyle(.plain)
                         .disabled(isSubmitting || isGoogleSubmitting || isAppleSubmitting || appleLinkPending)
                         .accessibilityIdentifier("native-driver-google-sign-in")
 
                         if appleLinkPending {
-                            Text("One-time setup: sign in with your existing Trashed email and password below to link Apple. Your Apple email can stay private. No new driver account will be created.")
+                            Text("One-time setup: sign in with your existing Trashed email and password below to link Apple. Your Apple email can stay private. No new account will be created.")
                                 .font(.system(size: 13))
                                 .foregroundColor(secondaryTextColor)
                                 .accessibilityIdentifier("native-driver-apple-link-notice")
@@ -775,7 +1162,7 @@ private struct NativeDriverLoginView: View {
                                 .padding(14)
                                 .background(fieldBackground)
                                 .foregroundColor(primaryTextColor)
-                                .accentColor(Color(red: 0.12, green: 0.74, blue: 0.45))
+                                .accentColor(primary)
                                 .accessibilityIdentifier("native-driver-email")
                         }
 
@@ -788,7 +1175,7 @@ private struct NativeDriverLoginView: View {
                                 .padding(14)
                                 .background(fieldBackground)
                                 .foregroundColor(primaryTextColor)
-                                .accentColor(Color(red: 0.12, green: 0.74, blue: 0.45))
+                                .accentColor(primary)
                                 .accessibilityIdentifier("native-driver-password")
                         }
 
@@ -810,14 +1197,15 @@ private struct NativeDriverLoginView: View {
                                         .progressViewStyle(CircularProgressViewStyle(tint: .white))
                                 }
                                 Text(isSubmitting ? "Signing In..." : "Sign In")
-                                    .font(.system(size: 16, weight: .bold))
+                                    .font(.system(size: 17, weight: .medium))
                             }
-                            .frame(maxWidth: .infinity)
-                            .padding(.vertical, 15)
-                            .background(canSubmit ? Color(red: 0.12, green: 0.74, blue: 0.45) : disabledButtonColor)
-                            .foregroundColor(.white)
+                            .padding(.horizontal, 14)
+                            .frame(maxWidth: .infinity, minHeight: 50)
+                            .background(canSubmit ? primary : disabledButtonColor)
+                            .foregroundColor(canSubmit ? .white : secondaryTextColor)
                             .cornerRadius(14)
                         }
+                        .buttonStyle(.plain)
                         .disabled(!canSubmit)
                         .accessibilityIdentifier("native-driver-sign-in")
                     }
@@ -828,9 +1216,8 @@ private struct NativeDriverLoginView: View {
                         RoundedRectangle(cornerRadius: 28)
                             .stroke(cardStrokeColor, lineWidth: 1)
                     )
-                    .shadow(color: cardShadowColor, radius: 24, x: 0, y: 18)
 
-                    Text("Need driver access? Ask your dispatcher or account admin to add you. By signing in, you agree to the Trashed Terms and Privacy Policy.")
+                    Text("Need access? Ask your account administrator to add you. By signing in, you agree to the Trashed Terms and Privacy Policy.")
                         .font(.system(size: 12))
                         .foregroundColor(footnoteTextColor)
                         .multilineTextAlignment(.center)
@@ -844,28 +1231,15 @@ private struct NativeDriverLoginView: View {
 
     private var fieldBackground: some View {
         RoundedRectangle(cornerRadius: 14)
-            .fill(isLightMode ? Color.white : Color.white.opacity(0.08))
+            .fill(isLightMode ? Color(red: 0.98, green: 0.97, blue: 0.99) : Color(red: 0.16, green: 0.13, blue: 0.20))
             .overlay(
                 RoundedRectangle(cornerRadius: 14)
-                    .stroke(isLightMode ? Color(red: 0.79, green: 0.84, blue: 0.91) : Color.white.opacity(0.14), lineWidth: 1)
+                    .stroke(isLightMode ? Color(red: 0.85, green: 0.82, blue: 0.88) : Color.white.opacity(0.14), lineWidth: 1)
             )
     }
 
-    private var cardBackground: some View {
-        LinearGradient(
-            gradient: Gradient(colors: isLightMode
-                ? [
-                    Color.white.opacity(0.96),
-                    Color(red: 0.94, green: 0.97, blue: 1.0).opacity(0.92),
-                ]
-                : [
-                    Color.white.opacity(0.16),
-                    Color.white.opacity(0.08),
-                ]
-            ),
-            startPoint: .topLeading,
-            endPoint: .bottomTrailing
-        )
+    private var cardBackground: Color {
+        isLightMode ? .white : Color(red: 0.12, green: 0.10, blue: 0.15)
     }
 
     private func submit() {
@@ -937,23 +1311,23 @@ private struct DriverLoginMapBackground: View {
     ]
 
     private var baseColor: Color {
-        isLightMode ? Color(red: 0.94, green: 0.96, blue: 0.97) : Color(red: 0.04, green: 0.04, blue: 0.04)
+        isLightMode ? Color(red: 0.98, green: 0.98, blue: 0.99) : Color(red: 0.08, green: 0.07, blue: 0.10)
     }
 
     private var tileRoadColor: Color {
-        isLightMode ? Color(red: 0.58, green: 0.64, blue: 0.72) : Color(red: 0.20, green: 0.24, blue: 0.31)
+        isLightMode ? Color(red: 0.72, green: 0.68, blue: 0.76) : Color(red: 0.16, green: 0.13, blue: 0.20)
     }
 
     private var routeGlowColor: Color {
-        isLightMode ? Color(red: 0.23, green: 0.51, blue: 0.96) : Color(red: 0.31, green: 0.27, blue: 0.90)
+        Color(red: 112 / 255, green: 51 / 255, blue: 1)
     }
 
     private var routeSurfaceColor: Color {
-        isLightMode ? Color(red: 0.58, green: 0.64, blue: 0.72) : Color(red: 0.12, green: 0.16, blue: 0.23)
+        isLightMode ? Color(red: 0.86, green: 0.82, blue: 0.91) : Color(red: 0.25, green: 0.20, blue: 0.29)
     }
 
     private var routeCenterColor: Color {
-        isLightMode ? .white : Color(red: 0.39, green: 0.40, blue: 0.95)
+        isLightMode ? .white : Color(red: 112 / 255, green: 51 / 255, blue: 1)
     }
 
     var body: some View {

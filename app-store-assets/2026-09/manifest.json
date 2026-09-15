@@ -1,0 +1,120 @@
+{
+  "schemaVersion": 1,
+  "artDirection": "Flat Trashed OG",
+  "palette": {
+    "background": "#faf9fc",
+    "foreground": "#211a2b",
+    "muted": "#eeeaf3",
+    "secondary": "#625a6d",
+    "primary": "#7434ce"
+  },
+  "renderer": {
+    "sharp": "0.35.4",
+    "vips": "8.18.6",
+    "pango": "1.58.2"
+  },
+  "generatedFromConfig": "app-store-assets/2026-09/config.json",
+  "configSha256": "aea3d1ff4ed798d8f81552ba5819c0c87c255185b16949baa5bfa52f7be51036",
+  "generatorSha256": "eaa0041d0ab86b08a7afa242004685bc18c3c256a7cecbe0c54cb4346e91fb70",
+  "font": {
+    "file": "app-store-assets/2026-09/fonts/Poppins-Bold.ttf",
+    "sha256": "1984efdda0fbe207d7ac20feac2ba7c2768c92a90094b02a206c9d58cc30ff2e"
+  },
+  "icon": {
+    "file": "app-store-assets/artwork/trashed-driver-icon-1024.png",
+    "sha256": "8e9229a463f650762b8cf1404da0050dbfeed566f33cf26884ccf1df97ed7322"
+  },
+  "assets": [
+    {
+      "file": "app-store-assets/2026-09/ios-cover-review-1320x2868.png",
+      "platform": "ios",
+      "width": 1320,
+      "height": 2868,
+      "colorType": 2,
+      "hasAlpha": false,
+      "sha256": "f55584d2e9c0037325d30810f8595d45bbd5bdcdb340dc82c53a5698150e6a54",
+      "status": "review-required",
+      "source": {
+        "file": "app-store-assets/sources/2026-09/ios-customers.png",
+        "sha256": "b0559d79589f275da61b61c997e85196cb2e1263fba9308b363d6efa53b3b397",
+        "platform": "ios",
+        "status": "verified-current",
+        "capturedAt": "2026-09-14T15:15:24-04:00",
+        "reviewedBy": "Codex root release task and artwork subagent; visually inspected iOS simulator capture",
+        "captureUrl": "http://localhost:3000/vendor/customers",
+        "provenance": "Actual iPhone 17 Pro Max iOS 26.5 simulator capture of the current vendor Customers page. Read-only navigation on the approved localhost development instance, with three disposable example.invalid customer fixtures (not real customer data). No UI redrawn or completed orders invented by the artwork generator. Root release task verified safe status/menu/bottom controls and no covering modal. Source review is not App Store approval.",
+        "width": 1320,
+        "height": 2868,
+        "colorType": 6,
+        "hasAlpha": true
+      },
+      "transform": "contained proportional resize; no UI redraw, no screenshot crop, no device chrome added"
+    },
+    {
+      "file": "app-store-assets/2026-09/android-cover-review-1080x1920.png",
+      "platform": "android",
+      "width": 1080,
+      "height": 1920,
+      "colorType": 2,
+      "hasAlpha": false,
+      "sha256": "8cd7c241aab980b984cc8c535596237677f70e549b14fc0a555eb6d6058de86d",
+      "status": "review-required",
+      "source": {
+        "file": "app-store-assets/sources/2026-09/android-native-login.png",
+        "sha256": "bd898d34a82ae806b3a29053589653178fef900789848e9e6b667b2042477516",
+        "platform": "android",
+        "status": "verified-current",
+        "capturedAt": "2026-09-14T16:11:01-04:00",
+        "reviewedBy": "Codex root release task and artwork subagent; independently visually inspected corrected native login",
+        "captureUrl": "http://localhost:3000/app?source=trashed-app",
+        "captureMethod": "Android instrumentation UiAutomation.takeScreenshot after native title assertion, before synthetic fixture",
+        "appPackage": "com.trashed.driver",
+        "androidApi": 36,
+        "installedApkSha256": "b809f8d59764133081fef42fc1e956330fdab690996e93fabd08afd84fe8e663",
+        "provenance": "Untouched native Trashed login on disposable TrashedReleaseApi36 emulator. Packaged application uses the approved localhost development instance. Native dark status/navigation frame and white system icons corrected in application source, then captured and independently reviewed. No authentication, orders, phone navigation, or image retouch before this capture. Source review is not Google Play approval.",
+        "width": 1080,
+        "height": 2400,
+        "colorType": 2,
+        "hasAlpha": false
+      },
+      "transform": "contained proportional resize; no UI redraw, no screenshot crop, no device chrome added"
+    },
+    {
+      "file": "app-store-assets/2026-09/ios-onboarding-review-1320x2868.png",
+      "platform": "ios",
+      "width": 1320,
+      "height": 2868,
+      "colorType": 2,
+      "hasAlpha": false,
+      "sha256": "79a52a9dc0e52a043616ae731fb76bba29f1ca895723c736c23be3d22ff753ad",
+      "status": "review-required",
+      "source": {
+        "file": "app-store-assets/sources/2026-09/ios-onboarding-business.png",
+        "sha256": "73f3b9ace0249b3902401701e404710826308df78644eaf09593373f96573dec",
+        "platform": "ios",
+        "status": "verified-current",
+        "capturedAt": "2026-09-14T15:10:00-04:00",
+        "reviewedBy": "Codex root release task; visually inspected iOS simulator capture",
+        "captureUrl": "http://localhost:3000/vendor/dashboard",
+        "provenance": "Actual iPhone 17 Pro Max simulator capture of current first-launch walkthrough on the local development instance. Root release task verified clean and safe-area-correct on 2026-09-14. No orders created and no outbound calls made for this artwork. Source review is not App Store approval.",
+        "width": 1320,
+        "height": 2868,
+        "colorType": 6,
+        "hasAlpha": true
+      },
+      "transform": "contained proportional resize; no UI redraw, no screenshot crop, no device chrome added"
+    },
+    {
+      "file": "app-store-assets/2026-09/feature-graphic-1024x500.png",
+      "platform": "feature",
+      "width": 1024,
+      "height": 500,
+      "colorType": 2,
+      "hasAlpha": false,
+      "sha256": "69559c128ba65ff134dab581bfc798ee25d9b020cdc61ddd0fd16f831491e8ed",
+      "status": "review-required",
+      "source": null,
+      "transform": "brand typography and canonical icon; no represented UI"
+    }
+  ]
+}

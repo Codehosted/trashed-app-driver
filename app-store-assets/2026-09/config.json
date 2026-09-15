@@ -1,0 +1,65 @@
+{
+  "outputDirectory": "app-store-assets/2026-09",
+  "font": "app-store-assets/2026-09/fonts/Poppins-Bold.ttf",
+  "icon": "app-store-assets/artwork/trashed-driver-icon-1024.png",
+  "screenshots": [
+    {
+      "platform": "ios",
+      "output": "ios-cover-review-1320x2868.png",
+      "source": {
+        "file": "app-store-assets/sources/2026-09/ios-customers.png",
+        "sha256": "b0559d79589f275da61b61c997e85196cb2e1263fba9308b363d6efa53b3b397",
+        "platform": "ios",
+        "status": "verified-current",
+        "capturedAt": "2026-09-14T15:15:24-04:00",
+        "reviewedBy": "Codex root release task and artwork subagent; visually inspected iOS simulator capture",
+        "captureUrl": "http://localhost:3000/vendor/customers",
+        "provenance": "Actual iPhone 17 Pro Max iOS 26.5 simulator capture of the current vendor Customers page. Read-only navigation on the approved localhost development instance, with three disposable example.invalid customer fixtures (not real customer data). No UI redrawn or completed orders invented by the artwork generator. Root release task verified safe status/menu/bottom controls and no covering modal. Source review is not App Store approval."
+      }
+    },
+    {
+      "platform": "android",
+      "output": "android-cover-review-1080x1920.png",
+      "headline": [
+        "Your account.",
+        "Your team.",
+        "One app."
+      ],
+      "subtitle": "Manage your waste services business\non-the-go with AI features.",
+      "source": {
+        "file": "app-store-assets/sources/2026-09/android-native-login.png",
+        "sha256": "bd898d34a82ae806b3a29053589653178fef900789848e9e6b667b2042477516",
+        "platform": "android",
+        "status": "verified-current",
+        "capturedAt": "2026-09-14T16:11:01-04:00",
+        "reviewedBy": "Codex root release task and artwork subagent; independently visually inspected corrected native login",
+        "captureUrl": "http://localhost:3000/app?source=trashed-app",
+        "captureMethod": "Android instrumentation UiAutomation.takeScreenshot after native title assertion, before synthetic fixture",
+        "appPackage": "com.trashed.driver",
+        "androidApi": 36,
+        "installedApkSha256": "b809f8d59764133081fef42fc1e956330fdab690996e93fabd08afd84fe8e663",
+        "provenance": "Untouched native Trashed login on disposable TrashedReleaseApi36 emulator. Packaged application uses the approved localhost development instance. Native dark status/navigation frame and white system icons corrected in application source, then captured and independently reviewed. No authentication, orders, phone navigation, or image retouch before this capture. Source review is not Google Play approval."
+      }
+    },
+    {
+      "platform": "ios",
+      "output": "ios-onboarding-review-1320x2868.png",
+      "headline": [
+        "One team.",
+        "One place.",
+        "Ready to go."
+      ],
+      "subtitle": "A simple start for every role.",
+      "source": {
+        "file": "app-store-assets/sources/2026-09/ios-onboarding-business.png",
+        "sha256": "73f3b9ace0249b3902401701e404710826308df78644eaf09593373f96573dec",
+        "platform": "ios",
+        "status": "verified-current",
+        "capturedAt": "2026-09-14T15:10:00-04:00",
+        "reviewedBy": "Codex root release task; visually inspected iOS simulator capture",
+        "captureUrl": "http://localhost:3000/vendor/dashboard",
+        "provenance": "Actual iPhone 17 Pro Max simulator capture of current first-launch walkthrough on the local development instance. Root release task verified clean and safe-area-correct on 2026-09-14. No orders created and no outbound calls made for this artwork. Source review is not App Store approval."
+      }
+    }
+  ]
+}

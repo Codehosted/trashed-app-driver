@@ -1,0 +1,17 @@
+[
+  {
+    "title": "Your waste service business in your pocket",
+    "body": "Manage orders, customers and your team wherever work takes you.",
+    "image": "onboarding_business"
+  },
+  {
+    "title": "Real-time customer chat",
+    "body": "Keep customers in the loop with direct messages and quick replies.",
+    "image": "onboarding_chat"
+  },
+  {
+    "title": "Hauler and dispatch",
+    "body": "Connect haulers and dispatch with live routes and clear stop details.",
+    "image": "onboarding_dispatch"
+  }
+]

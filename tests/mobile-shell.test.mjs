@@ -88,33 +88,33 @@ describe('mobile WebView shell contract', () => {
     assert.doesNotMatch(generator, /01-routes-raw\.png/, 'route screenshot must not use the inaccurate local route capture');
   });
 
-  it('shows a native iOS driver sign-in before falling back to the WebView login', () => {
+  it('shows native iOS sign-in before falling back to the WebView login', () => {
     const controller = read('ios/App/App/MainViewController.swift');
     const xcodeProject = read('ios/App/App.xcodeproj/project.pbxproj');
     assert.ok(existsSync(join(root, 'ios/App/App/Assets.xcassets/TrashedLogoMark.imageset/Contents.json')), 'missing real Trashed logo image set');
     assert.match(xcodeProject, /trashed-logo-mark\*\.png/, 'real Trashed logo images should be copied into the app bundle');
     assert.match(controller, /NativeDriverLoginView/, 'iOS should render a native SwiftUI driver login screen');
-    assert.match(controller, /Driver Sign In/, 'native login should mirror the driver sign-in title');
+    assert.match(controller, /Sign in to Trashed/, 'native login should welcome vendors and drivers');
     assert.match(controller, /trashed-logo-mark/, 'native login should use the real Trashed logo asset');
     assert.match(controller, /@Environment\(\\\.colorScheme\)/, 'native login should follow the iOS light or dark appearance');
     assert.match(controller, /DriverLoginMapBackground\(isLightMode: isLightMode\)/, 'native login should use the same map-style background as the driver shell');
-    assert.match(controller, /Color\(red: 0\.94, green: 0\.96, blue: 0\.97\).*Color\(red: 0\.04, green: 0\.04, blue: 0\.04\)/s, 'native login background should match the driver map light and dark base colors');
+    assert.match(controller, /Color\(red: 0\.98, green: 0\.98, blue: 0\.99\).*Color\(red: 0\.08, green: 0\.07, blue: 0\.10\)/s, 'native login background should use the neutral Trashed light and dark canvas colors');
     assert.match(controller, /routePath\(in: size\)[\s\S]*StrokeStyle\(lineWidth: 13, lineCap: \.round, lineJoin: \.round\)/, 'native login background should include the driver map route surface');
     assert.match(controller, /renderingMode\(\.template\)[\s\S]*foregroundColor\(logoColor\)[\s\S]*frame\(width: 104, height: 82\)/, 'native login should render the real logo directly without a badge container');
-    assert.match(controller, /components\.path = \"\/driver\"/, 'native shell should start on the driver app route, not the marketing site or full web login');
+    assert.match(controller, /components\.path = \"\/app\"/, 'native shell should start on the role-aware app route, not the marketing site or full web login');
     assert.doesNotMatch(controller, /Text\(\"T\"\)/, 'native login must not use a fake text-logo placeholder');
     assert.match(controller, /\/api\/auth\/mobile\/login/, 'native login should post credentials to the mobile auth endpoint');
     assert.match(controller, /__Secure-next-auth\.session-token/, 'native login should install secure NextAuth session cookies');
     assert.match(controller, /signInWithGoogle/, 'Google sign-in should use native Google Sign-In instead of the website OAuth redirect');
     assert.doesNotMatch(controller, /components\.path = "\/app\/login"/, 'native startup must not point the WebView at website login chrome');
-    assert.match(controller, /\/driver\?source=trashed-driver-app&theme=\\\(theme\.rawValue\)/, 'successful native login should load the driver shell with native theme context');
+    assert.match(controller, /\/app\?source=trashed-app&theme=\\\(theme\.rawValue\)/, 'successful native login should load the role-aware app with native theme context');
     assert.match(controller, /currentDriverTheme == \.light \? \.darkContent : \.lightContent/, 'status bar contrast should follow the native theme');
 
     const logoBlock = controller.match(/logoImage[\s\S]*?accessibilityHidden\(true\)/)?.[0] || '';
     assert.doesNotMatch(logoBlock, /\.background|\.cornerRadius|\.overlay|RoundedRectangle/, 'logo should not sit inside an outlined or tinted container');
   });
 
-  it('shows a native Android driver sign-in before loading the WebView app', () => {
+  it('shows native Android sign-in before loading the WebView app', () => {
     const activity = read('android/app/src/main/java/com/trashed/driver/MainActivity.java');
     assert.match(activity, /api\/auth\/mobile\/login/, 'Android native login should post credentials to the mobile auth endpoint');
     assert.match(activity, /CookieManager\.getInstance\(\)/, 'Android native login should install returned session cookies');
@@ -126,10 +126,10 @@ describe('mobile WebView shell contract', () => {
     assert.doesNotMatch(activity, /accounts\.google\.com|ACTION_VIEW/, 'Android native login must not launch browser OAuth from the WebView shell');
   });
 
-  it('loads the real Trashed driver page as the native shell', () => {
+  it('loads the role-aware Trashed entry as the native shell', () => {
     const capacitorConfig = read('capacitor.config.ts');
     assert.match(capacitorConfig, /https:\/\/trashed\.app/, 'TestFlight default should target production Trashed');
-    assert.match(capacitorConfig, /\/driver\?source=trashed-driver-app/, 'native shell should open the driver page');
+    assert.match(capacitorConfig, /\/app\?source=trashed-app/, 'native shell should open the role-aware app page');
     assert.match(capacitorConfig, /allowNavigation/, 'same-host navigation should stay in the WebView');
     assert.match(pkg.scripts['cap:sync:ios:dev'], /https:\/\/preview\.trashed\.app/, 'iOS dev sync should target the Cloudflare tunnel');
 
@@ -187,7 +187,7 @@ describe('mobile WebView shell contract', () => {
     assert.match(iosInfo, /NSLocationWhenInUseUsageDescription/, 'iOS must explain foreground location use');
     assert.match(iosInfo, /NSLocationAlwaysAndWhenInUseUsageDescription/, 'iOS must explain background location use');
     assert.match(iosInfo, /UIBackgroundModes[\s\S]*location/, 'iOS must enable background location mode');
-    assert.match(iosController, /driverSafeAreaScript[\s\S]*safe-area-inset-top/, 'iOS WebView should inject safe-area protection for the remote driver page');
+    assert.match(iosController, /webView\.topAnchor\.constraint\(equalTo: container\.safeAreaLayoutGuide\.topAnchor\)/, 'iOS WebView should stay inside the native safe area on all pages');
   });
 
   it('configures Android background delivery and Capacitor 7 push notifications', () => {

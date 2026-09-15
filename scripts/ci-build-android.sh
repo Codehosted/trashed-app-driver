@@ -7,6 +7,11 @@ case "$MODE" in
   *) echo "usage: $0 [verify|release]" >&2; exit 64 ;;
 esac
 
+if [[ "$MODE" == release ]]; then
+  : "${TRASHED_ANDROID_VERSION_CODE:?set an unused Google Play version code}"
+  : "${TRASHED_ANDROID_VERSION_NAME:?set the Android release version name}"
+fi
+
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 ARTIFACT_DIR="${ARTIFACT_DIR:-$ROOT_DIR/artifacts/android}"
 export TRASHED_WEB_URL=https://trashed.app
@@ -14,6 +19,9 @@ export GRADLE_USER_HOME="${GRADLE_USER_HOME:-$ROOT_DIR/android/.gradle-user}"
 export CI=true
 
 cd "$ROOT_DIR"
+if [[ "$MODE" == release ]]; then
+  node scripts/check-mobile-backend.mjs
+fi
 rm -rf "$ARTIFACT_DIR"
 mkdir -p "$ARTIFACT_DIR"
 
@@ -50,6 +58,11 @@ if [[ "$MODE" == release ]]; then
     APKSIGNER_BIN="$(find "$ANDROID_SDK_ROOT/build-tools" -mindepth 2 -maxdepth 2 -type f -name apksigner -print | sort -V | tail -1)"
   fi
   [[ -x "$APKSIGNER_BIN" ]] || { echo 'apksigner is required to verify release APKs' >&2; exit 1; }
+  AAPT2_BIN="$(dirname "$APKSIGNER_BIN")/aapt2"
+  [[ -x "$AAPT2_BIN" ]] || { echo 'aapt2 is required to verify release feature requirements' >&2; exit 1; }
+  TRASHED_ANDROID_RELEASE_MANIFEST="$ROOT_DIR/android/app/build/intermediates/merged_manifests/release/processReleaseManifest/AndroidManifest.xml" \
+    TRASHED_ANDROID_RELEASE_APK="$ROOT_DIR/$APK" TRASHED_ANDROID_AAPT2="$AAPT2_BIN" \
+    node --test "$ROOT_DIR/tests/android-release.test.mjs"
   export PATH="$(dirname "$APKSIGNER_BIN"):$PATH"
   apksigner verify --verbose --print-certs "$APK"
   jarsigner -verify -verbose -certs "$AAB" >/dev/null
