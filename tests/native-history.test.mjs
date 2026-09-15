@@ -41,6 +41,18 @@ test('compiled Swift exact-target history policy respects swipe direction and re
       }
       assert(!NativeWorkspaceHistory.isBackSwipe(x: 63, y: 0)); assert(NativeWorkspaceHistory.isBackSwipe(x: 64, y: 10))
       assert(!NativeWorkspaceHistory.isBackSwipe(x: -100, y: 0)); assert(!NativeWorkspaceHistory.isBackSwipe(x: 100, y: 100))
+      for start in [0.0, 1.0, 8.0, 24.0] {
+        assert(NativeWorkspaceHistory.isBackSwipeStart(x: start))
+        assert(NativeWorkspaceHistory.canBeginBackSwipe(startX: start, x: 12, y: 1, touches: 1))
+      }
+      for start in [-1.0, 24.1, 100.0, 440.0, Double.nan, Double.infinity] {
+        assert(!NativeWorkspaceHistory.isBackSwipeStart(x: start))
+        assert(!NativeWorkspaceHistory.canBeginBackSwipe(startX: start, x: 100, y: 0, touches: 1))
+      }
+      for (x, y) in [(0.0, 0.0), (-12.0, 0.0), (1.0, 12.0), (1.0, -12.0), (12.0, 8.0)] {
+        assert(!NativeWorkspaceHistory.canBeginBackSwipe(startX: 8, x: x, y: y, touches: 1))
+      }
+      for touches in [0, 2, 3] { assert(!NativeWorkspaceHistory.canBeginBackSwipe(startX: 8, x: 100, y: 0, touches: touches)) }
       for path in ["/support", "/faq", "/privacy", "/terms", "/cookies", "/legal"] {
         assert(NativeWorkspaceHistory.isSameOriginURL(url(path), origin: origin)); assert(!NativeWorkspaceHistory.isWorkspaceURL(url(path), origin: origin))
       }
@@ -61,6 +73,54 @@ test('compiled Swift exact-target history policy respects swipe direction and re
       state.update(index: 8, workspace: true, committed: true); assert(!allowed(11)) // Unexpected web pop beyond floor fails closed.
       state.update(index: 12, workspace: true, committed: true); assert(!allowed(12))
 
+    `);
+    run('swift', [path]);
+  } finally { rmSync(directory, { recursive: true, force: true }); }
+});
+
+test('compiled Swift simultaneous admission cooperates only with contained WebView touch plumbing', { skip: process.platform !== 'darwin' }, () => {
+  const directory = mkdtempSync(join(tmpdir(), 'trashed-history-gesture-swift-'));
+  try {
+    const start = ios.indexOf('    func gestureRecognizer(_ gestureRecognizer: UIGestureRecognizer, shouldRecognizeSimultaneouslyWith');
+    const end = ios.indexOf('    func gestureRecognizer(_ gestureRecognizer: UIGestureRecognizer, shouldReceive', start);
+    assert.ok(start >= 0 && end > start);
+    const method = ios.slice(start, end);
+    assert.doesNotMatch(method, /NSClassFromString|String\(describing|WKTouch|WKDeferring/);
+    const path = join(directory, 'gesture.swift');
+    // UIKit cannot execute on the macOS host. Compile the actual admission method
+    // with hierarchy/type fixtures; actual UIKit timing remains the simulator UI gate.
+    writeFileSync(path, `
+      class UIView {
+        var superview: UIView?
+        init(_ parent: UIView? = nil) { superview = parent }
+        func isDescendant(of view: UIView) -> Bool { self === view || superview?.isDescendant(of: view) == true }
+      }
+      class UIGestureRecognizer { var view: UIView?; init(_ view: UIView? = nil) { self.view = view } }
+      class UIPanGestureRecognizer: UIGestureRecognizer {}
+      class UIPinchGestureRecognizer: UIGestureRecognizer {}
+      class UIRotationGestureRecognizer: UIGestureRecognizer {}
+      class UITapGestureRecognizer: UIGestureRecognizer {}
+      class UILongPressGestureRecognizer: UIGestureRecognizer {}
+      class Harness {
+        var historyEdgeGesture: UIGestureRecognizer? = UIPanGestureRecognizer()
+        var webView: UIView? = UIView()
+        ${method}
+      }
+      let harness = Harness(), outside = UIView()
+      let web = harness.webView!, content = UIView(harness.webView), nested = UIView()
+      nested.superview = content
+      let edge = harness.historyEdgeGesture!
+      for owner in [web, content, nested] {
+        assert(harness.gestureRecognizer(edge, shouldRecognizeSimultaneouslyWith: UIGestureRecognizer(owner)))
+        for other in [UIPanGestureRecognizer(owner), UIPinchGestureRecognizer(owner), UIRotationGestureRecognizer(owner), UITapGestureRecognizer(owner), UILongPressGestureRecognizer(owner)] {
+          assert(!harness.gestureRecognizer(edge, shouldRecognizeSimultaneouslyWith: other))
+        }
+      }
+      assert(!harness.gestureRecognizer(edge, shouldRecognizeSimultaneouslyWith: UIGestureRecognizer(outside)))
+      assert(!harness.gestureRecognizer(edge, shouldRecognizeSimultaneouslyWith: UIGestureRecognizer()))
+      assert(!harness.gestureRecognizer(UIPanGestureRecognizer(), shouldRecognizeSimultaneouslyWith: UIGestureRecognizer(content)))
+      harness.webView = nil
+      assert(!harness.gestureRecognizer(edge, shouldRecognizeSimultaneouslyWith: UIGestureRecognizer(content)))
     `);
     run('swift', [path]);
   } finally { rmSync(directory, { recursive: true, force: true }); }
@@ -114,8 +174,14 @@ test('compiled Java history policy supports push/pop but never crosses a previou
 test('history integration preserves single bridges, native overlays and Capacitor intent/delegate policy', () => {
   assert.doesNotMatch(ios, /navigationDelegate\s*=|UINavigationController\(|pushViewController\(|reloadFromOrigin\(/);
   for (const property of ['canGoBack', 'isLoading', 'url']) assert.ok(ios.includes(`observe(\\.${property}`));
-  assert.match(ios, /UIScreenEdgePanGestureRecognizer/);
-  assert.match(ios, /edge.edges = \.left/);
+  assert.match(ios, /let edge = UIPanGestureRecognizer/);
+  assert.doesNotMatch(ios, /UIScreenEdgePanGestureRecognizer/);
+  assert.match(ios, /edge.maximumNumberOfTouches = 1/);
+  assert.match(ios, /edge.delegate = self/);
+  assert.match(ios, /panGestureRecognizer.require\(toFail: edge\)/);
+  assert.match(ios, /touch.type == \.direct && NativeWorkspaceHistory.isBackSwipeStart/);
+  assert.match(ios, /let startX = pan.location\(in: view\).x - delta.x/);
+  assert.match(ios, /NativeWorkspaceHistory.canBeginBackSwipe[\s\S]*touches: pan.numberOfTouches/);
   assert.match(ios, /webView.go\(to: target\)/);
   assert.match(ios, /history.currentItem === start.item/);
   assert.match(ios, /history.backItem === target/);

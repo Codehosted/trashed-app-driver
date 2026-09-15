@@ -77,6 +77,12 @@ private struct NativeWorkspaceHistory {
 
     static func isBackSwipe(x: Double, y: Double) -> Bool { x >= 64 && x > abs(y) * 1.5 }
 
+    static func isBackSwipeStart(x: Double) -> Bool { x >= 0 && x <= 24 }
+
+    static func canBeginBackSwipe(startX: Double, x: Double, y: Double, touches: Int) -> Bool {
+        touches == 1 && isBackSwipeStart(x: startX) && x > 0 && x > abs(y) * 1.5
+    }
+
     static func isAuthenticationURL(_ url: URL?) -> Bool {
         guard let path = url?.path else { return false }
         return path == "/app/login" || path == "/partners/login" || path.hasPrefix("/api/auth/")
@@ -152,14 +158,14 @@ private struct NativeAppleCredential {
     let nonce: String
 }
 
-class MainViewController: CAPBridgeViewController {
+class MainViewController: CAPBridgeViewController, UIGestureRecognizerDelegate {
     private var nativeLoginController: UIHostingController<NativeDriverLoginView>?
     private var nativeOnboardingController: UIHostingController<NativeAppOnboardingView>?
     private var onboardingReady = false
     private var loginURLObservation: NSKeyValueObservation?
     private var historyObservations: [NSKeyValueObservation] = []
     private var workspaceHistory = NativeWorkspaceHistory()
-    private var historyEdgeGesture: UIScreenEdgePanGestureRecognizer?
+    private var historyEdgeGesture: UIPanGestureRecognizer?
     private var historyGestureStart: (item: WKBackForwardListItem, url: URL)?
     private var historyBackCheckPending = false
     private static let dismissWebDialog = """
@@ -241,10 +247,13 @@ class MainViewController: CAPBridgeViewController {
         navigationController?.setToolbarHidden(true, animated: false)
         if let webView = webView {
             webView.allowsBackForwardNavigationGestures = false
-            let edge = UIScreenEdgePanGestureRecognizer(target: self, action: #selector(handleHistoryEdge(_:)))
-            edge.edges = .left
+            let edge = UIPanGestureRecognizer(target: self, action: #selector(handleHistoryEdge(_:)))
+            edge.maximumNumberOfTouches = 1
+            edge.delegate = self
             edge.isEnabled = false
             view.addGestureRecognizer(edge)
+            // Center/vertical gestures fail our edge gate and keep normal WebView scrolling.
+            webView.scrollView.panGestureRecognizer.require(toFail: edge)
             historyEdgeGesture = edge
             historyObservations = [
                 webView.observe(\.canGoBack, options: [.new]) { [weak self] _, _ in self?.updateHistoryGestures() },
@@ -317,7 +326,32 @@ class MainViewController: CAPBridgeViewController {
         }
     }
 
-    @objc private func handleHistoryEdge(_ gesture: UIScreenEdgePanGestureRecognizer) {
+    func gestureRecognizer(_ gestureRecognizer: UIGestureRecognizer, shouldRecognizeSimultaneouslyWith otherGestureRecognizer: UIGestureRecognizer) -> Bool {
+        guard gestureRecognizer === historyEdgeGesture, let webView = webView,
+              otherGestureRecognizer.view?.isDescendant(of: webView) == true else { return false }
+        // WebKit's DOM touch/scroll-lock recognizers must not swallow an admitted
+        // native edge Back. Ordinary manipulation gestures keep their precedence.
+        return !(otherGestureRecognizer is UIPanGestureRecognizer
+            || otherGestureRecognizer is UIPinchGestureRecognizer
+            || otherGestureRecognizer is UIRotationGestureRecognizer
+            || otherGestureRecognizer is UITapGestureRecognizer
+            || otherGestureRecognizer is UILongPressGestureRecognizer)
+    }
+
+    func gestureRecognizer(_ gestureRecognizer: UIGestureRecognizer, shouldReceive touch: UITouch) -> Bool {
+        guard gestureRecognizer === historyEdgeGesture else { return true }
+        return touch.type == .direct && NativeWorkspaceHistory.isBackSwipeStart(x: Double(touch.location(in: view).x))
+    }
+
+    func gestureRecognizerShouldBegin(_ gestureRecognizer: UIGestureRecognizer) -> Bool {
+        guard gestureRecognizer === historyEdgeGesture, let pan = gestureRecognizer as? UIPanGestureRecognizer else { return true }
+        let delta = pan.translation(in: view)
+        let startX = pan.location(in: view).x - delta.x
+        return NativeWorkspaceHistory.canBeginBackSwipe(startX: Double(startX), x: Double(delta.x),
+            y: Double(delta.y), touches: pan.numberOfTouches)
+    }
+
+    @objc private func handleHistoryEdge(_ gesture: UIPanGestureRecognizer) {
         guard let webView = webView else { return }
         let history = webView.backForwardList
         if gesture.state == .began {

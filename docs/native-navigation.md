@@ -3,25 +3,44 @@
 Trashed still uses **one Capacitor WebView and bridge per app**. This is not a
 native view-controller stack and does not prerender or keep hidden pages mounted.
 
-## Verification gate — draft, not a completed iOS feature
+## Verification gates
 
 - Android: API 36 / WebView 133 emulator instrumentation **2/2 passed**, including
   modal-first handling, exact renderer back, request-time same-URL race rejection,
   retained synthetic draft, one WebView, and account/root boundaries. This is
   synthetic HTTP-origin instrumentation, not physical-device or real Radix UI proof.
-- iOS: release-source simulator build and compiled policy tests pass. Actual CUA
-  drags in both browser mirror and Simulator window produced no edge-recognizer
-  callbacks despite eligible history. **Native edge-back runtime remains open.**
-  Temporary DEBUG touch-delivery diagnostics are excluded from source; the
-  experimental scroll-pan failure dependency is also excluded. Do not treat this
-  draft code or its successful build as a verified iOS navigation feature.
-- Focused native policy/regression suite: **21/21 passed**. Production resource
+- iOS: the original screen-edge recognizer never activated despite direct touches
+  at x=1 and x=8 points, an attached 440×956 view, and eligible history. The failure
+  was in gesture recognition, not a denied history target; UIKit's internal reason
+  is unproven. The remediation uses an ordinary one-finger pan with explicit edge
+  and direction gates. This passed actual Inventory→Dashboard Back and vertical
+  scrolling. A real Sheet exposed a second issue: WebKit's DOM touch/scroll-lock
+  recognizers blocked an admitted pan before its action callback. Scoped
+  simultaneous recognition restored action delivery. The final normal simulator
+  binary passed actual UI checks: root drawer closes; Inventory drawer closes
+  without navigating underneath; the next edge swipe returns to Dashboard; another
+  stays at the session root. Center drags and short edge swipes do not navigate,
+  and vertical scrolling works. Actual Log out returns to native sign-in; a full
+  edge swipe there stays on sign-in without exposing the prior workspace.
+  These checks used the production-mode local website
+  on port 3000 with database access forced read-only. Earlier short/coalesced
+  synthesized input attempts did not complete the action; their precise delivery
+  cause is unproven. This is not a physical-device reliability claim.
+  Temporary DEBUG touch-delivery diagnostics remain excluded. A build or compiled
+  policy test alone does not verify actual UIKit gesture delivery.
+- Full native policy/regression suite: **112/112 passed**. Production resource
   configs restored byte-exactly after local builds; no store release performed.
 
 ## Behavior and boundaries
 
-- iOS uses a native left-edge swipe recognizer: a deliberate rightward horizontal
-  swipe checks for an open dialog first, then loads the exact validated previous
+- iOS accepts a direct one-finger pan starting within the leftmost 24 points.
+  Center touches are rejected immediately; vertical, leftward, and multi-finger
+  gestures cannot begin Back. The WebView scroll pan waits for this narrow gate
+  to fail, preserving ordinary center/vertical scrolling. Only this edge pan may
+  cooperate with recognizers contained inside its WebView; public pan, pinch,
+  rotation, tap, and long-press recognizers are excluded. No private WebKit class
+  names or APIs are used. A deliberate rightward
+  horizontal swipe of at least 64 points checks for an open dialog first, then loads the exact validated previous
   WebKit history item within the visible session's same-origin `/vendor`, `/driver`,
   `/calls`, or `/admin` workspace. Standard WebKit back/forward gestures remain off
   because they can skip script-created entries. This is back-only, with no interactive
@@ -44,9 +63,14 @@ native view-controller stack and does not prerender or keep hidden pages mounted
   beyond the browser's normal behavior. This enhancement does not persist history
   or customer data.
 
-No speculative preloading: existing operational GETs can perform writes. Next
-route caches and ordinary user-triggered navigation remain web-owned. Tel links,
-external intents, exports, permissions, and auth retain their existing handlers.
+The native shell does not preload pages. The web layer owns bounded Next prefetch:
+only `/vendor/dashboard`, `/vendor/inventory`, `/driver`, and `/driver?view=profile`
+are allowed, only for inactive links in an authenticated open native drawer, and
+never during impersonation. Their load-time setup writes were separated into
+explicit POST actions; prefetch does not provision preferences, stores, or driver
+membership. Other operational links remain unprefetched. There are no hidden
+client mounts or extra WebViews. Tel links, external intents, exports, permissions,
+and auth retain their existing handlers.
 
 Tests compile the actual Swift/Java URL and session-floor policies. Android's
 synthetic instrumentation covers system Back, same-document draft retention,
@@ -55,8 +79,15 @@ the disposable emulator and `http://localhost:3000`. Compilation and runtime
 results are separate gates; authored instrumentation is not runtime proof.
 
 Platform references: [WebKit exact-item navigation](https://developer.apple.com/documentation/webkit/wkwebview/go(to:)),
-[UIKit screen-edge gesture](https://developer.apple.com/documentation/uikit/uiscreenedgepangesturerecognizer),
+[UIKit pan gesture](https://developer.apple.com/documentation/uikit/uipangesturerecognizer),
+[UIKit gesture admission](https://developer.apple.com/documentation/uikit/uigesturerecognizerdelegate/gesturerecognizershouldbegin(_:)),
+[UIKit simultaneous gestures](https://developer.apple.com/documentation/uikit/allowing-the-simultaneous-recognition-of-multiple-gestures),
 [Android custom Back](https://developer.android.com/guide/navigation/navigation-custom-back).
+
+The simultaneous-admission test compiles the actual Swift delegate method with
+small view/type fixtures on macOS; it does not emulate UIKit timing. Actual
+simulator gestures are a separate gate. WebKit's [touch-event recognizer source](https://github.com/WebKit/WebKit/blob/main/Source/WebKit/UIProcess/ios/WKTouchEventsGestureRecognizer.mm)
+documents the `preventDefault` cancellation mechanism observed with modal scroll lock.
 
 Android instrumentation supplies a fixed synthetic HTTP-origin document through
 an androidTest-only request interceptor, delegates lifecycle/history callbacks to
