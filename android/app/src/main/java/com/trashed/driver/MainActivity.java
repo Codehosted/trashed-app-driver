@@ -106,6 +106,9 @@ public class MainActivity extends BridgeActivity {
         boolean chatChannelSecured;
         String chatServerOrigin;
 
+        // This WebView override forwards runtime interface objects, not a plain
+        // Object instance. Their own @JavascriptInterface methods remain required.
+        @android.annotation.SuppressLint("JavascriptInterface")
         @Override public void addJavascriptInterface(Object object, String name) {
             if ("androidBridge".equals(name)) {
                 legacyBridgeInstalled = true;

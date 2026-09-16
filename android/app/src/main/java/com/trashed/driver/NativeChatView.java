@@ -71,7 +71,7 @@ final class NativeChatView extends LinearLayout {
         boolean sameConversation = state != null && state.scopeKey.equals(next.scopeKey) && state.conversationId.equals(next.conversationId);
         boolean bottom = scroll.getChildAt(0).getHeight() - scroll.getScrollY() - scroll.getHeight() < dp(64);
         int oldY = scroll.getScrollY();
-        if (!sameConversation) { disposeMaps(); views.clear(); bindings.keySet().removeIf(field -> field != draft); messages.removeAllViews(); screenToolbar.removeAllViews(); screenComposer.removeAllViews(); screenOverlay.removeAllViews(); screenFooter.removeAllViews(); Binding b = bindings.get(draft); b.local = b.server = ""; b.pending.clear(); }
+        if (!sameConversation) { disposeMaps(); views.clear(); Iterator<EditText> fields = bindings.keySet().iterator(); while (fields.hasNext()) { if (fields.next() != draft) fields.remove(); } messages.removeAllViews(); screenToolbar.removeAllViews(); screenComposer.removeAllViews(); screenOverlay.removeAllViews(); screenFooter.removeAllViews(); Binding b = bindings.get(draft); b.local = b.server = ""; b.pending.clear(); }
         if (state != null && (!state.context.equals(next.context) || state.revision != next.revision)) closeHistoryDialog();
         state = next; readOnly = cached;
         foreground = next.dark ? Color.rgb(242, 237, 249) : Color.rgb(33, 26, 43);
@@ -169,7 +169,8 @@ final class NativeChatView extends LinearLayout {
         while (parent.getChildCount() > children.size()) parent.removeViewAt(parent.getChildCount() - 1);
     }
     private void regionPadding(View region, List<JSONObject> nodes, int horizontal, int vertical) {
-        boolean boxed = nodes.stream().anyMatch(n -> n.has("box"));
+        boolean boxed = false;
+        for (JSONObject node : nodes) { if (node.has("box")) { boxed = true; break; } }
         region.setPadding(boxed ? 0 : dp(horizontal), boxed ? 0 : dp(vertical), boxed ? 0 : dp(horizontal), boxed ? 0 : dp(vertical));
     }
     /** A real Button owns interaction; measured graphics are noninteractive native children. */
@@ -237,7 +238,7 @@ final class NativeChatView extends LinearLayout {
                 textView.setTypeface(android.os.Build.VERSION.SDK_INT >= 28 ? Typeface.create(family, fontWeight, false) : Typeface.create(family, fontWeight >= 600 ? Typeface.BOLD : Typeface.NORMAL));
             }
             textView.setLetterSpacing((float)(style.optDouble("letterSpacing", 0) / size));
-            textView.setLineSpacing(0, 1); if (style.has("lineHeight")) textView.setLineHeight(px(style.optDouble("lineHeight")));
+            textView.setLineSpacing(0, 1); if (style.has("lineHeight")) androidx.core.widget.TextViewCompat.setLineHeight(textView, px(style.optDouble("lineHeight")));
             int horizontal = style.optString("textAlign", "left").equals("center") ? Gravity.CENTER_HORIZONTAL : style.optString("textAlign").equals("right") ? Gravity.RIGHT : Gravity.LEFT;
             textView.setGravity(horizontal | (view instanceof BoxButton || !(view instanceof EditText) ? Gravity.CENTER_VERTICAL : Gravity.TOP));
             double padding = style.optDouble("padding", 0);

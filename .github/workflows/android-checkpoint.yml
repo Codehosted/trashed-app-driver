@@ -53,6 +53,16 @@ jobs:
           bunx cap sync android
           cd android
           ./gradlew --no-daemon :app:testDebugUnitTest :app:lintDebug :app:assembleDebug :app:assembleDebugAndroidTest
+      - name: Preserve Android test and lint reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: trashed-android-reports-${{ github.run_id }}
+          path: |
+            android/app/build/reports/
+            android/app/build/test-results/
+          if-no-files-found: warn
+          retention-days: 14
       - name: Package build evidence
         run: |
           mkdir -p checkpoint
