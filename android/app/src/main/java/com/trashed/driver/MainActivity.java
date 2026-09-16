@@ -92,6 +92,9 @@ public class MainActivity extends BridgeActivity {
     private TextView errorText;
     private AuthConfig authConfig;
     private GoogleSignInClient googleClient;
+    private NativeBottomNavigation nativeNavigation;
+    private volatile long navigationDocument;
+    private boolean navigationLoading = true;
 
     // One-time bootstrap gate only. Once open, retain Capacitor's normal URL policy/client.
     static final class OnboardingWebView extends CapacitorWebView {
@@ -126,6 +129,7 @@ public class MainActivity extends BridgeActivity {
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
+        registerPlugin(TrashedNavigationPlugin.class);
         registerPlugin(TrashedFileExportPlugin.class);
         super.onCreate(savedInstanceState);
         // Android 16 enforces edge-to-edge; keep both native login and WebView inside the safe area.
@@ -135,18 +139,22 @@ public class MainActivity extends BridgeActivity {
         WindowCompat.getInsetsController(getWindow(), getWindow().getDecorView()).setAppearanceLightNavigationBars(false);
         ViewCompat.setOnApplyWindowInsetsListener(content, (view, windowInsets) -> {
             Insets insets = windowInsets.getInsets(WindowInsetsCompat.Type.systemBars() | WindowInsetsCompat.Type.displayCutout());
-            view.setPadding(insets.left, insets.top, insets.right, insets.bottom);
+            Insets ime = windowInsets.getInsets(WindowInsetsCompat.Type.ime());
+            view.setPadding(insets.left, insets.top, insets.right, Math.max(insets.bottom, ime.bottom));
+            if (nativeNavigation != null) nativeNavigation.keyboard(windowInsets.isVisible(WindowInsetsCompat.Type.ime()));
             return windowInsets;
         });
         ViewCompat.requestApplyInsets(content);
         authConfig = readAuthConfig();
         WebView webView = getBridge().getWebView();
+        nativeNavigation = new NativeBottomNavigation(this, webView, this::canPresentNavigation);
         CookieManager cookieManager = CookieManager.getInstance();
         cookieManager.setAcceptCookie(true);
         cookieManager.setAcceptThirdPartyCookies(webView, true);
 
         historyBack = new OnBackPressedCallback(false) {
             @Override public void handleOnBackPressed() {
+                if (nativeNavigation.dismissSheet()) return;
                 if (backCheckPending) return;
                 WebView view = getBridge().getWebView();
                 String requestedURL = view.getUrl();
@@ -182,6 +190,12 @@ public class MainActivity extends BridgeActivity {
         getOnBackPressedDispatcher().addCallback(this, historyBack);
         // Add history notifications only; inherit all Capacitor URL/intent/plugin navigation behavior.
         getBridge().setWebViewClient(new BridgeWebViewClient(getBridge()) {
+            @Override public void onPageStarted(WebView view, String url, android.graphics.Bitmap favicon) {
+                navigationLoading = true;
+                navigationDocument++;
+                nativeNavigation.reset();
+                super.onPageStarted(view, url, favicon);
+            }
             @Override public void doUpdateVisitedHistory(WebView view, String url, boolean isReload) {
                 super.doUpdateVisitedHistory(view, url, isReload);
                 updateWorkspaceHistory(view.getProgress() == 100);
@@ -189,6 +203,7 @@ public class MainActivity extends BridgeActivity {
 
             @Override public void onPageFinished(WebView view, String url) {
                 super.onPageFinished(view, url);
+                if (java.util.Objects.equals(url, view.getUrl())) navigationLoading = false;
                 updateWorkspaceHistory(view.getProgress() == 100);
             }
         });
@@ -208,12 +223,38 @@ public class MainActivity extends BridgeActivity {
         return getSharedPreferences(ONBOARDING_PREFERENCES, MODE_PRIVATE);
     }
 
+    long navigationDocument() { return navigationDocument; }
+    boolean navigationLoading() { return navigationLoading; }
+    boolean canPresentNavigation() {
+        return !isFinishing() && !isDestroyed() && !navigationLoading && onboardingReady && onboardingOverlay == null && loginOverlay == null
+            && authConfig != null && NativeWorkspaceHistory.isWorkspaceURL(getBridge().getWebView().getUrl(), authConfig.origin);
+    }
+    void setNativeNavigation(NativeNavigationState state, NativeBottomNavigation.Listener listener) { nativeNavigation.set(state, listener); }
+    void clearNativeNavigation(String context) { nativeNavigation.clear(context); }
+
+    @Override public void onConfigurationChanged(Configuration configuration) {
+        super.onConfigurationChanged(configuration);
+        if (nativeNavigation != null) nativeNavigation.dismissSheet();
+    }
+
+    @Override public void onPause() {
+        if (nativeNavigation != null) nativeNavigation.dismissSheet();
+        super.onPause();
+    }
+
+    @Override public void onDestroy() {
+        navigationDocument++;
+        if (nativeNavigation != null) nativeNavigation.reset();
+        super.onDestroy();
+    }
+
     private void updateWorkspaceHistory(boolean committed) {
         WebView webView = getBridge().getWebView();
         android.webkit.WebBackForwardList history = webView.copyBackForwardList();
         int index = history.getCurrentIndex();
         boolean visible = onboardingReady && onboardingOverlay == null && loginOverlay == null;
         boolean workspace = visible && NativeWorkspaceHistory.isWorkspaceURL(webView.getUrl(), authConfig.origin);
+        if (!workspace && nativeNavigation != null) nativeNavigation.reset();
         if (NativeWorkspaceHistory.isAuthenticationURL(webView.getUrl())) workspaceHistory.beginSession();
         workspaceHistory.update(index, workspace, committed);
         historyBackAvailable = workspace && workspaceHistory.canGoBack(index) && index > 0
@@ -229,6 +270,8 @@ public class MainActivity extends BridgeActivity {
     }
 
     private void showNativeOnboarding(String error) {
+        navigationDocument++;
+        if (nativeNavigation != null) nativeNavigation.reset();
         workspaceHistory.reset();
         historyBackAvailable = false;
         historyBack.setEnabled(false);
@@ -375,6 +418,8 @@ public class MainActivity extends BridgeActivity {
 
     private void showNativeLogin() {
         if (!onboardingReady || onboardingOverlay != null) return;
+        navigationDocument++;
+        if (nativeNavigation != null) nativeNavigation.reset();
         workspaceHistory.reset();
         historyBackAvailable = false;
         historyBack.setEnabled(false);

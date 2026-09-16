@@ -160,6 +160,8 @@ class MainViewController: CAPBridgeViewController, UIGestureRecognizerDelegate {
     private var nativeLoginController: UIHostingController<NativeDriverLoginView>?
     private var nativeOnboardingController: UIHostingController<NativeAppOnboardingView>?
     private var onboardingReady = false
+    private let nativeNavigation = TrashedNavigationPlugin()
+    private var nativeWebBottom: NSLayoutConstraint?
     private var loginURLObservation: NSKeyValueObservation?
     private var historyObservations: [NSKeyValueObservation] = []
     private var workspaceHistory = NativeWorkspaceHistory()
@@ -182,6 +184,7 @@ class MainViewController: CAPBridgeViewController, UIGestureRecognizerDelegate {
     override func capacitorDidLoad() {
         super.capacitorDidLoad()
         bridge?.registerPluginInstance(TrashedFileExportPlugin())
+        bridge?.registerPluginInstance(nativeNavigation)
         guard let webView = webView else { return }
 
         // A native boundary protects every website screen and modal, not just
@@ -192,12 +195,25 @@ class MainViewController: CAPBridgeViewController, UIGestureRecognizerDelegate {
         webView.translatesAutoresizingMaskIntoConstraints = false
         webView.scrollView.contentInsetAdjustmentBehavior = .never
         container.addSubview(webView)
+        let bottom = webView.bottomAnchor.constraint(equalTo: container.safeAreaLayoutGuide.bottomAnchor)
+        nativeWebBottom = bottom
         NSLayoutConstraint.activate([
             webView.leadingAnchor.constraint(equalTo: container.safeAreaLayoutGuide.leadingAnchor),
             webView.trailingAnchor.constraint(equalTo: container.safeAreaLayoutGuide.trailingAnchor),
             webView.topAnchor.constraint(equalTo: container.safeAreaLayoutGuide.topAnchor),
-            webView.bottomAnchor.constraint(equalTo: container.safeAreaLayoutGuide.bottomAnchor),
+            bottom,
         ])
+        nativeNavigation.attach(to: container)
+    }
+
+    var nativeNavigationAvailable: Bool {
+        onboardingReady && nativeOnboardingController == nil && nativeLoginController == nil
+            && webView?.isLoading == false && viewIfLoaded?.window != nil
+    }
+
+    func setNativeNavigationHeight(_ height: CGFloat) {
+        nativeWebBottom?.constant = -height
+        view.backgroundColor = .systemBackground
     }
 
     override func instanceDescriptor() -> InstanceDescriptor {
@@ -255,12 +271,17 @@ class MainViewController: CAPBridgeViewController, UIGestureRecognizerDelegate {
             historyEdgeGesture = edge
             historyObservations = [
                 webView.observe(\.canGoBack, options: [.new]) { [weak self] _, _ in self?.updateHistoryGestures() },
-                webView.observe(\.isLoading, options: [.new]) { [weak self] _, _ in self?.updateHistoryGestures() },
+                webView.observe(\.isLoading, options: [.new]) { [weak self] webView, _ in
+                    if webView.isLoading { self?.nativeNavigation.reset() }
+                    else { self?.nativeNavigation.refresh() }
+                    self?.updateHistoryGestures()
+                },
             ]
         }
         loginURLObservation = webView?.observe(\.url, options: [.new]) { [weak self] webView, _ in
             guard let self = self, let url = webView.url else { return }
             self.updateHistoryGestures()
+            if !NativeNavigationPolicy.isWorkspace(url, configured: self.bridge?.config.serverURL) { self.nativeNavigation.reset() }
             guard self.onboardingReady else { return }
             let config = self.makeDriverAuthConfig()
             guard url.scheme == config.origin.scheme,
@@ -365,6 +386,7 @@ class MainViewController: CAPBridgeViewController, UIGestureRecognizerDelegate {
         guard let start = historyGestureStart, !historyBackCheckPending,
               NativeWorkspaceHistory.isBackSwipe(x: Double(delta.x), y: Double(delta.y)),
               history.currentItem === start.item, webView.url == start.url else { return }
+        if nativeNavigation.dismissSheet() { return }
         let target = history.backItem
         historyBackCheckPending = true
         webView.evaluateJavaScript(Self.dismissWebDialog) { [weak self] result, error in
@@ -382,6 +404,7 @@ class MainViewController: CAPBridgeViewController, UIGestureRecognizerDelegate {
     }
 
     private func presentNativeOnboarding() {
+        nativeNavigation.reset()
         workspaceHistory.reset()
         webView?.allowsBackForwardNavigationGestures = false
         historyEdgeGesture?.isEnabled = false
@@ -469,6 +492,7 @@ class MainViewController: CAPBridgeViewController, UIGestureRecognizerDelegate {
 
     private func presentNativeLogin(_ config: DriverAuthConfig) {
         guard onboardingReady, nativeOnboardingController == nil else { return }
+        nativeNavigation.reset()
         workspaceHistory.reset()
         webView?.allowsBackForwardNavigationGestures = false
         historyEdgeGesture?.isEnabled = false
