@@ -14,7 +14,10 @@ const config: CapacitorConfig = {
   server: {
     // Load the role-aware Next.js app entry. The /app route is session-gated;
     // Capacitor passes cookies automatically via the WebView.
-    url: `${serverUrl}/app?source=trashed-app`,
+    // The modern Android bridge requires an ORIGIN in its allowlist; putting
+    // a path in server.url makes WebMessageListener fall back to legacy mode.
+    url: new URL(serverUrl).origin,
+    appStartPath: '/app?source=trashed-app',
     androidScheme: 'https',
     cleartext: !serverUrl.startsWith('https://'),
     // Keep all same-host navigation inside the WebView (login redirects, etc.)
@@ -22,6 +25,8 @@ const config: CapacitorConfig = {
   },
   android: {
     allowMixedContent: true,
+    // BackgroundGeolocation requires legacy saved-callback delivery after 5 minutes.
+    // Android isolates TrashedChat on its own origin/main-frame checked channel.
     useLegacyBridge: true,
   },
   plugins: {

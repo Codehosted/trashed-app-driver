@@ -121,8 +121,8 @@ test('bridge ACK/event/reset lifecycle retains native auth, document, modal and 
   assert.match(source,/sheet.dismiss\(animated: true\) \{[\s\S]*?self.emit\(context: context, tabID: tabID, itemID: itemID\)/);
   assert.match(source,/let event = store.state\?\.selection\(context: context, tabID: tabID, itemID: itemID\)/);
   assert.match(source,/shouldOverrideLoad[\s\S]*?targetFrame\?\.isMainFrame == true \{ reset\(\) \}[\s\S]*?return nil/);
-  assert.match(controller,/if webView.isLoading \{ self\?\.nativeNavigation.reset\(\) \}/);
-  assert.match(controller,/if !NativeNavigationPolicy.isWorkspace\(url, configured: self.bridge\?\.config.serverURL\) \{ self.nativeNavigation.reset\(\) \}/);
+  assert.match(controller,/if webView.isLoading \{ self\?\.nativeNavigation.reset\(\); self\?\.nativeChat.reset\(purge: !NativeChatPolicy.isAssistant\(webView.url, configured: self\?\.bridge\?\.config.serverURL\)\) \}/);
+  assert.match(controller,/if !NativeNavigationPolicy.isWorkspace\(url, configured: self.bridge\?\.config.serverURL\) \{ self.nativeNavigation.reset\(\); self.nativeChat.reset\(\) \}/);
   assert.match(controller,/private func presentNativeOnboarding\(\) \{\s*nativeNavigation.reset\(\)/);
   assert.match(controller,/private func presentNativeLogin[\s\S]*?nativeNavigation.reset\(\)/);
   assert.match(controller,/nativeNavigationAvailable: Bool \{\s*onboardingReady && nativeOnboardingController == nil && nativeLoginController == nil\s*&& webView\?\.isLoading == false/);

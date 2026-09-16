@@ -1,0 +1,11 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Host registration only: implementation and fixture exist in androidTest, never release. -->
+    <application>
+        <activity android:name="com.trashed.driver.SecureChatBridgeActivity" android:exported="false" />
+        <activity android:name="com.trashed.driver.NativeChatInputActivity" android:exported="false" />
+        <activity android:name="com.trashed.driver.NavigationTestActivity" android:exported="false" />
+        <activity android:name="com.trashed.driver.NativeChatPreviewActivity"
+            android:exported="false" android:theme="@style/Theme.AppCompat.Light.NoActionBar"
+            android:windowSoftInputMode="adjustResize" />
+    </application>
+</manifest>

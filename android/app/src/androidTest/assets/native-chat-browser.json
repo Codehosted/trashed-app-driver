@@ -1,0 +1,528 @@
+{
+  "version": 1,
+  "context": "native_fixture_context",
+  "revision": 1,
+  "appearance": "light",
+  "scopeKey": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "conversationId": "fixture-local-only",
+  "title": "Synthetic QA",
+  "input": {
+    "value": "",
+    "placeholder": "Message Trisha",
+    "disabled": false,
+    "sendActionId": "send",
+    "stopActionId": "stop"
+  },
+  "messages": [
+    {
+      "id": "fixture-message-0",
+      "role": "user",
+      "text": "",
+      "components": [
+        {
+          "id": "webfixture-19",
+          "type": "column",
+          "children": [
+            {
+              "id": "webfixture-20",
+              "type": "inline",
+              "children": [
+                {
+                  "id": "webfixture-21",
+                  "type": "text",
+                  "text": "Show me the next pickup."
+                }
+              ],
+              "style": {
+                "foreground": "#ffffff",
+                "fontSize": 14,
+                "fontWeight": "regular",
+                "radius": 0,
+                "padding": 0
+              }
+            }
+          ],
+          "style": {
+            "foreground": "#ffffff",
+            "fontSize": 14,
+            "fontWeight": "regular",
+            "radius": 0,
+            "padding": 0
+          }
+        }
+      ]
+    },
+    {
+      "id": "fixture-message-1",
+      "role": "assistant",
+      "text": "",
+      "components": [
+        {
+          "id": "webfixture-22",
+          "type": "column",
+          "children": [
+            {
+              "id": "webfixture-23",
+              "type": "column",
+              "children": [
+                {
+                  "id": "webfixture-24",
+                  "type": "column",
+                  "children": [
+                    {
+                      "id": "webfixture-25",
+                      "type": "inline",
+                      "children": [
+                        {
+                          "id": "webfixture-26",
+                          "type": "text",
+                          "text": "Hello "
+                        },
+                        {
+                          "id": "webfixture-27",
+                          "type": "inline",
+                          "children": [
+                            {
+                              "id": "webfixture-28",
+                              "type": "text",
+                              "text": "George"
+                            }
+                          ],
+                          "style": {
+                            "foreground": "#314158",
+                            "fontSize": 14,
+                            "fontWeight": "semibold",
+                            "radius": 0,
+                            "padding": 0
+                          }
+                        },
+                        {
+                          "id": "webfixture-29",
+                          "type": "text",
+                          "text": ", the next pickup is ready for review."
+                        }
+                      ],
+                      "style": {
+                        "foreground": "#314158",
+                        "fontSize": 14,
+                        "fontWeight": "regular",
+                        "radius": 0,
+                        "padding": 0
+                      }
+                    },
+                    {
+                      "id": "webfixture-30",
+                      "type": "text",
+                      "text": " "
+                    },
+                    {
+                      "id": "webfixture-31",
+                      "type": "inline",
+                      "children": [
+                        {
+                          "id": "webfixture-32",
+                          "type": "text",
+                          "text": "No business action has been taken."
+                        }
+                      ],
+                      "style": {
+                        "foreground": "#314158",
+                        "fontSize": 14,
+                        "fontWeight": "regular",
+                        "radius": 0,
+                        "padding": 0
+                      }
+                    }
+                  ],
+                  "style": {
+                    "foreground": "#314158",
+                    "fontSize": 14,
+                    "fontWeight": "regular",
+                    "radius": 0,
+                    "padding": 0
+                  }
+                }
+              ],
+              "style": {
+                "foreground": "#314158",
+                "fontSize": 14,
+                "fontWeight": "regular",
+                "radius": 0,
+                "padding": 0
+              }
+            }
+          ],
+          "style": {
+            "foreground": "#33343a",
+            "fontSize": 14,
+            "fontWeight": "regular",
+            "radius": 0,
+            "padding": 0
+          }
+        }
+      ]
+    }
+  ],
+  "conversations": [],
+  "suggestions": [],
+  "actions": [
+    {
+      "id": "send",
+      "kind": "send",
+      "label": "Send",
+      "disabled": true
+    },
+    {
+      "id": "stop",
+      "kind": "stop",
+      "label": "Stop",
+      "disabled": true
+    },
+    {
+      "id": "webfixture-2",
+      "kind": "component",
+      "label": "Conversations0",
+      "disabled": false
+    },
+    {
+      "id": "webfixture-3",
+      "kind": "component",
+      "label": "Open import panel",
+      "disabled": false
+    },
+    {
+      "id": "webfixture-4",
+      "kind": "component",
+      "label": "Open capabilities panel",
+      "disabled": false
+    },
+    {
+      "id": "webfixture-6",
+      "kind": "component",
+      "label": "Ask Trisha about rentals, inventory, customers, calls, routes, invoices, coupons",
+      "disabled": false
+    },
+    {
+      "id": "webfixture-8",
+      "kind": "component",
+      "label": "Add file or import data",
+      "disabled": false
+    },
+    {
+      "id": "webfixture-9",
+      "kind": "component",
+      "label": "Show Trisha capabilities",
+      "disabled": false
+    },
+    {
+      "id": "webfixture-11",
+      "kind": "component",
+      "label": "Start voice dictation",
+      "disabled": false
+    },
+    {
+      "id": "webfixture-12",
+      "kind": "component",
+      "label": "Send message",
+      "disabled": true
+    },
+    {
+      "id": "webfixture-16",
+      "kind": "component",
+      "label": "Privacy Policy",
+      "disabled": false
+    },
+    {
+      "id": "webfixture-17",
+      "kind": "component",
+      "label": "Terms",
+      "disabled": false
+    },
+    {
+      "id": "webfixture-18",
+      "kind": "component",
+      "label": "Reset",
+      "disabled": false
+    }
+  ],
+  "screen": {
+    "toolbar": [
+      {
+        "id": "webfixture-1",
+        "type": "row",
+        "children": [
+          {
+            "id": "webfixture-2",
+            "type": "button",
+            "text": "Conversations0",
+            "actionId": "webfixture-2",
+            "disabled": false,
+            "style": {
+              "foreground": "#33343a",
+              "background": "#fdfdfd",
+              "fontSize": 14,
+              "fontWeight": "medium",
+              "radius": 40,
+              "padding": 8.64,
+              "gap": 8.64
+            }
+          },
+          {
+            "id": "webfixture-3",
+            "type": "button",
+            "text": "Open import panel",
+            "actionId": "webfixture-3",
+            "disabled": false,
+            "style": {
+              "foreground": "#33343a",
+              "background": "#fdfdfd",
+              "fontSize": 14,
+              "fontWeight": "medium",
+              "radius": 40,
+              "padding": 0,
+              "gap": 8.64
+            }
+          },
+          {
+            "id": "webfixture-4",
+            "type": "button",
+            "text": "Open capabilities panel",
+            "actionId": "webfixture-4",
+            "disabled": false,
+            "style": {
+              "foreground": "#33343a",
+              "background": "#fdfdfd",
+              "fontSize": 14,
+              "fontWeight": "medium",
+              "radius": 40,
+              "padding": 0,
+              "gap": 8.64
+            }
+          }
+        ],
+        "style": {
+          "foreground": "#33343a",
+          "fontSize": 16,
+          "fontWeight": "regular",
+          "radius": 0,
+          "padding": 0,
+          "gap": 8.64
+        }
+      }
+    ],
+    "composer": [
+      {
+        "id": "webfixture-5",
+        "type": "column",
+        "children": [
+          {
+            "id": "webfixture-6",
+            "type": "input",
+            "text": "Ask Trisha about rentals, inventory, customers, calls, routes, invoices, coupons…",
+            "value": "",
+            "actionId": "webfixture-6",
+            "disabled": false,
+            "style": {
+              "foreground": "#33343a",
+              "fontSize": 16,
+              "fontWeight": "regular",
+              "radius": 6.4,
+              "padding": 17.28
+            },
+            "props": {
+              "inputType": "textarea",
+              "placeholder": "Ask Trisha about rentals, inventory, customers, calls, routes, invoices, coupons…"
+            }
+          },
+          {
+            "id": "webfixture-7",
+            "type": "row",
+            "children": [
+              {
+                "id": "webfixture-8",
+                "type": "button",
+                "text": "Add file or import data",
+                "actionId": "webfixture-8",
+                "disabled": false,
+                "style": {
+                  "foreground": "#33343a",
+                  "fontSize": 14,
+                  "fontWeight": "medium",
+                  "radius": 40,
+                  "padding": 0,
+                  "gap": 8.64
+                }
+              },
+              {
+                "id": "webfixture-9",
+                "type": "button",
+                "text": "Show Trisha capabilities",
+                "actionId": "webfixture-9",
+                "disabled": false,
+                "style": {
+                  "foreground": "#7033ff",
+                  "background": "#fcfcfc",
+                  "fontSize": 12,
+                  "fontWeight": "medium",
+                  "radius": 40,
+                  "padding": 0
+                }
+              },
+              {
+                "id": "webfixture-10",
+                "type": "row",
+                "children": [
+                  {
+                    "id": "webfixture-11",
+                    "type": "button",
+                    "text": "Start voice dictation",
+                    "actionId": "webfixture-11",
+                    "disabled": false,
+                    "style": {
+                      "foreground": "#525252",
+                      "fontSize": 14,
+                      "fontWeight": "medium",
+                      "radius": 8,
+                      "padding": 0,
+                      "gap": 8.64
+                    }
+                  },
+                  {
+                    "id": "webfixture-12",
+                    "type": "button",
+                    "text": "Send message",
+                    "actionId": "webfixture-12",
+                    "disabled": true,
+                    "style": {
+                      "foreground": "#ffffff",
+                      "background": "#7033ff",
+                      "fontSize": 14,
+                      "fontWeight": "medium",
+                      "radius": 40,
+                      "padding": 0,
+                      "gap": 8.64
+                    }
+                  }
+                ],
+                "style": {
+                  "foreground": "#33343a",
+                  "fontSize": 16,
+                  "fontWeight": "regular",
+                  "radius": 0,
+                  "padding": 0,
+                  "gap": 8.64
+                }
+              }
+            ],
+            "style": {
+              "foreground": "#33343a",
+              "background": "#fbfbfb",
+              "fontSize": 16,
+              "fontWeight": "regular",
+              "radius": 0,
+              "padding": 12.96,
+              "gap": 8.64
+            }
+          }
+        ],
+        "style": {
+          "foreground": "#33343a",
+          "background": "#fdfdfd",
+          "fontSize": 16,
+          "fontWeight": "regular",
+          "radius": 21,
+          "padding": 0
+        }
+      }
+    ],
+    "accessory": [
+      {
+        "id": "webfixture-13",
+        "type": "column",
+        "children": [
+          {
+            "id": "webfixture-14",
+            "type": "row",
+            "children": [
+              {
+                "id": "webfixture-15",
+                "type": "row",
+                "children": [
+                  {
+                    "id": "webfixture-16",
+                    "type": "link",
+                    "text": "Privacy Policy",
+                    "actionId": "webfixture-16",
+                    "disabled": false,
+                    "style": {
+                      "foreground": "#525252",
+                      "fontSize": 11,
+                      "fontWeight": "regular",
+                      "radius": 0,
+                      "padding": 0
+                    }
+                  },
+                  {
+                    "id": "webfixture-17",
+                    "type": "link",
+                    "text": "Terms",
+                    "actionId": "webfixture-17",
+                    "disabled": false,
+                    "style": {
+                      "foreground": "#525252",
+                      "fontSize": 11,
+                      "fontWeight": "regular",
+                      "radius": 0,
+                      "padding": 0
+                    }
+                  }
+                ],
+                "style": {
+                  "foreground": "#525252",
+                  "fontSize": 11,
+                  "fontWeight": "regular",
+                  "radius": 0,
+                  "padding": 0,
+                  "gap": 8.64
+                }
+              },
+              {
+                "id": "webfixture-18",
+                "type": "button",
+                "text": "Reset",
+                "actionId": "webfixture-18",
+                "disabled": false,
+                "style": {
+                  "foreground": "#525252",
+                  "fontSize": 11,
+                  "fontWeight": "medium",
+                  "radius": 40,
+                  "padding": 0,
+                  "gap": 8.64
+                }
+              }
+            ],
+            "style": {
+              "foreground": "#525252",
+              "fontSize": 11,
+              "fontWeight": "regular",
+              "radius": 0,
+              "padding": 0,
+              "gap": 12.96
+            }
+          }
+        ],
+        "style": {
+          "foreground": "#33343a",
+          "background": "#fdfdfd",
+          "fontSize": 16,
+          "fontWeight": "regular",
+          "radius": 0,
+          "padding": 6.48
+        }
+      }
+    ],
+    "overlay": []
+  },
+  "unsupported": []
+}

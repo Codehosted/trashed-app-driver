@@ -88,7 +88,11 @@ test('native exports expose only text and filename, require system pickers, and 
   assert.doesNotMatch(java + swift, /ACTION_SEND|UIActivityViewController|https?:\/\/|URLSession|HttpURLConnection|requestPermissions|takePersistableUriPermission|print\(|Log\./);
   assert.doesNotMatch(read('package.json'), /@capacitor\/(filesystem|share)/);
   assert.match(read('ios/App/App/MainViewController.swift'), /registerPluginInstance\(TrashedFileExportPlugin\(\)\)/);
-  assert.match(read('android/app/src/main/java/com/trashed/driver/MainActivity.java'), /registerPlugin\(TrashedFileExportPlugin.class\);\s*super.onCreate/);
+  const activity = read('android/app/src/main/java/com/trashed/driver/MainActivity.java');
+  const onCreate = activity.slice(activity.indexOf('protected void onCreate('), activity.indexOf('super.onCreate('));
+  for (const plugin of ['TrashedFileExportPlugin', 'TrashedChatPlugin', 'TrashedNavigationPlugin']) {
+    assert.ok(onCreate.includes(`registerPlugin(${plugin}.class)`), `${plugin} must register before Capacitor creates the bridge`);
+  }
 });
 
 test('export cancellation/busy handling retains neither transcript state nor bridge payload logs', () => {

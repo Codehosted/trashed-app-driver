@@ -1,9 +1,20 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
     <application>
+        <provider android:name="com.trashed.driver.NativeChatInputBytes"
+            android:authorities="com.trashed.driver.test.chatbytes" android:exported="true" />
+        <provider android:name="com.trashed.driver.NativeChatInputDocuments"
+            android:authorities="com.trashed.driver.test.chatinputs" android:exported="true"
+            android:grantUriPermissions="true" android:permission="android.permission.MANAGE_DOCUMENTS">
+            <intent-filter><action android:name="android.content.action.DOCUMENTS_PROVIDER" /></intent-filter>
+        </provider>
         <activity android:name="com.trashed.driver.NavigationTestActivity" android:exported="false" />
-        <!-- Separate test APK UID requires export; provider also checks emulator + exact test/target UIDs. -->
+        <!-- Separate test APK UID requires export; provider enforces emulator and exact caller UIDs. -->
         <provider android:name="com.trashed.driver.ByteExportTestProvider"
             android:authorities="com.trashed.driver.test.byteexports"
             android:exported="true" />
+        <activity android:name="com.trashed.driver.NativeChatPreviewActivity"
+            android:exported="false"
+            android:theme="@android:style/Theme.Material.Light.NoActionBar"
+            android:windowSoftInputMode="adjustResize" />
     </application>
 </manifest>

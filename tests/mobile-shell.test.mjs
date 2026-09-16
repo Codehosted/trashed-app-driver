@@ -210,11 +210,25 @@ describe('mobile WebView shell contract', () => {
     assert.match(capacitorSettings, /node_modules\/@capacitor\/push-notifications\/android/, 'Android settings should register the push plugin');
 
     const capacitorConfig = read('capacitor.config.ts');
-    assert.match(capacitorConfig, /useLegacyBridge:\s*true/, 'Android legacy bridge should keep background location callbacks alive');
+    assert.match(capacitorConfig, /useLegacyBridge:\s*true/, 'background location requires legacy saved-callback delivery');
+    const secureBridge = read('android/app/src/main/java/com/trashed/driver/SecureChatBridge.java');
+    assert.match(secureBridge, /!isMainFrame \|\| !allowed\.equals\(sourceOrigin\.toString\(\)\)/, 'dedicated chat must verify frame and exact origin');
+    assert.match(secureBridge, /DOCUMENT_START_SCRIPT/, 'chat routing must be installed before app scripts');
+    assert.match(secureBridge, /if \(!"TrashedChat"\.equals\(new JSONObject\(data\)\.optString\("pluginId"\)\)\) handler\.postMessage\(data\)/, 'legacy interface must deny all chat calls');
+    assert.match(capacitorConfig, /url: new URL\(serverUrl\)\.origin/, 'bridge origin rules must not include the app route');
+    assert.match(capacitorConfig, /appStartPath: '\/app\?source=trashed-app'/, 'keep the existing app entry separately from the bridge origin');
     assert.doesNotMatch(capacitorConfig, /CapacitorHttp:\s*{[\s\S]*?enabled:\s*true/, 'native HTTP must not globally patch WebView requests');
 
     const manifest = read('android/app/src/main/AndroidManifest.xml');
     assert.match(manifest, /android\.permission\.POST_NOTIFICATIONS/, 'Android 13+ should declare notification permission');
+    assert.match(manifest, /com\.google\.firebase\.messaging\.default_notification_channel_id/, 'Android background notifications should use an explicit default channel');
+    assert.match(manifest, /@string\/trashed_notification_channel_id/, 'default channel should come from a resource');
+    assert.match(manifest, /com\.google\.firebase\.messaging\.default_notification_icon/, 'Android background notifications should use an explicit small icon');
+    assert.match(manifest, /@drawable\/ic_notification/, 'notification icon should be a white-only drawable resource');
+    assert.match(manifest, /com\.google\.firebase\.messaging\.default_notification_color/, 'Android background notifications should set the Trashed notification color');
+    assert.ok(existsSync(join(root, 'android/app/src/main/res/drawable/ic_notification.xml')), 'missing notification icon drawable');
+    assert.match(read('android/app/src/main/res/values/strings.xml'), /<string name="trashed_notification_channel_id">trashed_alerts<\/string>/);
+    assert.match(read('android/app/src/main/res/values/colors.xml'), /<color name="trashed_notification_color">#7033FF<\/color>/);
 
     const instrumentedTest = read('android/app/src/androidTest/java/com/getcapacitor/myapp/ExampleInstrumentedTest.java');
     assert.match(instrumentedTest, /assertEquals\("com\.trashed\.driver"/, 'instrumented test should assert the production package');

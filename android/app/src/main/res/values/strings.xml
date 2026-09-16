@@ -6,4 +6,5 @@
     <string name="custom_url_scheme">com.trashed.driver</string>
     <string name="continue_with_google">Continue with Google</string>
     <string name="sign_in">Sign In</string>
+    <string name="trashed_notification_channel_id">trashed_alerts</string>
 </resources>

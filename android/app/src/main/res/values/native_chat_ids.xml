@@ -1,0 +1,4 @@
+<resources>
+    <item name="native_chat_type" type="id" />
+    <item name="native_chat_image_source" type="id" />
+</resources>

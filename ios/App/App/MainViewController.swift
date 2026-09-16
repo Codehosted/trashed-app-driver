@@ -6,6 +6,29 @@ import GoogleSignIn
 import AuthenticationServices
 import CryptoKit
 
+// CAPPluginCall drops WKFrameInfo. Validate chat's source before forwarding
+// to Capacitor, without changing other plugins' message handling.
+private final class NativeChatBridgeSourceGuard: NSObject, WKScriptMessageHandler {
+    weak var forward: WKScriptMessageHandler?
+    let configured: URL
+    init(forward: WKScriptMessageHandler, configured: URL) {
+        self.forward = forward; self.configured = configured
+    }
+    func userContentController(_ userContentController: WKUserContentController, didReceive message: WKScriptMessage) {
+        if let body = message.body as? [String: Any], body["pluginId"] as? String == "TrashedChat" {
+            let frame = message.frameInfo
+            let origin = frame.securityOrigin
+            var source = URLComponents()
+            source.scheme = origin.protocol
+            source.host = origin.host
+            if origin.port != 0 { source.port = origin.port }
+            guard frame.isMainFrame, let expected = NativeChatPolicy.origin(configured),
+                  NativeChatPolicy.origin(source.url) == expected else { return }
+        }
+        forward?.userContentController(userContentController, didReceive: message)
+    }
+}
+
 private let driverSessionCookieNames = [
     "next-auth.session-token",
     "__Secure-next-auth.session-token",
@@ -161,6 +184,8 @@ class MainViewController: CAPBridgeViewController, UIGestureRecognizerDelegate {
     private var nativeOnboardingController: UIHostingController<NativeAppOnboardingView>?
     private var onboardingReady = false
     private let nativeNavigation = TrashedNavigationPlugin()
+    private let nativeChat = TrashedChatPlugin()
+    private var nativeChatSourceGuard: NativeChatBridgeSourceGuard?
     private var nativeWebBottom: NSLayoutConstraint?
     private var loginURLObservation: NSKeyValueObservation?
     private var historyObservations: [NSKeyValueObservation] = []
@@ -185,7 +210,16 @@ class MainViewController: CAPBridgeViewController, UIGestureRecognizerDelegate {
         super.capacitorDidLoad()
         bridge?.registerPluginInstance(TrashedFileExportPlugin())
         bridge?.registerPluginInstance(nativeNavigation)
+        bridge?.registerPluginInstance(nativeChat)
         guard let webView = webView else { return }
+
+        if let configured = bridge?.config.serverURL,
+           let forward = webView.navigationDelegate as? WKScriptMessageHandler {
+            let sourceGuard = NativeChatBridgeSourceGuard(forward: forward, configured: configured)
+            webView.configuration.userContentController.removeScriptMessageHandler(forName: "bridge")
+            webView.configuration.userContentController.add(sourceGuard, name: "bridge")
+            nativeChatSourceGuard = sourceGuard
+        }
 
         // A native boundary protects every website screen and modal, not just
         // driver controls with a particular CSS class. The status bar stays visible.
@@ -204,11 +238,16 @@ class MainViewController: CAPBridgeViewController, UIGestureRecognizerDelegate {
             bottom,
         ])
         nativeNavigation.attach(to: container)
+        nativeChat.attach(to: container)
     }
 
     var nativeNavigationAvailable: Bool {
         onboardingReady && nativeOnboardingController == nil && nativeLoginController == nil
             && webView?.isLoading == false && viewIfLoaded?.window != nil
+    }
+
+    var nativeChatAvailable: Bool {
+        nativeNavigationAvailable && nativeChatSourceGuard != nil
     }
 
     func setNativeNavigationHeight(_ height: CGFloat) {
@@ -220,6 +259,9 @@ class MainViewController: CAPBridgeViewController, UIGestureRecognizerDelegate {
         let descriptor = super.instanceDescriptor()
         let serverURL = descriptor.serverURL ?? bundledServerURLString() ?? "https://trashed.app/app?source=trashed-app"
         descriptor.serverURL = driverURLString(from: serverURL, theme: currentDriverTheme)
+        // Android needs a separate start path for its strict bridge origin. Here
+        // serverURL already includes /app and theme; do not append it twice.
+        descriptor.appStartPath = nil
         return descriptor
     }
 
@@ -272,16 +314,18 @@ class MainViewController: CAPBridgeViewController, UIGestureRecognizerDelegate {
             historyObservations = [
                 webView.observe(\.canGoBack, options: [.new]) { [weak self] _, _ in self?.updateHistoryGestures() },
                 webView.observe(\.isLoading, options: [.new]) { [weak self] webView, _ in
-                    if webView.isLoading { self?.nativeNavigation.reset() }
+                    if webView.isLoading { self?.nativeNavigation.reset(); self?.nativeChat.reset(purge: !NativeChatPolicy.isAssistant(webView.url, configured: self?.bridge?.config.serverURL)) }
                     else { self?.nativeNavigation.refresh() }
                     self?.updateHistoryGestures()
                 },
             ]
         }
         loginURLObservation = webView?.observe(\.url, options: [.new]) { [weak self] webView, _ in
-            guard let self = self, let url = webView.url else { return }
+            guard let self = self else { return }
+            guard let url = webView.url else { self.nativeChat.reset(); return }
             self.updateHistoryGestures()
-            if !NativeNavigationPolicy.isWorkspace(url, configured: self.bridge?.config.serverURL) { self.nativeNavigation.reset() }
+            if !NativeNavigationPolicy.isWorkspace(url, configured: self.bridge?.config.serverURL) { self.nativeNavigation.reset(); self.nativeChat.reset() }
+            if url.path != "/vendor/assistant" { self.nativeChat.reset() }
             guard self.onboardingReady else { return }
             let config = self.makeDriverAuthConfig()
             guard url.scheme == config.origin.scheme,
@@ -405,6 +449,7 @@ class MainViewController: CAPBridgeViewController, UIGestureRecognizerDelegate {
 
     private func presentNativeOnboarding() {
         nativeNavigation.reset()
+        nativeChat.reset()
         workspaceHistory.reset()
         webView?.allowsBackForwardNavigationGestures = false
         historyEdgeGesture?.isEnabled = false
@@ -493,6 +538,7 @@ class MainViewController: CAPBridgeViewController, UIGestureRecognizerDelegate {
     private func presentNativeLogin(_ config: DriverAuthConfig) {
         guard onboardingReady, nativeOnboardingController == nil else { return }
         nativeNavigation.reset()
+        nativeChat.reset()
         workspaceHistory.reset()
         webView?.allowsBackForwardNavigationGestures = false
         historyEdgeGesture?.isEnabled = false

@@ -32,10 +32,21 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  android-checkpoint:
+    if: github.event_name == 'workflow_dispatch'
+    uses: ./.github/workflows/android-checkpoint.yml
+    permissions:
+      contents: read
+    secrets:
+      SLACK_MOBILE_BUILD_BOT_TOKEN: ${{ secrets.SLACK_MOBILE_BUILD_BOT_TOKEN }}
+
   upload-testflight:
     name: Build and upload TestFlight build
     runs-on: macos-15
     timeout-minutes: 60
+    outputs:
+      build_number: ${{ steps.version.outputs.build_number }}
+      version: ${{ steps.version.outputs.version }}
     permissions:
       contents: read
     env:
@@ -74,5 +85,46 @@ jobs:
           printf '%s\n' "$XCODE_VERSION_OUTPUT"
           grep -Eq '^Xcode 26([.]|$)' <<< "$XCODE_VERSION_OUTPUT"
 
+      - name: Resolve exact build identity
+        id: version
+        shell: bash
+        run: |
+          set -euo pipefail
+          BUILD_NUMBER="${BUILD_NUMBER:-$(date -u +%Y%m%d%H%M)}"
+          [[ "$BUILD_NUMBER" =~ ^[0-9]{1,18}$ ]] || exit 2
+          [[ "$MARKETING_VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || exit 2
+          printf 'BUILD_NUMBER=%s\n' "$BUILD_NUMBER" >> "$GITHUB_ENV"
+          printf 'build_number=%s\nversion=%s\n' "$BUILD_NUMBER" "$MARKETING_VERSION" >> "$GITHUB_OUTPUT"
       - name: Upload to TestFlight
         run: bash scripts/ci-upload-testflight.sh
+
+  notify-ios:
+    needs: upload-testflight
+    if: always() && vars.SLACK_APP_UPDATES_ENABLED == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Notify iOS channel and verify message
+        run: node scripts/notify-build-slack.mjs
+        env:
+          SLACK_APP_UPDATES_ENABLED: ${{ vars.SLACK_APP_UPDATES_ENABLED }}
+          SLACK_MOBILE_BUILD_BOT_TOKEN: ${{ secrets.SLACK_MOBILE_BUILD_BOT_TOKEN }}
+          SLACK_MOBILE_APP_IOS_CHANNEL_ID: ${{ vars.SLACK_MOBILE_APP_IOS_CHANNEL_ID }}
+          MOBILE_PLATFORM: ios
+          MOBILE_BUILD_STATUS: ${{ needs.upload-testflight.result }}
+          MOBILE_VERSION: ${{ needs.upload-testflight.outputs.version }}
+          MOBILE_BUILD_NUMBER: ${{ needs.upload-testflight.outputs.build_number }}
+          SLACK_RECEIPT_PATH: slack-ios-receipt.json
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: slack-ios-receipt-${{ github.run_id }}
+          path: slack-ios-receipt.json
+          if-no-files-found: warn
+          retention-days: 14

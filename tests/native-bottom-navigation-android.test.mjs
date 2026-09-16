@@ -47,7 +47,7 @@ test('host clears document/account boundaries and dismisses native sheet before 
     const start = activity.indexOf(`private void ${method}(`);
     assert.match(activity.slice(start, start + 400), /nativeNavigation.reset\(\)/);
   }
-  assert.match(activity, /handleOnBackPressed\(\) \{\s*if \(nativeNavigation.dismissSheet\(\)\) return;\s*if \(backCheckPending\)/);
+  assert.match(activity, /handleOnBackPressed\(\) \{\s*if \(nativeNavigation.dismissSheet\(\)\) return;\s*if \(nativeChat != null && nativeChat.dismissDialog\(\)\) return;\s*if \(backCheckPending\)/);
   assert.match(activity, /NativeWorkspaceHistory.isWorkspaceURL\(getBridge\(\).getWebView\(\).getUrl\(\), authConfig.origin\)/);
   assert.match(activity, /nativeNavigation.keyboard\(windowInsets.isVisible\(WindowInsetsCompat.Type.ime\(\)\)\)/);
   assert.match(activity, /Math.max\(insets.bottom, ime.bottom\)/);
