@@ -2,7 +2,8 @@
     <!-- Host registration only: instrumentation loads implementations from the
          androidTest APK into the target process. Keep them out of the app APK,
          especially release; MissingClass is expected only on these four hosts. -->
-    <application>
+    <application android:networkSecurityConfig="@xml/native_workspace_debug_network">
+        <activity android:name="com.trashed.driver.NativeWorkspaceTestActivity" android:exported="false" tools:ignore="MissingClass" />
         <activity android:name="com.trashed.driver.SecureChatBridgeActivity" android:exported="false" tools:ignore="MissingClass" />
         <activity android:name="com.trashed.driver.NativeChatInputActivity" android:exported="false" tools:ignore="MissingClass" />
         <activity android:name="com.trashed.driver.NavigationTestActivity" android:exported="false" tools:ignore="MissingClass" />

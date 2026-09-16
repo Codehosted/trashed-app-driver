@@ -13,7 +13,7 @@ test('instrumentation-only activity exceptions are narrow and absent from releas
  const debug=read('android/app/src/debug/AndroidManifest.xml');
  assert.doesNotMatch(debug,/<application[^>]*tools:ignore/);
  const hosts=[...debug.matchAll(/<activity\b[^>]*>/g)].map(([row])=>row);
- assert.equal(hosts.length,4);
+ assert.equal(hosts.length,5);
  for(const host of hosts){
   const name=host.match(/android:name="com\.trashed\.driver\.([^"]+)"/)[1];
   assert.match(host,/android:exported="false"/);

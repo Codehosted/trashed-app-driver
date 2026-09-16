@@ -1,5 +1,6 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
     <application>
+        <activity android:name="com.trashed.driver.NativeWorkspaceTestActivity" android:exported="false" />
         <provider android:name="com.trashed.driver.NativeChatInputBytes"
             android:authorities="com.trashed.driver.test.chatbytes" android:exported="true" />
         <provider android:name="com.trashed.driver.NativeChatInputDocuments"
