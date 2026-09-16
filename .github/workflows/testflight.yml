@@ -3,6 +3,16 @@ name: Upload Driver App to TestFlight
 on:
   workflow_dispatch:
     inputs:
+      build_ios:
+        description: Build and upload iOS to TestFlight
+        type: boolean
+        required: true
+        default: true
+      build_android:
+        description: Build Android QA APK artifacts
+        type: boolean
+        required: true
+        default: true
       marketing_version:
         description: App Store marketing version
         required: false
@@ -33,7 +43,7 @@ concurrency:
 
 jobs:
   android-checkpoint:
-    if: github.event_name == 'workflow_dispatch'
+    if: github.event_name == 'workflow_dispatch' && inputs.build_android
     uses: ./.github/workflows/android-checkpoint.yml
     permissions:
       contents: read
@@ -41,6 +51,7 @@ jobs:
       SLACK_MOBILE_BUILD_BOT_TOKEN: ${{ secrets.SLACK_MOBILE_BUILD_BOT_TOKEN }}
 
   upload-testflight:
+    if: github.event_name != 'workflow_dispatch' || inputs.build_ios
     name: Build and upload TestFlight build
     runs-on: macos-15
     timeout-minutes: 60
