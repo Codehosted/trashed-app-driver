@@ -19,4 +19,37 @@
     <style name="AppTheme.NoActionBarLaunch" parent="Theme.SplashScreen">
         <item name="android:background">@drawable/splash</item>
     </style>
+    <!-- Scoped to native navigation views/dialogs; keep the existing Activity theme. -->
+    <style name="TrashedNavigationLight" parent="Theme.MaterialComponents.Light.NoActionBar">
+        <item name="colorPrimary">#7033FF</item>
+        <item name="colorSecondary">#7033FF</item>
+        <item name="colorSurface">#FFFFFF</item>
+        <item name="colorOnSurface">#211A2B</item>
+    </style>
+    <style name="TrashedNavigationDark" parent="Theme.MaterialComponents.NoActionBar">
+        <item name="colorPrimary">#BE9FFF</item>
+        <item name="colorSecondary">#BE9FFF</item>
+        <item name="colorSurface">#1F1A26</item>
+        <item name="colorOnSurface">#F2EDF9</item>
+    </style>
+    <style name="TrashedNavigationSheetLight" parent="Theme.MaterialComponents.Light.BottomSheetDialog">
+        <item name="colorPrimary">#7033FF</item>
+        <item name="colorSecondary">#7033FF</item>
+        <item name="colorSurface">#FFFFFF</item>
+        <item name="colorOnSurface">#211A2B</item>
+        <item name="bottomSheetStyle">@style/TrashedNavigationSheet</item>
+    </style>
+    <style name="TrashedNavigationSheetDark" parent="Theme.MaterialComponents.BottomSheetDialog">
+        <item name="colorPrimary">#BE9FFF</item>
+        <item name="colorSecondary">#BE9FFF</item>
+        <item name="colorSurface">#1F1A26</item>
+        <item name="colorOnSurface">#F2EDF9</item>
+        <item name="bottomSheetStyle">@style/TrashedNavigationSheet</item>
+    </style>
+    <style name="TrashedNavigationSheet" parent="Widget.MaterialComponents.BottomSheet.Modal">
+        <item name="android:elevation">0dp</item>
+        <item name="paddingBottomSystemWindowInsets">true</item>
+        <item name="paddingLeftSystemWindowInsets">true</item>
+        <item name="paddingRightSystemWindowInsets">true</item>
+    </style>
 </resources>
