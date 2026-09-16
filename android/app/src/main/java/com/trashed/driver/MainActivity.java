@@ -93,12 +93,39 @@ public class MainActivity extends BridgeActivity {
     private AuthConfig authConfig;
     private GoogleSignInClient googleClient;
     private NativeBottomNavigation nativeNavigation;
+    private TrashedChatPlugin nativeChat;
+    private FrameLayout chatContainer;
+    private boolean chatResumed;
     private volatile long navigationDocument;
     private boolean navigationLoading = true;
+    private NativeWorkspaceView nativeWorkspace;
+    private String nativeWorkspaceURL;
+    private String nativeWorkspaceBypass = "";
+    private String nativeWorkspaceBypassSession = "";
 
     // One-time bootstrap gate only. Once open, retain Capacitor's normal URL policy/client.
     static final class OnboardingWebView extends CapacitorWebView {
         boolean appNavigationEnabled;
+        boolean legacyBridgeInstalled;
+        boolean chatChannelSecured;
+        String chatServerOrigin;
+
+        // This WebView override forwards runtime interface objects, not a plain
+        // Object instance. Their own @JavascriptInterface methods remain required.
+        @android.annotation.SuppressLint("JavascriptInterface")
+        @Override public void addJavascriptInterface(Object object, String name) {
+            if ("androidBridge".equals(name)) {
+                legacyBridgeInstalled = true;
+                chatChannelSecured = false;
+                if (object instanceof com.getcapacitor.MessageHandler) {
+                    com.getcapacitor.MessageHandler handler = (com.getcapacitor.MessageHandler) object;
+                    super.addJavascriptInterface(new SecureChatBridge.LegacyBridgeGate(handler), name);
+                    chatChannelSecured = SecureChatBridge.install(this, handler, chatServerOrigin);
+                }
+                return; // Never expose the unfiltered, frame-blind chat dispatcher.
+            }
+            super.addJavascriptInterface(object, name);
+        }
 
         OnboardingWebView(Context context) { super(context, null); }
 
@@ -119,6 +146,7 @@ public class MainActivity extends BridgeActivity {
         ViewGroup parent = (ViewGroup) original.getParent();
         int index = parent.indexOfChild(original);
         OnboardingWebView gated = new OnboardingWebView(this);
+        gated.chatServerOrigin = (config != null ? config : com.getcapacitor.CapConfig.loadDefault(this)).getServerUrl();
         gated.setId(original.getId());
         ViewGroup.LayoutParams params = original.getLayoutParams();
         parent.removeView(original);
@@ -131,7 +159,13 @@ public class MainActivity extends BridgeActivity {
     protected void onCreate(Bundle savedInstanceState) {
         registerPlugin(TrashedNavigationPlugin.class);
         registerPlugin(TrashedFileExportPlugin.class);
+        registerPlugin(TrashedChatPlugin.class);
         super.onCreate(savedInstanceState);
+        if (android.os.Build.VERSION.SDK_INT >= 26) {
+            android.app.NotificationChannel channel = new android.app.NotificationChannel("trashed_alerts", "Trashed alerts", android.app.NotificationManager.IMPORTANCE_HIGH);
+            channel.setDescription("Order, message and service alerts from Trashed");
+            getSystemService(android.app.NotificationManager.class).createNotificationChannel(channel);
+        }
         // Android 16 enforces edge-to-edge; keep both native login and WebView inside the safe area.
         View content = findViewById(android.R.id.content);
         content.setBackgroundColor(Color.rgb(2, 6, 23));
@@ -148,6 +182,14 @@ public class MainActivity extends BridgeActivity {
         authConfig = readAuthConfig();
         WebView webView = getBridge().getWebView();
         nativeNavigation = new NativeBottomNavigation(this, webView, this::canPresentNavigation);
+        // Overlay only the web content slot, never the bottom navigation. Keep WebView running.
+        ViewGroup webParent = (ViewGroup) webView.getParent();
+        int webIndex = webParent.indexOfChild(webView);
+        ViewGroup.LayoutParams webParams = webView.getLayoutParams();
+        webParent.removeView(webView);
+        chatContainer = new FrameLayout(this);
+        chatContainer.addView(webView, fullFrameParams());
+        webParent.addView(chatContainer, webIndex, webParams);
         CookieManager cookieManager = CookieManager.getInstance();
         cookieManager.setAcceptCookie(true);
         cookieManager.setAcceptThirdPartyCookies(webView, true);
@@ -155,6 +197,8 @@ public class MainActivity extends BridgeActivity {
         historyBack = new OnBackPressedCallback(false) {
             @Override public void handleOnBackPressed() {
                 if (nativeNavigation.dismissSheet()) return;
+                if (nativeWorkspace != null && nativeWorkspace.back()) return;
+                if (nativeChat != null && nativeChat.dismissDialog()) return;
                 if (backCheckPending) return;
                 WebView view = getBridge().getWebView();
                 String requestedURL = view.getUrl();
@@ -173,6 +217,14 @@ public class MainActivity extends BridgeActivity {
                         || (requestedIndex > 0 && !java.util.Objects.equals(requestedBack,
                             currentHistory.getItemAtIndex(requestedIndex - 1).getUrl()))) return;
                     if (!"false".equals(result)) return; // An open dialog or failed check consumes Back.
+                    // Explicit full tools is a web presentation of this native route, not
+                    // a permanent route opt-out. Back returns to native before popping history.
+                    if (!navigationLoading && requestedURL != null && requestedURL.equals(nativeWorkspaceBypass)) {
+                        nativeWorkspaceBypass = "";
+                        nativeWorkspaceBypassSession = "";
+                        updateNativeWorkspace();
+                        if (nativeWorkspace != null) return;
+                    }
                     if (historyBackAvailable) {
                         // Android WebView's native offset API also skips unactivated entries.
                         // Renderer history.go is exact; recheck the document before executing it.
@@ -191,9 +243,15 @@ public class MainActivity extends BridgeActivity {
         // Add history notifications only; inherit all Capacitor URL/intent/plugin navigation behavior.
         getBridge().setWebViewClient(new BridgeWebViewClient(getBridge()) {
             @Override public void onPageStarted(WebView view, String url, android.graphics.Bitmap favicon) {
+                closeNativeWorkspace();
+                if (!java.util.Objects.equals(url, nativeWorkspaceBypass)) {
+                    nativeWorkspaceBypass = "";
+                    nativeWorkspaceBypassSession = "";
+                }
                 navigationLoading = true;
                 navigationDocument++;
                 nativeNavigation.reset();
+                if (nativeChat != null) nativeChat.newDocument();
                 super.onPageStarted(view, url, favicon);
             }
             @Override public void doUpdateVisitedHistory(WebView view, String url, boolean isReload) {
@@ -224,12 +282,107 @@ public class MainActivity extends BridgeActivity {
     }
 
     long navigationDocument() { return navigationDocument; }
+    void attachNativeChat(TrashedChatPlugin plugin) { nativeChat = plugin; }
+    String chatOrigin() { return authConfig == null ? "" : authConfig.origin; }
+    String chatSession() {
+        String cookies = CookieManager.getInstance().getCookie(chatOrigin());
+        if (cookies == null) return "";
+        java.util.List<String> sessionCookies = new java.util.ArrayList<>();
+        for (String cookie : cookies.split(";")) {
+            String part = cookie.trim(); String name = part.split("=", 2)[0];
+            if (name.equals(SESSION_COOKIE) || name.equals(SECURE_SESSION_COOKIE) || name.startsWith(SESSION_COOKIE + ".") || name.startsWith(SECURE_SESSION_COOKIE + ".")) sessionCookies.add(part);
+        }
+        java.util.Collections.sort(sessionCookies);
+        return sessionCookies.isEmpty() ? "" : NativeChatCache.digest(String.join(";", sessionCookies));
+    }
+    static boolean isAssistantURL(String url, String origin) {
+        if (!NativeWorkspaceHistory.isSameOriginURL(url, origin)) return false;
+        try { return "/vendor/assistant".equals(new java.net.URI(url).getRawPath()); }
+        catch (Exception ignored) { return false; }
+    }
+    boolean canPresentChat() {
+        return chatBridgeMainFrameOnly() && chatResumed && chatContainer != null && canPresentNavigation()
+            && isAssistantURL(getBridge().getWebView().getUrl(), chatOrigin()) && !chatSession().isEmpty();
+    }
+    boolean chatBridgeMainFrameOnly() {
+        if (getBridge() == null || !(getBridge().getWebView() instanceof OnboardingWebView)) return false;
+        OnboardingWebView view = (OnboardingWebView) getBridge().getWebView();
+        return view.chatChannelSecured || (!getBridge().getConfig().isUsingLegacyBridge()
+            && androidx.webkit.WebViewFeature.isFeatureSupported(androidx.webkit.WebViewFeature.WEB_MESSAGE_LISTENER)
+            && !view.legacyBridgeInstalled);
+    }
+    void showNativeChat(NativeChatView view) {
+        chatContainer.addView(view, fullFrameParams());
+        getBridge().getWebView().setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_NO_HIDE_DESCENDANTS);
+    }
+    void hideNativeChat(NativeChatView view) {
+        if (view.hasFocus()) hideKeyboard();
+        if (view.getParent() instanceof ViewGroup) ((ViewGroup) view.getParent()).removeView(view);
+        getBridge().getWebView().setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_AUTO);
+    }
     boolean navigationLoading() { return navigationLoading; }
     boolean canPresentNavigation() {
         return !isFinishing() && !isDestroyed() && !navigationLoading && onboardingReady && onboardingOverlay == null && loginOverlay == null
             && authConfig != null && NativeWorkspaceHistory.isWorkspaceURL(getBridge().getWebView().getUrl(), authConfig.origin);
     }
-    void setNativeNavigation(NativeNavigationState state, NativeBottomNavigation.Listener listener) { nativeNavigation.set(state, listener); }
+    void setNativeNavigation(NativeNavigationState state, NativeBottomNavigation.Listener listener) {
+        nativeNavigation.set(state, new NativeBottomNavigation.Listener() {
+            @Override public void select(NativeNavigationState.Selection selection) {
+                Runnable next = () -> listener.select(selection);
+                if (nativeWorkspace != null) nativeWorkspace.confirmLeave(next); else next.run();
+            }
+            @Override public void reset(String context) { listener.reset(context); }
+        });
+    }
+    private String workspaceSession() {
+        String identity = NativeWorkspacePolicy.identityFingerprint(CookieManager.getInstance().getCookie(chatOrigin()));
+        return identity.isEmpty() ? "" : NativeChatCache.digest(chatOrigin() + ":" + identity);
+    }
+    private void closeNativeWorkspace() {
+        if (nativeWorkspace == null) return;
+        if (nativeWorkspace.hasFocus()) hideKeyboard();
+        nativeWorkspace.dispose(); chatContainer.removeView(nativeWorkspace);
+        nativeWorkspace = null; nativeWorkspaceURL = null;
+        getBridge().getWebView().setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_AUTO);
+    }
+    private void updateNativeWorkspace() {
+        if (getBridge() == null || chatContainer == null) return;
+        String url = getBridge().getWebView().getUrl();
+        String destination = NativeWorkspacePolicy.destination(url, chatOrigin());
+        String session = workspaceSession();
+        // Loading/pausing is not route departure. Keep the explicit web choice
+        // through callbacks and resume, scoped to the exact URL and identity.
+        if ((!navigationLoading && !java.util.Objects.equals(url, nativeWorkspaceBypass))
+            || !session.equals(nativeWorkspaceBypassSession)) {
+            nativeWorkspaceBypass = "";
+            nativeWorkspaceBypassSession = "";
+        }
+        if (!canPresentNavigation() || !chatResumed || destination.isEmpty()
+            || java.util.Objects.equals(url, nativeWorkspaceBypass) || session.isEmpty()) { closeNativeWorkspace(); return; }
+        if (nativeWorkspace != null && java.util.Objects.equals(url, nativeWorkspaceURL)
+            && nativeWorkspace.session.equals(workspaceSession())) return;
+        closeNativeWorkspace();
+        boolean dark = (getResources().getConfiguration().uiMode & Configuration.UI_MODE_NIGHT_MASK) == Configuration.UI_MODE_NIGHT_YES;
+        nativeWorkspaceURL = url;
+        nativeWorkspace = new NativeWorkspaceView(this, new NativeWorkspaceView.Host() {
+            public String session() { return workspaceSession(); }
+            public String cookies() { return CookieManager.getInstance().getCookie(chatOrigin()); }
+            public NativeWorkspaceApi.CookieSource cookieSource() { return new NativeWorkspaceCookieStore(chatOrigin()); }
+            public void signIn() { closeNativeWorkspace(); showNativeLogin(); }
+            public void web(String path) {
+                if (!path.startsWith("/") || path.startsWith("//")) return;
+                String target = chatOrigin() + path;
+                if (!NativeWorkspaceHistory.isWorkspaceURL(target, chatOrigin())) return;
+                nativeWorkspaceBypass = NativeWorkspacePolicy.destination(target, chatOrigin()).isEmpty() ? "" : target;
+                nativeWorkspaceBypassSession = nativeWorkspaceBypass.isEmpty() ? "" : workspaceSession();
+                navigationLoading = true;
+                closeNativeWorkspace(); getBridge().getWebView().loadUrl(target);
+            }
+            public void back() { getOnBackPressedDispatcher().onBackPressed(); }
+        }, chatOrigin(), url, destination, dark);
+        chatContainer.addView(nativeWorkspace, fullFrameParams());
+        getBridge().getWebView().setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_NO_HIDE_DESCENDANTS);
+    }
     void clearNativeNavigation(String context) { nativeNavigation.clear(context); }
 
     @Override public void onConfigurationChanged(Configuration configuration) {
@@ -238,12 +391,25 @@ public class MainActivity extends BridgeActivity {
     }
 
     @Override public void onPause() {
+        chatResumed = false;
+        if (nativeChat != null) nativeChat.pause();
+        if (nativeWorkspace != null) nativeWorkspace.suspend();
         if (nativeNavigation != null) nativeNavigation.dismissSheet();
         super.onPause();
     }
 
+    @Override public void onResume() {
+        super.onResume();
+        chatResumed = true;
+        if (nativeChat != null) nativeChat.resume();
+        if (nativeWorkspace != null) nativeWorkspace.resume();
+        updateNativeWorkspace();
+    }
+
     @Override public void onDestroy() {
         navigationDocument++;
+        closeNativeWorkspace();
+        if (nativeChat != null) nativeChat.reset(false, true);
         if (nativeNavigation != null) nativeNavigation.reset();
         super.onDestroy();
     }
@@ -255,8 +421,11 @@ public class MainActivity extends BridgeActivity {
         boolean visible = onboardingReady && onboardingOverlay == null && loginOverlay == null;
         boolean workspace = visible && NativeWorkspaceHistory.isWorkspaceURL(webView.getUrl(), authConfig.origin);
         if (!workspace && nativeNavigation != null) nativeNavigation.reset();
+        if (nativeChat != null && (!canPresentChat())) nativeChat.reset(true,
+            !navigationLoading || !isAssistantURL(webView.getUrl(), chatOrigin()) || chatSession().isEmpty());
         if (NativeWorkspaceHistory.isAuthenticationURL(webView.getUrl())) workspaceHistory.beginSession();
         workspaceHistory.update(index, workspace, committed);
+        updateNativeWorkspace();
         historyBackAvailable = workspace && workspaceHistory.canGoBack(index) && index > 0
             && NativeWorkspaceHistory.isWorkspaceURL(history.getItemAtIndex(index - 1).getUrl(), authConfig.origin);
         // Public help/legal pages can host the same app drawer; history itself stays workspace-only.
@@ -271,6 +440,7 @@ public class MainActivity extends BridgeActivity {
 
     private void showNativeOnboarding(String error) {
         navigationDocument++;
+        if (nativeChat != null) nativeChat.newDocument();
         if (nativeNavigation != null) nativeNavigation.reset();
         workspaceHistory.reset();
         historyBackAvailable = false;
@@ -418,7 +588,11 @@ public class MainActivity extends BridgeActivity {
 
     private void showNativeLogin() {
         if (!onboardingReady || onboardingOverlay != null) return;
+        nativeWorkspaceBypass = "";
+        nativeWorkspaceBypassSession = "";
+        closeNativeWorkspace();
         navigationDocument++;
+        if (nativeChat != null) nativeChat.newDocument();
         if (nativeNavigation != null) nativeNavigation.reset();
         workspaceHistory.reset();
         historyBackAvailable = false;

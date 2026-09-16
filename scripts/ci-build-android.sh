@@ -21,6 +21,7 @@ export CI=true
 cd "$ROOT_DIR"
 if [[ "$MODE" == release ]]; then
   node scripts/check-mobile-backend.mjs
+  node scripts/check-mobile-push-config.mjs
 fi
 rm -rf "$ARTIFACT_DIR"
 mkdir -p "$ARTIFACT_DIR"

@@ -1,0 +1,255 @@
+import SwiftUI
+import AVFoundation
+
+@available(iOS 16.0, *)
+@MainActor
+final class WorkspaceAudio: ObservableObject {
+    @Published private(set) var call: WorkspaceCall?
+    @Published private(set) var playing = false
+    @Published private(set) var loading = false
+    @Published private(set) var elapsed: Double = 0
+    @Published private(set) var duration: Double = 0
+    @Published private(set) var error: String?
+    private var player: AVPlayer?
+    private var file: URL?
+    private var observer: Any?
+    private var status: NSKeyValueObservation?
+    private var timeStatus: NSKeyValueObservation?
+    private var finished: NSObjectProtocol?
+    private var interrupted: NSObjectProtocol?
+    private var request: Task<Void, Never>?
+    private var revision = UUID()
+
+    func toggle(_ call: WorkspaceCall, api: any WorkspaceServing, scope: String, failure: @escaping (Error) -> Void) {
+        if self.call?.id == call.id, let player = player {
+            if playing { player.pause() }
+            else { if duration > 0 && elapsed >= duration - 0.2 { seek(0) }; player.play() }
+            return
+        }
+        stop()
+        self.call = call; loading = true
+        let revision = self.revision
+        request = Task { [weak self] in
+            guard let self = self else { return }
+            do {
+                let (data, ext) = try await api.recording(call, scope: scope)
+                try Task.checkCancellation()
+                guard self.revision == revision else { return }
+                let file = FileManager.default.temporaryDirectory.appendingPathComponent("native-workspace-\(UUID().uuidString).\(ext)")
+                try data.write(to: file, options: [.atomic, .completeFileProtection])
+                self.file = file
+                try AVAudioSession.sharedInstance().setCategory(.playback, mode: .spokenAudio)
+                try AVAudioSession.sharedInstance().setActive(true)
+                let item = AVPlayerItem(url: file)
+                let player = AVPlayer(playerItem: item)
+                self.player = player
+                self.status = item.observe(\.status, options: [.initial, .new]) { [weak self] item, _ in
+                    Task { @MainActor in
+                        guard let self = self, self.revision == revision else { return }
+                        switch item.status {
+                        case .readyToPlay:
+                            let seconds = item.duration.seconds
+                            self.duration = seconds.isFinite ? max(0, seconds) : 0
+                            self.loading = false
+                        case .failed:
+                            self.loading = false; self.playing = false
+                            self.error = "The recording could not be played. Try again."
+                            self.player?.pause()
+                            if let observer = self.observer { self.player?.removeTimeObserver(observer) }
+                            self.observer = nil; self.player = nil
+                        default: break
+                        }
+                    }
+                }
+                self.timeStatus = player.observe(\.timeControlStatus, options: [.initial, .new]) { [weak self] player, _ in
+                    Task { @MainActor in
+                        guard self?.revision == revision else { return }
+                        self?.playing = player.timeControlStatus == .playing
+                        self?.loading = player.timeControlStatus == .waitingToPlayAtSpecifiedRate
+                    }
+                }
+                self.observer = player.addPeriodicTimeObserver(forInterval: CMTime(seconds: 0.25, preferredTimescale: 600), queue: .main) { [weak self] time in
+                    Task { @MainActor in
+                        guard self?.revision == revision, time.seconds.isFinite else { return }
+                        self?.elapsed = max(0, time.seconds)
+                    }
+                }
+                self.finished = NotificationCenter.default.addObserver(forName: .AVPlayerItemDidPlayToEndTime, object: item, queue: .main) { [weak self] _ in
+                    Task { @MainActor in if self?.revision == revision { self?.playing = false } }
+                }
+                self.interrupted = NotificationCenter.default.addObserver(forName: AVAudioSession.interruptionNotification, object: nil, queue: .main) { [weak self] _ in
+                    Task { @MainActor in if self?.revision == revision { self?.player?.pause() } }
+                }
+                player.play()
+            } catch {
+                guard !Task.isCancelled, self.revision == revision else { return }
+                self.loading = false; self.error = error.localizedDescription
+                failure(error)
+            }
+        }
+    }
+
+    func seek(_ seconds: Double) {
+        guard seconds.isFinite else { return }
+        player?.seek(to: CMTime(seconds: min(max(0, seconds), duration), preferredTimescale: 600))
+    }
+
+    func stop() {
+        revision = UUID(); request?.cancel(); request = nil
+        player?.pause()
+        if let observer = observer { player?.removeTimeObserver(observer) }
+        observer = nil; status = nil; timeStatus = nil
+        if let finished = finished { NotificationCenter.default.removeObserver(finished) }
+        if let interrupted = interrupted { NotificationCenter.default.removeObserver(interrupted) }
+        finished = nil; interrupted = nil; player = nil
+        if let file = file { try? FileManager.default.removeItem(at: file) }
+        file = nil; call = nil; playing = false; loading = false; error = nil; elapsed = 0; duration = 0
+        try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
+    }
+}
+
+@available(iOS 16.0, *)
+@MainActor
+final class WorkspaceModel: ObservableObject {
+    let api: any WorkspaceServing
+    let audio = WorkspaceAudio() // A single player owned above every collapsible row.
+    @Published private(set) var profile: WorkspaceProfile?
+    @Published private(set) var loading = false
+    @Published private(set) var saving = false
+    @Published private(set) var error: String?
+    @Published private(set) var pageError: String?
+    @Published private(set) var pagination = WorkspacePagination()
+    @Published private(set) var paging = false
+    @Published private(set) var invalidated = false
+    @Published private(set) var suspended = false
+    private var loadID = UUID()
+    private var closed = false
+    private var lifecycleID = UUID()
+    private var profileID = UUID()
+    private var saveID = UUID()
+    var onExpired: (() -> Void)?
+    var scope: String? { profile?.scope(origin: api.origin) }
+
+    init(api: any WorkspaceServing) {
+        self.api = api
+        api.onSessionChange = { [weak self] in self?.invalidate(WorkspaceError.scopeChanged) }
+    }
+
+    func close() {
+        closed = true; lifecycleID = UUID(); loadID = UUID(); audio.stop(); api.close()
+        loading = false; paging = false; saving = false
+        profile = nil; pagination.reset()
+    }
+
+    func suspend() {
+        guard !closed, !invalidated else { return }
+        suspended = true; lifecycleID = UUID(); saving = false
+        loadID = UUID(); audio.stop(); api.cancelPending()
+        loading = false; paging = false
+    }
+
+    func resume() async {
+        guard !closed, !invalidated, suspended else { return }
+        let id = UUID(); lifecycleID = id
+        do {
+            let current = try await api.profile()
+            guard lifecycleID == id, !Task.isCancelled, !closed, !invalidated else { return }
+            if let scope = scope, current.scope(origin: api.origin) != scope { throw WorkspaceError.scopeChanged }
+            profile = current; suspended = false
+        } catch {
+            guard lifecycleID == id, !Task.isCancelled, !closed, !invalidated else { return }
+            invalidate(error)
+        }
+    }
+
+    func invalidate(_ failure: Error) {
+        guard !closed, !invalidated else { return }
+        lifecycleID = UUID(); invalidated = true; profile = nil; pagination.reset(); audio.stop()
+        loadID = UUID(); loading = false; paging = false; saving = false
+        error = failure.localizedDescription
+        if case WorkspaceError.expired = failure { onExpired?() }
+    }
+
+    func handle(_ failure: Error) {
+        switch failure {
+        case WorkspaceError.expired, WorkspaceError.scopeChanged, WorkspaceError.forbidden, WorkspaceError.emailChanged: invalidate(failure)
+        default: break
+        }
+    }
+
+    func loadProfile() async {
+        guard !closed, !invalidated, !suspended else { return }
+        let lifetime = lifecycleID, id = UUID(); profileID = id
+        loading = true; error = nil
+        defer { if lifecycleID == lifetime, profileID == id { loading = false } }
+        do {
+            let profile = try await api.profile()
+            try Task.checkCancellation()
+            guard lifecycleID == lifetime, profileID == id, !closed, !invalidated, !suspended else { return }
+            if let scope = scope, profile.scope(origin: api.origin) != scope { throw WorkspaceError.scopeChanged }
+            self.profile = profile
+        } catch {
+            guard lifecycleID == lifetime, profileID == id, !Task.isCancelled, !closed, !invalidated, !suspended else { return }
+            self.error = error.localizedDescription; handle(error)
+        }
+    }
+
+    func save(_ edit: WorkspaceProfileEdit) async -> Bool {
+        guard let scope = scope, !saving, !closed, !invalidated, !suspended else { return false }
+        if let validation = edit.validation { error = validation; return false }
+        let lifetime = lifecycleID, id = UUID(); saveID = id
+        saving = true; error = nil
+        defer { if lifecycleID == lifetime, saveID == id { saving = false } }
+        do {
+            let verified = try await api.save(edit, scope: scope)
+            guard lifecycleID == lifetime, saveID == id, !Task.isCancelled, !closed, !invalidated, !suspended else { return false }
+            profile = verified
+            return true
+        } catch {
+            guard lifecycleID == lifetime, saveID == id, !Task.isCancelled, !closed, !invalidated, !suspended else { return false }
+            self.error = error.localizedDescription; handle(error); return false
+        }
+    }
+
+    func loadCalls(_ query: WorkspaceCallsQuery, refresh: Bool = false, debounce: Bool = false) async {
+        guard !closed, !invalidated, !suspended else { return }
+        let id = UUID(); loadID = id
+        loading = true; paging = false; error = nil; pageError = nil
+        if !refresh { pagination.reset() }
+        defer { if loadID == id { loading = false } }
+        do {
+            if debounce { try await Task.sleep(nanoseconds: 300_000_000) }
+            try Task.checkCancellation()
+            let current = try await api.profile()
+            guard loadID == id, !closed, !invalidated else { return }
+            if let scope = scope, current.scope(origin: api.origin) != scope { throw WorkspaceError.scopeChanged }
+            guard current.capabilities.calls else { throw WorkspaceError.forbidden }
+            profile = current
+            let page = try await api.calls(query: query, page: 1, scope: current.scope(origin: api.origin))
+            try Task.checkCancellation()
+            guard loadID == id, !closed, !invalidated else { return }
+            var result = WorkspacePagination()
+            try result.apply(page, requested: 1, generation: result.generation)
+            pagination = result
+        } catch {
+            guard !Task.isCancelled, loadID == id, !closed else { return }
+            self.error = error.localizedDescription; handle(error)
+        }
+    }
+
+    func loadMore(_ query: WorkspaceCallsQuery) async {
+        guard !paging, !loading, !closed, !invalidated, !suspended, pagination.hasMore, let scope = scope else { return }
+        paging = true; pageError = nil
+        let id = loadID, generation = pagination.generation, next = pagination.currentPage + 1
+        defer { if loadID == id { paging = false } }
+        do {
+            let page = try await api.calls(query: query, page: next, scope: scope)
+            try Task.checkCancellation()
+            guard loadID == id, !closed, !invalidated else { return }
+            try pagination.apply(page, requested: next, generation: generation)
+        } catch {
+            guard !Task.isCancelled, loadID == id, !closed else { return }
+            pageError = error.localizedDescription; handle(error)
+        }
+    }
+}

@@ -1,0 +1,109 @@
+name: Android checkpoint build
+
+on:
+  workflow_dispatch:
+  workflow_call:
+    secrets:
+      SLACK_MOBILE_BUILD_BOT_TOKEN:
+        required: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: android-checkpoint-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    outputs:
+      build_number: ${{ steps.version.outputs.build_number }}
+    env:
+      TRASHED_WEB_URL: https://trashed.app
+      TRASHED_ANDROID_VERSION_NAME: 1.0.3-checkpoint
+      CI: true
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.1.38
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+      - uses: android-actions/setup-android@v3
+        with:
+          packages: 'platform-tools platforms;android-36 build-tools;36.0.0'
+          log-accepted-android-sdk-licenses: false
+      - name: Install locked dependencies
+        run: bun install --frozen-lockfile
+      - name: Validate production routing and Android push configuration
+        run: |
+          node scripts/check-mobile-backend.mjs
+          node scripts/check-mobile-push-config.mjs
+      - name: Build native checkpoint
+        id: version
+        run: |
+          set -euo pipefail
+          export TRASHED_ANDROID_VERSION_CODE="$(date -u +%s)"
+          printf 'build_number=%s\n' "$TRASHED_ANDROID_VERSION_CODE" >> "$GITHUB_OUTPUT"
+          bun run build
+          bunx cap sync android
+          cd android
+          ./gradlew --no-daemon :app:testDebugUnitTest :app:lintDebug :app:assembleDebug :app:assembleDebugAndroidTest
+      - name: Preserve Android test and lint reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: trashed-android-reports-${{ github.run_id }}
+          path: |
+            android/app/build/reports/
+            android/app/build/test-results/
+          if-no-files-found: warn
+          retention-days: 14
+      - name: Package build evidence
+        run: |
+          mkdir -p checkpoint
+          cp android/app/build/outputs/apk/debug/app-debug.apk checkpoint/trashed-native-checkpoint.apk
+          cp android/app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk checkpoint/trashed-native-checkpoint-tests.apk
+          git rev-parse HEAD > checkpoint/COMMIT.txt
+          sha256sum checkpoint/*.apk > checkpoint/SHA256SUMS
+          printf '%s\n' 'Debug-signed checkpoint for QA, not a Google Play release. Native chat requires the paired website changes and rollout flag. Physical-device checks are not certified.' > checkpoint/README.txt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: trashed-android-checkpoint-${{ github.run_id }}
+          path: checkpoint/
+          if-no-files-found: error
+          retention-days: 14
+          compression-level: 0
+
+  notify-android:
+    needs: build
+    if: always() && vars.SLACK_APP_UPDATES_ENABLED == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Notify Android channel and verify message
+        run: node scripts/notify-build-slack.mjs
+        env:
+          SLACK_APP_UPDATES_ENABLED: ${{ vars.SLACK_APP_UPDATES_ENABLED }}
+          SLACK_MOBILE_BUILD_BOT_TOKEN: ${{ secrets.SLACK_MOBILE_BUILD_BOT_TOKEN }}
+          SLACK_MOBILE_APP_ANDROID_CHANNEL_ID: ${{ vars.SLACK_MOBILE_APP_ANDROID_CHANNEL_ID }}
+          MOBILE_PLATFORM: android
+          MOBILE_BUILD_STATUS: ${{ needs.build.result }}
+          MOBILE_VERSION: 1.0.3-checkpoint
+          MOBILE_BUILD_NUMBER: ${{ needs.build.outputs.build_number }}
+          SLACK_RECEIPT_PATH: slack-android-receipt.json
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: slack-android-receipt-${{ github.run_id }}
+          path: slack-android-receipt.json
+          if-no-files-found: warn
+          retention-days: 14

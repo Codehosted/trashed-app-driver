@@ -6,6 +6,29 @@ import GoogleSignIn
 import AuthenticationServices
 import CryptoKit
 
+// CAPPluginCall drops WKFrameInfo. Validate chat's source before forwarding
+// to Capacitor, without changing other plugins' message handling.
+private final class NativeChatBridgeSourceGuard: NSObject, WKScriptMessageHandler {
+    weak var forward: WKScriptMessageHandler?
+    let configured: URL
+    init(forward: WKScriptMessageHandler, configured: URL) {
+        self.forward = forward; self.configured = configured
+    }
+    func userContentController(_ userContentController: WKUserContentController, didReceive message: WKScriptMessage) {
+        if let body = message.body as? [String: Any], body["pluginId"] as? String == "TrashedChat" {
+            let frame = message.frameInfo
+            let origin = frame.securityOrigin
+            var source = URLComponents()
+            source.scheme = origin.protocol
+            source.host = origin.host
+            if origin.port != 0 { source.port = origin.port }
+            guard frame.isMainFrame, let expected = NativeChatPolicy.origin(configured),
+                  NativeChatPolicy.origin(source.url) == expected else { return }
+        }
+        forward?.userContentController(userContentController, didReceive: message)
+    }
+}
+
 private let driverSessionCookieNames = [
     "next-auth.session-token",
     "__Secure-next-auth.session-token",
@@ -51,6 +74,14 @@ private final class OnboardingWebView: WKWebView {
     override func load(_ request: URLRequest) -> WKNavigation? {
         guard appNavigationEnabled else { return nil }
         return super.load(request)
+    }
+}
+
+// Pure routing decision shared with bounded executable lifecycle regression tests.
+private enum WorkspaceWebRouting {
+    static func clearsBypass(url: URL, origin: URL, bypass: WorkspaceRoute?, committed: Bool) -> Bool {
+        committed && NativeWorkspaceHistory.isWorkspaceURL(url, origin: origin)
+            && WorkspaceRoute.parse(url, origin: origin) != bypass
     }
 }
 
@@ -161,6 +192,8 @@ class MainViewController: CAPBridgeViewController, UIGestureRecognizerDelegate {
     private var nativeOnboardingController: UIHostingController<NativeAppOnboardingView>?
     private var onboardingReady = false
     private let nativeNavigation = TrashedNavigationPlugin()
+    private let nativeChat = TrashedChatPlugin()
+    private var nativeChatSourceGuard: NativeChatBridgeSourceGuard?
     private var nativeWebBottom: NSLayoutConstraint?
     private var loginURLObservation: NSKeyValueObservation?
     private var historyObservations: [NSKeyValueObservation] = []
@@ -176,6 +209,15 @@ class MainViewController: CAPBridgeViewController, UIGestureRecognizerDelegate {
     })()
     """
     private var pendingAppleCredential: NativeAppleCredential?
+    private var nativeWorkspaceController: UIViewController?
+    private var nativeWorkspaceFinish: (() -> Void)?
+    private var nativeWorkspaceURL: URL?
+    private var nativeWorkspaceBypass: WorkspaceRoute?
+    private var nativeWorkspaceDismissing = false
+    private var lastWebWorkspaceURL: URL?
+    #if DEBUG && targetEnvironment(simulator)
+    private var workspaceFixtureStore: WKWebsiteDataStore?
+    #endif
 
     override func webView(with frame: CGRect, configuration: WKWebViewConfiguration) -> WKWebView {
         OnboardingWebView(frame: frame, configuration: configuration)
@@ -185,7 +227,16 @@ class MainViewController: CAPBridgeViewController, UIGestureRecognizerDelegate {
         super.capacitorDidLoad()
         bridge?.registerPluginInstance(TrashedFileExportPlugin())
         bridge?.registerPluginInstance(nativeNavigation)
+        bridge?.registerPluginInstance(nativeChat)
         guard let webView = webView else { return }
+
+        if let configured = bridge?.config.serverURL,
+           let forward = webView.navigationDelegate as? WKScriptMessageHandler {
+            let sourceGuard = NativeChatBridgeSourceGuard(forward: forward, configured: configured)
+            webView.configuration.userContentController.removeScriptMessageHandler(forName: "bridge")
+            webView.configuration.userContentController.add(sourceGuard, name: "bridge")
+            nativeChatSourceGuard = sourceGuard
+        }
 
         // A native boundary protects every website screen and modal, not just
         // driver controls with a particular CSS class. The status bar stays visible.
@@ -204,11 +255,151 @@ class MainViewController: CAPBridgeViewController, UIGestureRecognizerDelegate {
             bottom,
         ])
         nativeNavigation.attach(to: container)
+        nativeChat.attach(to: container)
     }
+
+    // Transition named routes to real native screens. Only URL routing is shared;
+    // loading, edits, paging and playback are independent of the HTML document.
+    private func updateNativeWorkspace(for url: URL?) {
+        guard #available(iOS 16.0, *), let url = url else { return }
+        #if DEBUG && targetEnvironment(simulator)
+        if workspaceFixtureStore != nil { return }
+        #endif
+        let origin = makeDriverAuthConfig().origin
+        let route = WorkspaceRoute.parse(url, origin: origin)
+        // URL KVO also reports about:blank and /app during redirects. Neither
+        // consumes an explicit web fallback; only a committed different workspace does.
+        if WorkspaceWebRouting.clearsBypass(url: url, origin: origin, bypass: nativeWorkspaceBypass, committed: webView?.isLoading == false) {
+            nativeWorkspaceBypass = nil
+        }
+        if route == nil {
+            if webView?.isLoading == false, NativeWorkspaceHistory.isWorkspaceURL(url, origin: origin) { lastWebWorkspaceURL = url }
+            dismissNativeWorkspace()
+            return
+        }
+        guard onboardingReady, nativeLoginController == nil, nativeOnboardingController == nil,
+              viewIfLoaded?.window != nil else { return }
+        if nativeWorkspaceBypass == route { return }
+        if nativeWorkspaceDismissing { return }
+        if nativeWorkspaceURL == url, nativeWorkspaceController != nil { return }
+        if nativeWorkspaceController != nil {
+            dismissNativeWorkspace { [weak self] in
+                guard let self = self else { return }
+                self.updateNativeWorkspace(for: self.webView?.url)
+            }
+            return
+        }
+        guard nativeWorkspaceController == nil, presentedViewController == nil,
+              let route = route, let store = webView?.configuration.websiteDataStore.httpCookieStore else { return }
+        presentNativeWorkspace(route: route, url: url, origin: origin, store: store)
+    }
+
+    @available(iOS 16.0, *)
+    private func presentNativeWorkspace(route: WorkspaceRoute, url: URL, origin: URL, store: WKHTTPCookieStore) {
+        guard nativeWorkspaceController == nil, presentedViewController == nil else { return }
+        let api = WorkspaceAPI(origin: origin, cookieStore: store)
+        let controller = WorkspaceHostingController(api: api, route: route,
+            openWeb: { [weak self] path in self?.openWorkspaceWeb(path, origin: origin) },
+            close: { [weak self] in self?.closeNativeWorkspace() })
+        controller.model.onExpired = { [weak self] in
+            guard let self = self else { return }
+            #if DEBUG && targetEnvironment(simulator)
+            if self.workspaceFixtureStore != nil { return }
+            #endif
+            self.nativeWorkspaceBypass = route
+            self.dismissNativeWorkspace { [weak self] in
+                guard let self = self else { return }
+                self.presentNativeLogin(self.makeDriverAuthConfig())
+            }
+        }
+        nativeWorkspaceController = controller
+        nativeWorkspaceFinish = { [weak controller] in controller?.finish() }
+        nativeWorkspaceURL = url
+        historyEdgeGesture?.isEnabled = false
+        present(controller, animated: false)
+    }
+
+    private func dismissNativeWorkspace(completion: (() -> Void)? = nil) {
+        guard !nativeWorkspaceDismissing else { return }
+        guard let controller = nativeWorkspaceController else { completion?(); return }
+        nativeWorkspaceDismissing = true
+        nativeWorkspaceFinish?(); nativeWorkspaceFinish = nil
+        controller.dismiss(animated: false) { [weak self] in
+            guard let self = self else { return }
+            self.nativeWorkspaceController = nil; self.nativeWorkspaceURL = nil
+            self.nativeWorkspaceDismissing = false
+            completion?()
+            self.updateHistoryGestures()
+        }
+    }
+
+    private func closeNativeWorkspace() {
+        guard let current = nativeWorkspaceURL else { return }
+        let origin = makeDriverAuthConfig().origin
+        nativeWorkspaceBypass = WorkspaceRoute.parse(current, origin: origin)
+        #if DEBUG && targetEnvironment(simulator)
+        if workspaceFixtureStore != nil {
+            dismissNativeWorkspace()
+            return
+        }
+        #endif
+        let returnURL = lastWebWorkspaceURL ?? URL(string: "/app?source=trashed-app", relativeTo: origin)!.absoluteURL
+        let sourceURL = webView?.url
+        dismissNativeWorkspace { [weak self] in
+            guard let self = self, self.webView?.url == sourceURL else { return }
+            self.webView?.load(URLRequest(url: returnURL))
+        }
+    }
+
+    private func openWorkspaceWeb(_ path: String, origin: URL) {
+        guard let url = URL(string: path, relativeTo: origin)?.absoluteURL,
+              NativeWorkspaceHistory.isWorkspaceURL(url, origin: origin) else { return }
+        // A deliberate web fallback must not immediately reopen the native overview.
+        nativeWorkspaceBypass = WorkspaceRoute.parse(url, origin: origin)
+        #if DEBUG && targetEnvironment(simulator)
+        if workspaceFixtureStore != nil {
+            let alert = UIAlertController(title: "Web destination", message: "Local fixture only: \(path)", preferredStyle: .alert)
+            alert.addAction(UIAlertAction(title: "OK", style: .default))
+            nativeWorkspaceController?.present(alert, animated: false)
+            return
+        }
+        #endif
+        let sourceURL = webView?.url
+        dismissNativeWorkspace { [weak self] in
+            guard let self = self, self.webView?.url == sourceURL else { return }
+            self.webView?.load(URLRequest(url: url))
+        }
+    }
+
+    #if DEBUG && targetEnvironment(simulator)
+    // Explicit, loopback-only UI test harness. No production cookies/data or release bypass.
+    private func startWorkspaceFixtureIfRequested() -> Bool {
+        guard #available(iOS 16.0, *),
+              let raw = ProcessInfo.processInfo.environment["TRASHED_WORKSPACE_FIXTURE_ORIGIN"],
+              let origin = URL(string: raw), origin.scheme == "http", origin.host == "127.0.0.1",
+              origin.user == nil, origin.password == nil, origin.port != nil,
+              let path = ProcessInfo.processInfo.environment["TRASHED_WORKSPACE_FIXTURE_PATH"],
+              let url = URL(string: path, relativeTo: origin)?.absoluteURL,
+              let route = WorkspaceRoute.parse(url, origin: origin) else { return false }
+        let store = WKWebsiteDataStore.nonPersistent()
+        workspaceFixtureStore = store
+        let cookie = HTTPCookie(properties: [.name: "next-auth.session-token", .value: "local-ui-fixture", .domain: "127.0.0.1", .path: "/"])!
+        store.httpCookieStore.setCookie(cookie) { [weak self] in
+            DispatchQueue.main.async {
+                self?.presentNativeWorkspace(route: route, url: url, origin: origin, store: store.httpCookieStore)
+            }
+        }
+        return true
+    }
+    #endif
 
     var nativeNavigationAvailable: Bool {
         onboardingReady && nativeOnboardingController == nil && nativeLoginController == nil
             && webView?.isLoading == false && viewIfLoaded?.window != nil
+    }
+
+    var nativeChatAvailable: Bool {
+        nativeNavigationAvailable && nativeChatSourceGuard != nil
     }
 
     func setNativeNavigationHeight(_ height: CGFloat) {
@@ -220,6 +411,9 @@ class MainViewController: CAPBridgeViewController, UIGestureRecognizerDelegate {
         let descriptor = super.instanceDescriptor()
         let serverURL = descriptor.serverURL ?? bundledServerURLString() ?? "https://trashed.app/app?source=trashed-app"
         descriptor.serverURL = driverURLString(from: serverURL, theme: currentDriverTheme)
+        // Android needs a separate start path for its strict bridge origin. Here
+        // serverURL already includes /app and theme; do not append it twice.
+        descriptor.appStartPath = nil
         return descriptor
     }
 
@@ -255,6 +449,9 @@ class MainViewController: CAPBridgeViewController, UIGestureRecognizerDelegate {
 
     override func viewDidLoad() {
         super.viewDidLoad()
+        #if DEBUG && targetEnvironment(simulator)
+        if startWorkspaceFixtureIfRequested() { return }
+        #endif
         // Hide the native browser toolbar — this is a full-screen app shell, not a browser
         webView?.scrollView.bounces = false
         navigationController?.setNavigationBarHidden(true, animated: false)
@@ -272,16 +469,18 @@ class MainViewController: CAPBridgeViewController, UIGestureRecognizerDelegate {
             historyObservations = [
                 webView.observe(\.canGoBack, options: [.new]) { [weak self] _, _ in self?.updateHistoryGestures() },
                 webView.observe(\.isLoading, options: [.new]) { [weak self] webView, _ in
-                    if webView.isLoading { self?.nativeNavigation.reset() }
+                    if webView.isLoading { self?.nativeNavigation.reset(); self?.nativeChat.reset(purge: !NativeChatPolicy.isAssistant(webView.url, configured: self?.bridge?.config.serverURL)) }
                     else { self?.nativeNavigation.refresh() }
                     self?.updateHistoryGestures()
                 },
             ]
         }
         loginURLObservation = webView?.observe(\.url, options: [.new]) { [weak self] webView, _ in
-            guard let self = self, let url = webView.url else { return }
+            guard let self = self else { return }
+            guard let url = webView.url else { self.nativeChat.reset(); return }
             self.updateHistoryGestures()
-            if !NativeNavigationPolicy.isWorkspace(url, configured: self.bridge?.config.serverURL) { self.nativeNavigation.reset() }
+            if !NativeNavigationPolicy.isWorkspace(url, configured: self.bridge?.config.serverURL) { self.nativeNavigation.reset(); self.nativeChat.reset() }
+            if url.path != "/vendor/assistant" { self.nativeChat.reset() }
             guard self.onboardingReady else { return }
             let config = self.makeDriverAuthConfig()
             guard url.scheme == config.origin.scheme,
@@ -339,7 +538,9 @@ class MainViewController: CAPBridgeViewController, UIGestureRecognizerDelegate {
             if NativeWorkspaceHistory.isAuthenticationURL(webView.url) { self.workspaceHistory.beginSession() }
             self.workspaceHistory.update(index: history.backList.count,
                 workspace: visible && NativeWorkspaceHistory.isWorkspaceURL(webView.url, origin: origin), committed: !webView.isLoading)
-            self.historyEdgeGesture?.isEnabled = visible && !webView.isLoading
+            if !visible { self.dismissNativeWorkspace() }
+            self.updateNativeWorkspace(for: webView.url)
+            self.historyEdgeGesture?.isEnabled = visible && self.nativeWorkspaceController == nil && !webView.isLoading
                 && NativeWorkspaceHistory.isSameOriginURL(webView.url, origin: origin)
                 && !NativeWorkspaceHistory.isAuthenticationURL(webView.url)
         }
@@ -405,6 +606,7 @@ class MainViewController: CAPBridgeViewController, UIGestureRecognizerDelegate {
 
     private func presentNativeOnboarding() {
         nativeNavigation.reset()
+        nativeChat.reset()
         workspaceHistory.reset()
         webView?.allowsBackForwardNavigationGestures = false
         historyEdgeGesture?.isEnabled = false
@@ -492,7 +694,9 @@ class MainViewController: CAPBridgeViewController, UIGestureRecognizerDelegate {
 
     private func presentNativeLogin(_ config: DriverAuthConfig) {
         guard onboardingReady, nativeOnboardingController == nil else { return }
+        dismissNativeWorkspace()
         nativeNavigation.reset()
+        nativeChat.reset()
         workspaceHistory.reset()
         webView?.allowsBackForwardNavigationGestures = false
         historyEdgeGesture?.isEnabled = false

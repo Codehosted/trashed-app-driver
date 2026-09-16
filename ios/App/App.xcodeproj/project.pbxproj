@@ -7,6 +7,12 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		B10000011FED79650016851F /* NativeWorkspaceView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000021FED79650016851F /* NativeWorkspaceView.swift */; };
+		B20000011FED79650016851F /* NativeWorkspaceHost.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20000021FED79650016851F /* NativeWorkspaceHost.swift */; };
+		AD0000011FED79650016851F /* NativeWorkspacePolicy.swift in Sources */ = {isa = PBXBuildFile; fileRef = AD0000021FED79650016851F /* NativeWorkspacePolicy.swift */; };
+		AE0000011FED79650016851F /* NativeWorkspaceAPI.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE0000021FED79650016851F /* NativeWorkspaceAPI.swift */; };
+		AF0000011FED79650016851F /* NativeWorkspaceModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = AF0000021FED79650016851F /* NativeWorkspaceModel.swift */; };
+		AC0000011FED79650016851F /* NativeChatFonts in Resources */ = {isa = PBXBuildFile; fileRef = AC0000021FED79650016851F /* NativeChatFonts */; };
 		2FAD9763203C412B000D30F8 /* config.xml in Resources */ = {isa = PBXBuildFile; fileRef = 2FAD9762203C412B000D30F8 /* config.xml */; };
 		50379B232058CBB4000EE86E /* capacitor.config.json in Resources */ = {isa = PBXBuildFile; fileRef = 50379B222058CBB4000EE86E /* capacitor.config.json */; };
 		504EC3081FED79650016851F /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 504EC3071FED79650016851F /* AppDelegate.swift */; };
@@ -18,9 +24,23 @@
 		A20000011FED79650016851F /* TrashedFileExportPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000021FED79650016851F /* TrashedFileExportPlugin.swift */; };
 		A084ECDBA7D38E1E42DFC39D /* Pods_App.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = AF277DCFFFF123FFC6DF26C7 /* Pods_App.framework */; };
 		A30000011FED79650016851F /* TrashedNavigationPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = A30000021FED79650016851F /* TrashedNavigationPlugin.swift */; };
+		A40000011FED79650016851F /* TrashedChatPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = A40000021FED79650016851F /* TrashedChatPlugin.swift */; };
+		A50000011FED79650016851F /* NativeChatPolicy.swift in Sources */ = {isa = PBXBuildFile; fileRef = A50000021FED79650016851F /* NativeChatPolicy.swift */; };
+		A60000011FED79650016851F /* NativeChatCache.swift in Sources */ = {isa = PBXBuildFile; fileRef = A60000021FED79650016851F /* NativeChatCache.swift */; };
+		A70000011FED79650016851F /* NativeChatComponents.swift in Sources */ = {isa = PBXBuildFile; fileRef = A70000021FED79650016851F /* NativeChatComponents.swift */; };
+		AB0000011FED79650016851F /* NativeChatMeasured.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB0000021FED79650016851F /* NativeChatMeasured.swift */; };
+		A80000011FED79650016851F /* NativeChatImage.swift in Sources */ = {isa = PBXBuildFile; fileRef = A80000021FED79650016851F /* NativeChatImage.swift */; };
+		A90000011FED79650016851F /* NativeChatView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A90000021FED79650016851F /* NativeChatView.swift */; };
 /* End PBXBuildFile section */
+		AA0000011FED79650016851F /* NativeChatInput.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA0000021FED79650016851F /* NativeChatInput.swift */; };
 
 /* Begin PBXFileReference section */
+		B10000021FED79650016851F /* NativeWorkspaceView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NativeWorkspaceView.swift; sourceTree = "<group>"; };
+		B20000021FED79650016851F /* NativeWorkspaceHost.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NativeWorkspaceHost.swift; sourceTree = "<group>"; };
+		AD0000021FED79650016851F /* NativeWorkspacePolicy.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NativeWorkspacePolicy.swift; sourceTree = "<group>"; };
+		AE0000021FED79650016851F /* NativeWorkspaceAPI.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NativeWorkspaceAPI.swift; sourceTree = "<group>"; };
+		AF0000021FED79650016851F /* NativeWorkspaceModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NativeWorkspaceModel.swift; sourceTree = "<group>"; };
+		AC0000021FED79650016851F /* NativeChatFonts */ = {isa = PBXFileReference; lastKnownFileType = folder; path = NativeChatFonts; sourceTree = "<group>"; };
 		2FAD9762203C412B000D30F8 /* config.xml */ = {isa = PBXFileReference; lastKnownFileType = text.xml; path = config.xml; sourceTree = "<group>"; };
 		50379B222058CBB4000EE86E /* capacitor.config.json */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.json; path = capacitor.config.json; sourceTree = "<group>"; };
 		504EC3041FED79650016851F /* App.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = App.app; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -37,7 +57,15 @@
 		AF51FD2D460BCFE21FA515B2 /* Pods-App.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-App.release.xcconfig"; path = "Pods/Target Support Files/Pods-App/Pods-App.release.xcconfig"; sourceTree = "<group>"; };
 		FC68EB0AF532CFC21C3344DD /* Pods-App.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-App.debug.xcconfig"; path = "Pods/Target Support Files/Pods-App/Pods-App.debug.xcconfig"; sourceTree = "<group>"; };
 		A30000021FED79650016851F /* TrashedNavigationPlugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrashedNavigationPlugin.swift; sourceTree = "<group>"; };
+		A40000021FED79650016851F /* TrashedChatPlugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrashedChatPlugin.swift; sourceTree = "<group>"; };
+		A50000021FED79650016851F /* NativeChatPolicy.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NativeChatPolicy.swift; sourceTree = "<group>"; };
+		A60000021FED79650016851F /* NativeChatCache.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NativeChatCache.swift; sourceTree = "<group>"; };
+		A70000021FED79650016851F /* NativeChatComponents.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NativeChatComponents.swift; sourceTree = "<group>"; };
+		AB0000021FED79650016851F /* NativeChatMeasured.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NativeChatMeasured.swift; sourceTree = "<group>"; };
+		A80000021FED79650016851F /* NativeChatImage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NativeChatImage.swift; sourceTree = "<group>"; };
+		A90000021FED79650016851F /* NativeChatView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NativeChatView.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
+		AA0000021FED79650016851F /* NativeChatInput.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NativeChatInput.swift; sourceTree = "<group>"; };
 
 /* Begin PBXFrameworksBuildPhase section */
 		504EC3011FED79650016851F /* Frameworks */ = {
@@ -84,8 +112,22 @@
 				504EC3071FED79650016851F /* AppDelegate.swift */,
 				A10000041FED79650016851F /* App.entitlements */,
 				A10000021FED79650016851F /* MainViewController.swift */,
+				AD0000021FED79650016851F /* NativeWorkspacePolicy.swift */,
+				AE0000021FED79650016851F /* NativeWorkspaceAPI.swift */,
+				AF0000021FED79650016851F /* NativeWorkspaceModel.swift */,
+				B10000021FED79650016851F /* NativeWorkspaceView.swift */,
+				B20000021FED79650016851F /* NativeWorkspaceHost.swift */,
 				A20000021FED79650016851F /* TrashedFileExportPlugin.swift */,
 				A30000021FED79650016851F /* TrashedNavigationPlugin.swift */,
+				A40000021FED79650016851F /* TrashedChatPlugin.swift */,
+				A50000021FED79650016851F /* NativeChatPolicy.swift */,
+				A60000021FED79650016851F /* NativeChatCache.swift */,
+				A70000021FED79650016851F /* NativeChatComponents.swift */,
+				AB0000021FED79650016851F /* NativeChatMeasured.swift */,
+				A80000021FED79650016851F /* NativeChatImage.swift */,
+				A90000021FED79650016851F /* NativeChatView.swift */,
+				AA0000021FED79650016851F /* NativeChatInput.swift */,
+				AC0000021FED79650016851F /* NativeChatFonts */,
 				504EC30B1FED79650016851F /* Main.storyboard */,
 				504EC30E1FED79650016851F /* Assets.xcassets */,
 				504EC3101FED79650016851F /* LaunchScreen.storyboard */,
@@ -178,6 +220,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				504EC3121FED79650016851F /* LaunchScreen.storyboard in Resources */,
+				AC0000011FED79650016851F /* NativeChatFonts in Resources */,
 				504EC30F1FED79650016851F /* Assets.xcassets in Resources */,
 				50B271D11FEDC1A000F3C39B /* public in Resources */,
 				50379B232058CBB4000EE86E /* capacitor.config.json in Resources */,
@@ -253,8 +296,21 @@
 			files = (
 				504EC3081FED79650016851F /* AppDelegate.swift in Sources */,
 				A10000011FED79650016851F /* MainViewController.swift in Sources */,
+				AD0000011FED79650016851F /* NativeWorkspacePolicy.swift in Sources */,
+				AE0000011FED79650016851F /* NativeWorkspaceAPI.swift in Sources */,
+				AF0000011FED79650016851F /* NativeWorkspaceModel.swift in Sources */,
+				B10000011FED79650016851F /* NativeWorkspaceView.swift in Sources */,
+				B20000011FED79650016851F /* NativeWorkspaceHost.swift in Sources */,
 				A20000011FED79650016851F /* TrashedFileExportPlugin.swift in Sources */,
 				A30000011FED79650016851F /* TrashedNavigationPlugin.swift in Sources */,
+				A40000011FED79650016851F /* TrashedChatPlugin.swift in Sources */,
+				A50000011FED79650016851F /* NativeChatPolicy.swift in Sources */,
+				A60000011FED79650016851F /* NativeChatCache.swift in Sources */,
+				A70000011FED79650016851F /* NativeChatComponents.swift in Sources */,
+				AB0000011FED79650016851F /* NativeChatMeasured.swift in Sources */,
+				A80000011FED79650016851F /* NativeChatImage.swift in Sources */,
+				A90000011FED79650016851F /* NativeChatView.swift in Sources */,
+				AA0000011FED79650016851F /* NativeChatInput.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

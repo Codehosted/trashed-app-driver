@@ -1,0 +1,2139 @@
+{
+  "version": 1,
+  "context": "native_fixture_context",
+  "revision": 1,
+  "appearance": "dark",
+  "scopeKey": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "conversationId": "fixture-local-only",
+  "title": "Synthetic QA",
+  "input": {
+    "value": "",
+    "placeholder": "Message Trisha",
+    "disabled": false,
+    "sendActionId": "send",
+    "stopActionId": "stop"
+  },
+  "messages": [
+    {
+      "id": "fixture-message-0",
+      "role": "user",
+      "presentation": "measured",
+      "text": "",
+      "components": [
+        {
+          "id": "webfixture-19-frame",
+          "type": "column",
+          "box": {
+            "x": 0,
+            "y": 0,
+            "width": 411,
+            "height": 84.875
+          },
+          "style": {
+            "background": "#1a1b1e"
+          },
+          "children": [
+            {
+              "id": "webfixture-19",
+              "type": "column",
+              "box": {
+                "x": 17.265625,
+                "y": 0,
+                "width": 372.16,
+                "height": 68.88
+              },
+              "style": {
+                "foreground": "#f0f0f0",
+                "fontSize": 16,
+                "fontWeight": "regular",
+                "fontFamily": "jakarta",
+                "lineHeight": 24,
+                "letterSpacing": 0,
+                "radius": 0,
+                "borderWidth": 0,
+                "borderColor": "#33353a",
+                "textAlign": "left",
+                "opacity": 1,
+                "paddingTop": 0,
+                "paddingRight": 0,
+                "paddingBottom": 0,
+                "paddingLeft": 0
+              },
+              "children": [
+                {
+                  "id": "webfixture-20",
+                  "type": "column",
+                  "box": {
+                    "x": 282.5,
+                    "y": 0,
+                    "width": 89.66,
+                    "height": 16.5
+                  },
+                  "style": {
+                    "foreground": "#a0a0a0",
+                    "fontSize": 11,
+                    "fontWeight": "medium",
+                    "fontFamily": "jakarta",
+                    "lineHeight": 16.5,
+                    "letterSpacing": 0,
+                    "radius": 0,
+                    "borderWidth": 0,
+                    "borderColor": "#33353a",
+                    "textAlign": "left",
+                    "opacity": 1,
+                    "paddingTop": 0,
+                    "paddingRight": 8.64,
+                    "paddingBottom": 0,
+                    "paddingLeft": 8.64
+                  },
+                  "children": [
+                    {
+                      "id": "webfixture-visual-20-0",
+                      "type": "text",
+                      "text": "Jan 1, 7:00 AM",
+                      "box": {
+                        "x": 8.63,
+                        "y": 1,
+                        "width": 72.41,
+                        "height": 13
+                      },
+                      "style": {
+                        "foreground": "#a0a0a0",
+                        "fontSize": 11,
+                        "fontWeight": "medium",
+                        "fontFamily": "jakarta",
+                        "lineHeight": 13,
+                        "letterSpacing": 0,
+                        "radius": 0,
+                        "borderWidth": 0,
+                        "borderColor": "#33353a",
+                        "textAlign": "left",
+                        "opacity": 1,
+                        "paddingTop": 0,
+                        "paddingRight": 0,
+                        "paddingBottom": 0,
+                        "paddingLeft": 0
+                      }
+                    }
+                  ]
+                },
+                {
+                  "id": "webfixture-22",
+                  "type": "column",
+                  "box": {
+                    "x": 168.73,
+                    "y": 22.97,
+                    "width": 203.42,
+                    "height": 45.91
+                  },
+                  "style": {
+                    "foreground": "#ffffff",
+                    "background": "#8c5cff",
+                    "fontSize": 14,
+                    "fontWeight": "regular",
+                    "fontFamily": "jakarta",
+                    "lineHeight": 20,
+                    "letterSpacing": 0,
+                    "radius": 17.6,
+                    "borderWidth": 0,
+                    "borderColor": "#33353a",
+                    "textAlign": "left",
+                    "opacity": 1,
+                    "paddingTop": 12.96,
+                    "paddingRight": 17.28,
+                    "paddingBottom": 12.96,
+                    "paddingLeft": 17.28
+                  },
+                  "children": [
+                    {
+                      "id": "webfixture-23",
+                      "type": "column",
+                      "box": {
+                        "x": 17.27,
+                        "y": 12.95,
+                        "width": 168.89,
+                        "height": 20
+                      },
+                      "style": {
+                        "foreground": "#ffffff",
+                        "fontSize": 14,
+                        "fontWeight": "regular",
+                        "fontFamily": "jakarta",
+                        "lineHeight": 20,
+                        "letterSpacing": 0,
+                        "radius": 0,
+                        "borderWidth": 0,
+                        "borderColor": "#33353a",
+                        "textAlign": "left",
+                        "opacity": 1,
+                        "paddingTop": 0,
+                        "paddingRight": 0,
+                        "paddingBottom": 0,
+                        "paddingLeft": 0
+                      },
+                      "children": [
+                        {
+                          "id": "webfixture-24",
+                          "type": "column",
+                          "box": {
+                            "x": 0,
+                            "y": 0,
+                            "width": 168.89,
+                            "height": 20
+                          },
+                          "style": {
+                            "foreground": "#ffffff",
+                            "fontSize": 14,
+                            "fontWeight": "regular",
+                            "fontFamily": "jakarta",
+                            "lineHeight": 20,
+                            "letterSpacing": 0,
+                            "radius": 0,
+                            "borderWidth": 0,
+                            "borderColor": "#33353a",
+                            "textAlign": "left",
+                            "opacity": 1,
+                            "paddingTop": 0,
+                            "paddingRight": 0,
+                            "paddingBottom": 0,
+                            "paddingLeft": 0
+                          },
+                          "children": [
+                            {
+                              "id": "webfixture-visual-21-0",
+                              "type": "text",
+                              "text": "Show me the next pickup.",
+                              "box": {
+                                "x": 0,
+                                "y": 1,
+                                "width": 168.89,
+                                "height": 18
+                              },
+                              "style": {
+                                "foreground": "#ffffff",
+                                "fontSize": 14,
+                                "fontWeight": "regular",
+                                "fontFamily": "jakarta",
+                                "lineHeight": 18,
+                                "letterSpacing": 0,
+                                "radius": 0,
+                                "borderWidth": 0,
+                                "borderColor": "#33353a",
+                                "textAlign": "left",
+                                "opacity": 1,
+                                "paddingTop": 0,
+                                "paddingRight": 0,
+                                "paddingBottom": 0,
+                                "paddingLeft": 0
+                              }
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "fixture-message-1",
+      "role": "assistant",
+      "presentation": "measured",
+      "text": "",
+      "components": [
+        {
+          "id": "webfixture-26-frame",
+          "type": "column",
+          "box": {
+            "x": 0,
+            "y": 0,
+            "width": 411,
+            "height": 141.59375
+          },
+          "style": {
+            "background": "#1a1b1e"
+          },
+          "children": [
+            {
+              "id": "webfixture-26",
+              "type": "column",
+              "box": {
+                "x": 17.265625,
+                "y": 0,
+                "width": 372.16,
+                "height": 125.59
+              },
+              "style": {
+                "foreground": "#f0f0f0",
+                "fontSize": 16,
+                "fontWeight": "regular",
+                "fontFamily": "jakarta",
+                "lineHeight": 24,
+                "letterSpacing": 0,
+                "radius": 0,
+                "borderWidth": 0,
+                "borderColor": "#33353a",
+                "textAlign": "left",
+                "opacity": 1,
+                "paddingTop": 0,
+                "paddingRight": 0,
+                "paddingBottom": 0,
+                "paddingLeft": 0
+              },
+              "children": [
+                {
+                  "id": "webfixture-27",
+                  "type": "column",
+                  "box": {
+                    "x": 0,
+                    "y": 0,
+                    "width": 89.66,
+                    "height": 16.5
+                  },
+                  "style": {
+                    "foreground": "#a0a0a0",
+                    "fontSize": 11,
+                    "fontWeight": "medium",
+                    "fontFamily": "jakarta",
+                    "lineHeight": 16.5,
+                    "letterSpacing": 0,
+                    "radius": 0,
+                    "borderWidth": 0,
+                    "borderColor": "#33353a",
+                    "textAlign": "left",
+                    "opacity": 1,
+                    "paddingTop": 0,
+                    "paddingRight": 8.64,
+                    "paddingBottom": 0,
+                    "paddingLeft": 8.64
+                  },
+                  "children": [
+                    {
+                      "id": "webfixture-visual-22-0",
+                      "type": "text",
+                      "text": "Jan 1, 7:00 AM",
+                      "box": {
+                        "x": 8.63,
+                        "y": 1,
+                        "width": 72.41,
+                        "height": 13
+                      },
+                      "style": {
+                        "foreground": "#a0a0a0",
+                        "fontSize": 11,
+                        "fontWeight": "medium",
+                        "fontFamily": "jakarta",
+                        "lineHeight": 13,
+                        "letterSpacing": 0,
+                        "radius": 0,
+                        "borderWidth": 0,
+                        "borderColor": "#33353a",
+                        "textAlign": "left",
+                        "opacity": 1,
+                        "paddingTop": 0,
+                        "paddingRight": 0,
+                        "paddingBottom": 0,
+                        "paddingLeft": 0
+                      }
+                    }
+                  ]
+                },
+                {
+                  "id": "webfixture-29",
+                  "type": "column",
+                  "box": {
+                    "x": 0,
+                    "y": 22.97,
+                    "width": 334.94,
+                    "height": 102.63
+                  },
+                  "style": {
+                    "foreground": "#f0f0f0",
+                    "background": "#222327",
+                    "fontSize": 14,
+                    "fontWeight": "regular",
+                    "fontFamily": "jakarta",
+                    "lineHeight": 20,
+                    "letterSpacing": 0,
+                    "radius": 17.6,
+                    "borderWidth": 1,
+                    "borderColor": "#2b2d32",
+                    "textAlign": "left",
+                    "opacity": 1,
+                    "paddingTop": 12.96,
+                    "paddingRight": 17.28,
+                    "paddingBottom": 12.96,
+                    "paddingLeft": 17.28
+                  },
+                  "children": [
+                    {
+                      "id": "webfixture-30",
+                      "type": "column",
+                      "box": {
+                        "x": 18.27,
+                        "y": 13.95,
+                        "width": 298.41,
+                        "height": 74.72
+                      },
+                      "style": {
+                        "foreground": "#f0f0f0",
+                        "fontSize": 14,
+                        "fontWeight": "regular",
+                        "fontFamily": "jakarta",
+                        "lineHeight": 20,
+                        "letterSpacing": 0,
+                        "radius": 0,
+                        "borderWidth": 0,
+                        "borderColor": "#33353a",
+                        "textAlign": "left",
+                        "opacity": 1,
+                        "paddingTop": 0,
+                        "paddingRight": 0,
+                        "paddingBottom": 0,
+                        "paddingLeft": 0
+                      },
+                      "children": [
+                        {
+                          "id": "webfixture-31",
+                          "type": "column",
+                          "box": {
+                            "x": 0,
+                            "y": 2.16,
+                            "width": 30.23,
+                            "height": 30.23
+                          },
+                          "style": {
+                            "foreground": "#f0f0f0",
+                            "background": "#f3edff",
+                            "fontSize": 14,
+                            "fontWeight": "regular",
+                            "fontFamily": "jakarta",
+                            "lineHeight": 20,
+                            "letterSpacing": 0,
+                            "radius": 40,
+                            "borderWidth": 0,
+                            "borderColor": "#33353a",
+                            "textAlign": "left",
+                            "opacity": 1,
+                            "paddingTop": 0,
+                            "paddingRight": 0,
+                            "paddingBottom": 0,
+                            "paddingLeft": 0
+                          },
+                          "children": [
+                            {
+                              "id": "webfixture-32",
+                              "type": "column",
+                              "box": {
+                                "x": 0,
+                                "y": 0,
+                                "width": 30.23,
+                                "height": 30.23
+                              },
+                              "style": {
+                                "foreground": "#7c3aed",
+                                "background": "#ede9fe",
+                                "fontSize": 12,
+                                "fontWeight": "bold",
+                                "fontFamily": "jakarta",
+                                "lineHeight": 16,
+                                "letterSpacing": 0,
+                                "radius": 40,
+                                "borderWidth": 0,
+                                "borderColor": "#33353a",
+                                "textAlign": "left",
+                                "opacity": 1,
+                                "paddingTop": 0,
+                                "paddingRight": 0,
+                                "paddingBottom": 0,
+                                "paddingLeft": 0
+                              },
+                              "children": [
+                                {
+                                  "id": "webfixture-visual-23-0",
+                                  "type": "text",
+                                  "text": "T",
+                                  "box": {
+                                    "x": 11.86,
+                                    "y": 7.11,
+                                    "width": 6.52,
+                                    "height": 15
+                                  },
+                                  "style": {
+                                    "foreground": "#7c3aed",
+                                    "fontSize": 12,
+                                    "fontWeight": "bold",
+                                    "fontFamily": "jakarta",
+                                    "lineHeight": 15,
+                                    "letterSpacing": 0,
+                                    "radius": 40,
+                                    "borderWidth": 0,
+                                    "borderColor": "#33353a",
+                                    "textAlign": "left",
+                                    "opacity": 1,
+                                    "paddingTop": 0,
+                                    "paddingRight": 0,
+                                    "paddingBottom": 0,
+                                    "paddingLeft": 0
+                                  }
+                                }
+                              ]
+                            },
+                            {
+                              "id": "webfixture-visual-24",
+                              "type": "image",
+                              "text": "Trisha",
+                              "box": {
+                                "x": 0,
+                                "y": 0,
+                                "width": 30.23,
+                                "height": 30.23
+                              },
+                              "style": {
+                                "foreground": "#201a2a",
+                                "fontSize": 14,
+                                "fontWeight": "regular",
+                                "fontFamily": "jakarta",
+                                "lineHeight": 20,
+                                "letterSpacing": 0,
+                                "radius": 0,
+                                "borderWidth": 0,
+                                "borderColor": "#33353a",
+                                "textAlign": "left",
+                                "opacity": 1,
+                                "paddingTop": 0,
+                                "paddingRight": 0,
+                                "paddingBottom": 0,
+                                "paddingLeft": 0
+                              },
+                              "props": {
+                                "raster": {
+                                  "base64": "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",
+                                  "width": 60,
+                                  "height": 60
+                                }
+                              }
+                            }
+                          ]
+                        },
+                        {
+                          "id": "webfixture-35",
+                          "type": "column",
+                          "box": {
+                            "x": 43.19,
+                            "y": 0,
+                            "width": 255.22,
+                            "height": 74.72
+                          },
+                          "style": {
+                            "foreground": "#f0f0f0",
+                            "fontSize": 14,
+                            "fontWeight": "regular",
+                            "fontFamily": "jakarta",
+                            "lineHeight": 20,
+                            "letterSpacing": 0,
+                            "radius": 0,
+                            "borderWidth": 0,
+                            "borderColor": "#33353a",
+                            "textAlign": "left",
+                            "opacity": 1,
+                            "paddingTop": 0,
+                            "paddingRight": 0,
+                            "paddingBottom": 0,
+                            "paddingLeft": 0
+                          },
+                          "children": [
+                            {
+                              "id": "webfixture-36",
+                              "type": "column",
+                              "box": {
+                                "x": 0,
+                                "y": 0,
+                                "width": 255.22,
+                                "height": 74.72
+                              },
+                              "style": {
+                                "foreground": "#e2e8f0",
+                                "fontSize": 14,
+                                "fontWeight": "regular",
+                                "fontFamily": "jakarta",
+                                "lineHeight": 22.75,
+                                "letterSpacing": 0,
+                                "radius": 0,
+                                "borderWidth": 0,
+                                "borderColor": "#33353a",
+                                "textAlign": "left",
+                                "opacity": 1,
+                                "paddingTop": 0,
+                                "paddingRight": 0,
+                                "paddingBottom": 0,
+                                "paddingLeft": 0
+                              },
+                              "children": [
+                                {
+                                  "id": "webfixture-37",
+                                  "type": "column",
+                                  "box": {
+                                    "x": 0,
+                                    "y": 0,
+                                    "width": 255.22,
+                                    "height": 74.72
+                                  },
+                                  "style": {
+                                    "foreground": "#e2e8f0",
+                                    "fontSize": 14,
+                                    "fontWeight": "regular",
+                                    "fontFamily": "jakarta",
+                                    "lineHeight": 22.75,
+                                    "letterSpacing": 0,
+                                    "radius": 0,
+                                    "borderWidth": 0,
+                                    "borderColor": "#33353a",
+                                    "textAlign": "left",
+                                    "opacity": 1,
+                                    "paddingTop": 0,
+                                    "paddingRight": 0,
+                                    "paddingBottom": 0,
+                                    "paddingLeft": 0
+                                  },
+                                  "children": [
+                                    {
+                                      "id": "webfixture-38",
+                                      "type": "column",
+                                      "box": {
+                                        "x": 0,
+                                        "y": 0,
+                                        "width": 255.22,
+                                        "height": 45.5
+                                      },
+                                      "style": {
+                                        "foreground": "#e2e8f0",
+                                        "fontSize": 14,
+                                        "fontWeight": "regular",
+                                        "fontFamily": "jakarta",
+                                        "lineHeight": 22.75,
+                                        "letterSpacing": 0,
+                                        "radius": 0,
+                                        "borderWidth": 0,
+                                        "borderColor": "#33353a",
+                                        "textAlign": "left",
+                                        "opacity": 1,
+                                        "paddingTop": 0,
+                                        "paddingRight": 0,
+                                        "paddingBottom": 0,
+                                        "paddingLeft": 0
+                                      },
+                                      "children": [
+                                        {
+                                          "id": "webfixture-visual-25-0",
+                                          "type": "text",
+                                          "text": "Hello ",
+                                          "box": {
+                                            "x": 0,
+                                            "y": 2,
+                                            "width": 36.89,
+                                            "height": 18
+                                          },
+                                          "style": {
+                                            "foreground": "#e2e8f0",
+                                            "fontSize": 14,
+                                            "fontWeight": "regular",
+                                            "fontFamily": "jakarta",
+                                            "lineHeight": 18,
+                                            "letterSpacing": 0,
+                                            "radius": 0,
+                                            "borderWidth": 0,
+                                            "borderColor": "#33353a",
+                                            "textAlign": "left",
+                                            "opacity": 1,
+                                            "paddingTop": 0,
+                                            "paddingRight": 0,
+                                            "paddingBottom": 0,
+                                            "paddingLeft": 0
+                                          }
+                                        },
+                                        {
+                                          "id": "webfixture-40",
+                                          "type": "column",
+                                          "box": {
+                                            "x": 36.89,
+                                            "y": 2,
+                                            "width": 51.94,
+                                            "height": 18
+                                          },
+                                          "style": {
+                                            "foreground": "#e2e8f0",
+                                            "fontSize": 14,
+                                            "fontWeight": "semibold",
+                                            "fontFamily": "jakarta",
+                                            "lineHeight": 22.75,
+                                            "letterSpacing": 0,
+                                            "radius": 0,
+                                            "borderWidth": 0,
+                                            "borderColor": "#33353a",
+                                            "textAlign": "left",
+                                            "opacity": 1,
+                                            "paddingTop": 0,
+                                            "paddingRight": 0,
+                                            "paddingBottom": 0,
+                                            "paddingLeft": 0
+                                          },
+                                          "children": [
+                                            {
+                                              "id": "webfixture-visual-26-0",
+                                              "type": "text",
+                                              "text": "George",
+                                              "box": {
+                                                "x": 0,
+                                                "y": 0,
+                                                "width": 51.94,
+                                                "height": 18
+                                              },
+                                              "style": {
+                                                "foreground": "#e2e8f0",
+                                                "fontSize": 14,
+                                                "fontWeight": "semibold",
+                                                "fontFamily": "jakarta",
+                                                "lineHeight": 18,
+                                                "letterSpacing": 0,
+                                                "radius": 0,
+                                                "borderWidth": 0,
+                                                "borderColor": "#33353a",
+                                                "textAlign": "left",
+                                                "opacity": 1,
+                                                "paddingTop": 0,
+                                                "paddingRight": 0,
+                                                "paddingBottom": 0,
+                                                "paddingLeft": 0
+                                              }
+                                            }
+                                          ]
+                                        },
+                                        {
+                                          "id": "webfixture-visual-27-0",
+                                          "type": "text",
+                                          "text": ", the next pickup is ready ",
+                                          "box": {
+                                            "x": 88.83,
+                                            "y": 2,
+                                            "width": 160.84,
+                                            "height": 18
+                                          },
+                                          "style": {
+                                            "foreground": "#e2e8f0",
+                                            "fontSize": 14,
+                                            "fontWeight": "regular",
+                                            "fontFamily": "jakarta",
+                                            "lineHeight": 18,
+                                            "letterSpacing": 0,
+                                            "radius": 0,
+                                            "borderWidth": 0,
+                                            "borderColor": "#33353a",
+                                            "textAlign": "left",
+                                            "opacity": 1,
+                                            "paddingTop": 0,
+                                            "paddingRight": 0,
+                                            "paddingBottom": 0,
+                                            "paddingLeft": 0
+                                          }
+                                        },
+                                        {
+                                          "id": "webfixture-visual-27-1",
+                                          "type": "text",
+                                          "text": "for review.",
+                                          "box": {
+                                            "x": 0,
+                                            "y": 24.75,
+                                            "width": 68.23,
+                                            "height": 18
+                                          },
+                                          "style": {
+                                            "foreground": "#e2e8f0",
+                                            "fontSize": 14,
+                                            "fontWeight": "regular",
+                                            "fontFamily": "jakarta",
+                                            "lineHeight": 18,
+                                            "letterSpacing": 0,
+                                            "radius": 0,
+                                            "borderWidth": 0,
+                                            "borderColor": "#33353a",
+                                            "textAlign": "left",
+                                            "opacity": 1,
+                                            "paddingTop": 0,
+                                            "paddingRight": 0,
+                                            "paddingBottom": 0,
+                                            "paddingLeft": 0
+                                          }
+                                        }
+                                      ]
+                                    },
+                                    {
+                                      "id": "webfixture-44",
+                                      "type": "column",
+                                      "box": {
+                                        "x": 0,
+                                        "y": 51.97,
+                                        "width": 255.22,
+                                        "height": 22.75
+                                      },
+                                      "style": {
+                                        "foreground": "#e2e8f0",
+                                        "fontSize": 14,
+                                        "fontWeight": "regular",
+                                        "fontFamily": "jakarta",
+                                        "lineHeight": 22.75,
+                                        "letterSpacing": 0,
+                                        "radius": 0,
+                                        "borderWidth": 0,
+                                        "borderColor": "#33353a",
+                                        "textAlign": "left",
+                                        "opacity": 1,
+                                        "paddingTop": 0,
+                                        "paddingRight": 0,
+                                        "paddingBottom": 0,
+                                        "paddingLeft": 0
+                                      },
+                                      "children": [
+                                        {
+                                          "id": "webfixture-visual-28-0",
+                                          "type": "text",
+                                          "text": "No business action has been taken.",
+                                          "box": {
+                                            "x": 0,
+                                            "y": 2,
+                                            "width": 231.41,
+                                            "height": 18
+                                          },
+                                          "style": {
+                                            "foreground": "#e2e8f0",
+                                            "fontSize": 14,
+                                            "fontWeight": "regular",
+                                            "fontFamily": "jakarta",
+                                            "lineHeight": 18,
+                                            "letterSpacing": 0,
+                                            "radius": 0,
+                                            "borderWidth": 0,
+                                            "borderColor": "#33353a",
+                                            "textAlign": "left",
+                                            "opacity": 1,
+                                            "paddingTop": 0,
+                                            "paddingRight": 0,
+                                            "paddingBottom": 0,
+                                            "paddingLeft": 0
+                                          }
+                                        }
+                                      ]
+                                    }
+                                  ]
+                                }
+                              ]
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "conversations": [],
+  "suggestions": [],
+  "actions": [
+    {
+      "id": "send",
+      "kind": "send",
+      "label": "Send",
+      "disabled": true
+    },
+    {
+      "id": "stop",
+      "kind": "stop",
+      "label": "Stop",
+      "disabled": true
+    },
+    {
+      "id": "webfixture-2",
+      "kind": "component",
+      "label": "Conversations0",
+      "disabled": false
+    },
+    {
+      "id": "webfixture-3",
+      "kind": "component",
+      "label": "Open import panel",
+      "disabled": false
+    },
+    {
+      "id": "webfixture-4",
+      "kind": "component",
+      "label": "Open capabilities panel",
+      "disabled": false
+    },
+    {
+      "id": "webfixture-6",
+      "kind": "component",
+      "label": "Ask Trisha about rentals, inventory, customers, calls, routes, invoices, coupons",
+      "disabled": false
+    },
+    {
+      "id": "webfixture-8",
+      "kind": "component",
+      "label": "Add file or import data",
+      "disabled": false
+    },
+    {
+      "id": "webfixture-9",
+      "kind": "component",
+      "label": "Show Trisha capabilities",
+      "disabled": false
+    },
+    {
+      "id": "webfixture-11",
+      "kind": "component",
+      "label": "Start voice dictation",
+      "disabled": false
+    },
+    {
+      "id": "webfixture-12",
+      "kind": "component",
+      "label": "Send message",
+      "disabled": true
+    },
+    {
+      "id": "webfixture-16",
+      "kind": "component",
+      "label": "Privacy Policy",
+      "disabled": false
+    },
+    {
+      "id": "webfixture-17",
+      "kind": "component",
+      "label": "Terms",
+      "disabled": false
+    },
+    {
+      "id": "webfixture-18",
+      "kind": "component",
+      "label": "Reset",
+      "disabled": false
+    }
+  ],
+  "screen": {
+    "toolbar": [
+      {
+        "id": "webfixture-1-frame",
+        "type": "column",
+        "box": {
+          "x": 0,
+          "y": 0,
+          "width": 411,
+          "height": 71.1875
+        },
+        "style": {
+          "background": "#1a1b1e"
+        },
+        "children": [
+          {
+            "id": "webfixture-1",
+            "type": "column",
+            "box": {
+              "x": 17.265625,
+              "y": 16,
+              "width": 376.47,
+              "height": 43.19
+            },
+            "style": {
+              "foreground": "#f0f0f0",
+              "fontSize": 16,
+              "fontWeight": "regular",
+              "fontFamily": "jakarta",
+              "lineHeight": 24,
+              "letterSpacing": 0,
+              "radius": 0,
+              "borderWidth": 0,
+              "borderColor": "#33353a",
+              "textAlign": "left",
+              "opacity": 1,
+              "paddingTop": 0,
+              "paddingRight": 0,
+              "paddingBottom": 0,
+              "paddingLeft": 0
+            },
+            "children": [
+              {
+                "id": "webfixture-2",
+                "type": "button",
+                "box": {
+                  "x": 0,
+                  "y": 0,
+                  "width": 272.84,
+                  "height": 43.19
+                },
+                "style": {
+                  "foreground": "#f0f0f0",
+                  "background": "#212226",
+                  "fontSize": 14,
+                  "fontWeight": "medium",
+                  "fontFamily": "jakarta",
+                  "lineHeight": 20,
+                  "letterSpacing": 0,
+                  "radius": 40,
+                  "borderWidth": 1,
+                  "borderColor": "#33353a",
+                  "textAlign": "center",
+                  "opacity": 1,
+                  "paddingTop": 8.64,
+                  "paddingRight": 17.28,
+                  "paddingBottom": 8.64,
+                  "paddingLeft": 17.28
+                },
+                "actionId": "webfixture-2",
+                "disabled": false,
+                "accessibilityLabel": "Conversations0",
+                "children": [
+                  {
+                    "id": "webfixture-visual-1",
+                    "type": "column",
+                    "box": {
+                      "x": 18.27,
+                      "y": 11.59,
+                      "width": 122.97,
+                      "height": 20
+                    },
+                    "style": {
+                      "foreground": "#f0f0f0",
+                      "fontSize": 14,
+                      "fontWeight": "medium",
+                      "fontFamily": "jakarta",
+                      "lineHeight": 20,
+                      "letterSpacing": 0,
+                      "radius": 0,
+                      "borderWidth": 0,
+                      "borderColor": "#33353a",
+                      "textAlign": "center",
+                      "opacity": 1,
+                      "paddingTop": 0,
+                      "paddingRight": 0,
+                      "paddingBottom": 0,
+                      "paddingLeft": 0
+                    },
+                    "children": [
+                      {
+                        "id": "webfixture-visual-2",
+                        "type": "image",
+                        "text": "",
+                        "box": {
+                          "x": 0,
+                          "y": 1.36,
+                          "width": 17.27,
+                          "height": 17.27
+                        },
+                        "style": {
+                          "foreground": "#8c5cff",
+                          "fontSize": 14,
+                          "fontWeight": "medium",
+                          "fontFamily": "jakarta",
+                          "lineHeight": 20,
+                          "letterSpacing": 0,
+                          "radius": 0,
+                          "borderWidth": 0,
+                          "borderColor": "#33353a",
+                          "textAlign": "center",
+                          "opacity": 1,
+                          "paddingTop": 0,
+                          "paddingRight": 0,
+                          "paddingBottom": 0,
+                          "paddingLeft": 0
+                        },
+                        "props": {
+                          "raster": {
+                            "base64": "iVBORw0KGgoAAAANSUhEUgAAACMAAAAjCAYAAAAe2bNZAAAFb0lEQVR4AcxXa2xVRRD+5hbbVEFBAfFtYuSPiaCCioSX8lB8RCPXkD6EEHlEIwR6W8IPpaJBob3QYAwpQiK0tyVpYwSsVlGCj0jFR1M1GvWHojFaaxCtFFt6z/jN9p6Ti33Xew0nZ3Zmdmdnvp3ds2c3hLPoGTKYzWEdV5qj86K5uqQkV9eV5Oka6vklOTr7hbAOH8oYBwUmmqPzS3N1G+mLUBZ+Rgj1Ktglgo0CRKnvkRAOnspCK8HVluTrvYMBNSAwW/J1BkffqCHUQfA46br+ghDcg6LYX5qnX1v2imfqsP769AlmW1jHcIR1nuIwRz8RiUeBvykehuIZ8qVsn0c5TFrJtu2kFtb773jL3vDLcTS6UK/wK3vivYLh/F/VnoUjHOH8oKOigaOdXVgp2ZFKmRWJyRPkO4ti8iblWtLzbHuUNFY9zCGoz4K+wA2agU835+rUpLozxB7BRPN0AqfiYwK5xqzptIWjXsxgUwpi8rbV9UeFVfIWQU1g3xWBrWB0SPA+p+3WoC5J6Abm2Rwd5QEHCWa0s1McEw+TCWS30wdZEFC5xnEbB3Pc70qAB7Yu1Kt93efdwAyzrwMYkzBozOwgkCo5ltCHxAqr5QjXlWXjhHPADHVmoNLJScUZYLjyc0XwgLUr0Io45q6skeTFaE1DoqIq+ZYZsvV32hwwzlRuEYtM9ikAU1ysIQVK/QbKGyLV8puvp4Jbhuh3Y5Kv0k1LdISvB2BGfIM7uWDHuQauk6JKCYC5uhQVXEPFBPSDc8fpyujAEiezCMB4gmXU3UvjF52QrsJDNMn1Al92YOw/A4HbugnE0w7s8g3SwjOwl19X3PlWTN2ap5eY7MBIFqZzipxMowNFNfKLNaaLCivkV+7K9c6/QPil3WSyD+BSUxwJ3nU8zQX3rgY/BIGNM9mBESAAw2lK6RdkQXokQRBHFRebjQNDZBeaYpQBdG1MSPOjOBlEEIwEHweGmWmm7F6iDLLkKtJVJACYe/5824w7MATwvSlGnKYrjf8PdG0QQ/CTyV1gBD+aYsQs9fqLt/YU0u2+L8b80GQHJu7BFPfPYOU0t+9QSNe7dbGO5L7mnxZPFFRKk8VyYNZVye8K7LcKGgmy4H6WTk9DcboTj/huGTc4H4X8Snio8GUuqHxfTjXfEtZs/pHX+n4pvxTIvsCT2T7uvn+aLoIpxtNB8UwsB3+QCd9NPDm+mpARZOa5sF5Ao/Ndg+KU4ykuNuXrJC7Wp323qnjKl40HYDIy4X6UVklK+S8h+rCO55TUQ9B1wVN8GYnhFSQ9ARga3R/UC2oDOQUCbwRzvTgamJWLzB0z8kc8hAUCrk6rSJADUxzWTFbbkRBcN/FQO15OtP8nVr5Mz+FRdguD1HMdjjJn/HraGOuOtRXylenJRDvgvCzMYWayXYPg0JoacSd5nlEn8xJXTGogneSt8gNeY+5zdn0Utk+x75OtbfiOZqvpW8jtbeIhblKkSj4x5d/kwLByGsm9TGEzg+5g8GY6OUov60m3kM7l6KZwZPvYfpwjLiet4kV/oU0Dg6+gXkZ+yN3DBbY4L3NOrVCU8MI3saeMWLORA8O0BSljwDzSUgYfawY9Edst5XZMLeNFv5oXszcg2E7bVeSzyIOX4N+DhxmRmBQFlb0IDgwNd7PTO91sFB9BsV46cSNHJVDMp00Nqc+XvlpoG/U8jOcBfDqnZUBfpwNjntlppni4m07WU1+a2Y6xkZjcTNpQsFcaWQfKrxPUQ9ntGKHAPbS1nXQH5XpOb5kHLOLnez19Wd+I3ZWs30ApAGMdCqrkNQbcwIA7+7q8PVYjfzFgHW0303Y55bsKY7Ka15s9a2LyufkaCv0DAAD//6cZJVsAAAAGSURBVAMA4FjdVrQsGs0AAAAASUVORK5CYII=",
+                            "width": 35,
+                            "height": 35
+                          }
+                        }
+                      },
+                      {
+                        "id": "webfixture-visual-3",
+                        "type": "column",
+                        "box": {
+                          "x": 25.89,
+                          "y": 0,
+                          "width": 97.08,
+                          "height": 20
+                        },
+                        "style": {
+                          "foreground": "#f0f0f0",
+                          "fontSize": 14,
+                          "fontWeight": "medium",
+                          "fontFamily": "jakarta",
+                          "lineHeight": 20,
+                          "letterSpacing": 0,
+                          "radius": 0,
+                          "borderWidth": 0,
+                          "borderColor": "#33353a",
+                          "textAlign": "center",
+                          "opacity": 1,
+                          "paddingTop": 0,
+                          "paddingRight": 0,
+                          "paddingBottom": 0,
+                          "paddingLeft": 0
+                        },
+                        "children": [
+                          {
+                            "id": "webfixture-visual-4-0",
+                            "type": "text",
+                            "text": "Conversations",
+                            "box": {
+                              "x": 0,
+                              "y": 1,
+                              "width": 97.08,
+                              "height": 18
+                            },
+                            "style": {
+                              "foreground": "#f0f0f0",
+                              "fontSize": 14,
+                              "fontWeight": "medium",
+                              "fontFamily": "jakarta",
+                              "lineHeight": 18,
+                              "letterSpacing": 0,
+                              "radius": 0,
+                              "borderWidth": 0,
+                              "borderColor": "#33353a",
+                              "textAlign": "center",
+                              "opacity": 1,
+                              "paddingTop": 0,
+                              "paddingRight": 0,
+                              "paddingBottom": 0,
+                              "paddingLeft": 0
+                            }
+                          }
+                        ]
+                      }
+                    ]
+                  },
+                  {
+                    "id": "webfixture-visual-5",
+                    "type": "column",
+                    "box": {
+                      "x": 245.88,
+                      "y": 13.59,
+                      "width": 8.7,
+                      "height": 16
+                    },
+                    "style": {
+                      "foreground": "#a0a0a0",
+                      "fontSize": 12,
+                      "fontWeight": "medium",
+                      "fontFamily": "jakarta",
+                      "lineHeight": 16,
+                      "letterSpacing": 0,
+                      "radius": 0,
+                      "borderWidth": 0,
+                      "borderColor": "#33353a",
+                      "textAlign": "center",
+                      "opacity": 1,
+                      "paddingTop": 0,
+                      "paddingRight": 0,
+                      "paddingBottom": 0,
+                      "paddingLeft": 0
+                    },
+                    "children": [
+                      {
+                        "id": "webfixture-visual-6-0",
+                        "type": "text",
+                        "text": "0",
+                        "box": {
+                          "x": 0,
+                          "y": 0,
+                          "width": 8.7,
+                          "height": 15
+                        },
+                        "style": {
+                          "foreground": "#a0a0a0",
+                          "fontSize": 12,
+                          "fontWeight": "medium",
+                          "fontFamily": "jakarta",
+                          "lineHeight": 15,
+                          "letterSpacing": 0,
+                          "radius": 0,
+                          "borderWidth": 0,
+                          "borderColor": "#33353a",
+                          "textAlign": "center",
+                          "opacity": 1,
+                          "paddingTop": 0,
+                          "paddingRight": 0,
+                          "paddingBottom": 0,
+                          "paddingLeft": 0
+                        }
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "id": "webfixture-3",
+                "type": "button",
+                "box": {
+                  "x": 281.47,
+                  "y": 0,
+                  "width": 43.19,
+                  "height": 43.19
+                },
+                "style": {
+                  "foreground": "#f0f0f0",
+                  "background": "#212226",
+                  "fontSize": 14,
+                  "fontWeight": "medium",
+                  "fontFamily": "jakarta",
+                  "lineHeight": 20,
+                  "letterSpacing": 0,
+                  "radius": 40,
+                  "borderWidth": 1,
+                  "borderColor": "#33353a",
+                  "textAlign": "center",
+                  "opacity": 1,
+                  "paddingTop": 0,
+                  "paddingRight": 0,
+                  "paddingBottom": 0,
+                  "paddingLeft": 0
+                },
+                "actionId": "webfixture-3",
+                "disabled": false,
+                "accessibilityLabel": "Open import panel",
+                "children": [
+                  {
+                    "id": "webfixture-visual-7",
+                    "type": "image",
+                    "text": "",
+                    "box": {
+                      "x": 12.95,
+                      "y": 12.95,
+                      "width": 17.27,
+                      "height": 17.27
+                    },
+                    "style": {
+                      "foreground": "#8c5cff",
+                      "fontSize": 14,
+                      "fontWeight": "medium",
+                      "fontFamily": "jakarta",
+                      "lineHeight": 20,
+                      "letterSpacing": 0,
+                      "radius": 0,
+                      "borderWidth": 0,
+                      "borderColor": "#33353a",
+                      "textAlign": "center",
+                      "opacity": 1,
+                      "paddingTop": 0,
+                      "paddingRight": 0,
+                      "paddingBottom": 0,
+                      "paddingLeft": 0
+                    },
+                    "props": {
+                      "raster": {
+                        "base64": "iVBORw0KGgoAAAANSUhEUgAAACMAAAAjCAYAAAAe2bNZAAAE5klEQVR4AdxXXWxURRT+zl0awMSACO2LGoMa0qCgEiSkbaTEFxN8E2y7xQg1GiFo2t3axBgSYoy22zaGBwzREmh3W0l98EUfiGhtG2MQI6L4l5JIUPGvxBSNUN09fme69/Yu/dstNEE3c2bO//3m3Jm5sx6uod9/G0zzVi1trdE1ezfrsqtd1Bkrk9iqxa1R3dNaqydIGlF8CQ/HR+fjl0RUz1LX3h7Vu64GsCnBvFKtJQTRIYqfIdjNh60m5TQR3ERFfUZwMlGrh5trdQXlWbdJwRDEw/94rIBge05mxXkFTlL3KSmnCbAlAnzdUquP5hgKECaAYbKnWIle0pIgj+IgHe+Ip+TGxqSsjiflXpJIBhsJriPwI0O/Q8wRJ1twY+x4DEu9gYp94xoMeYpVBLGtISlDIb1jY93yPsE9Lh5WQPGRU7JjjkRbVDeRLagxLsf/UCApPll4Cfc0pOTzQDcFE+uUbwl4PQG96buooKutSm/25XzGAEyiRusEuCUbdC4zik07e+WPrJzXQECbVXECY7/FGsELY2x+fQCGa2SbH8J1sOfZXvnJlwsZIxnU+v6sziN89X3cEO9xPMxxLydd5dsvHx2Y5u16PbdpmRkJZJjrYL/xs6GGHjnFHG9bLCu9gHQ/J1rJcQvHXVxfPTyfBnl+3Wk+YXJgvIvYGCgV/QE/SyaSRhPXz8hU4TZxnl8DiWpdFfZxYGi8PaT8OMTPirXqIIPbWKFKIz74Aa6lJ0jdoYSLEcG7rFCxr3NgOIuFIcWUM/J98hnjPfIbX3efUSwlRxtT8hop6mWwjs87bzn46pbxrNplvNEYGA8BmIziohnmihq65RjPrgdD+Xfsf0ivM9mBYRl/NMGRh4LOBhdTYGeA+MqOuDDBkguL4DaPA8NVPugM7AisoJOzuUYruW17Wqq0guGFtD7fmcBWGu/AxJLyGRfaV6YgsDWt1Vru+Bm69hpd7gmO8N1XefNw1OQZQsLmM77ADVRqvAPjGEWrjY48tLlxms6uC7w6fMhE87JuRSbnC4hxt2bjuJ4xanwAhiv+AKvzqylZnft4aUo6fpLOgPCSNUi/khyzoMQAmT1HP5mgqPPV3FHHjA/AOCGDxzD+i/IMWDcujnHt1bqSQQMEstRp1CZGzh8JiPZ+u55SO2njZ6GD8cvNyAIMpxfgLfDHOPbZxivBO0y904l2wwO+cHy2MyBpDwNcI2P3X8UZJnNHASvyF2PdOqC9mN+ofvPPhgYDF/vrBBJc2rhhdjcdkAvmkAPGFPzy7ksL1koaaxu75E/TGdlMHRDBDSYTxGkvwi0phEAFAWgaKKf0HUVAsDTjIadCLVEto18dsj/meNWelxUxAYwZmrrkeOwNOWu8Tzyo2rnoHBDqhrhqKxo65QfyQWtKyfcEWM6HnHZKniEW53h2RUU4xW3szjSOL/J03kF10CYFE1hDDGc0YCKTfJO5hIr6pJwz+XIygAaU+iESWKngw1t/UH6fD5Qy1938NDzv7KHOC/HTsrEkXuKZsuHvCMpmuus4oGmsN/94Ci+HEz+dkpEYz7WwzufzBiMQbeiSD57rlGE/eLrRPpTmb3HT+YVteYMJB80VnwUzV+kLy/v/AiNAkjtmhNRRWB0mel9xZfjP8sl4ShZxqz4zMX1hmisGU9jjpve+psD8CwAA///1jFhAAAAABklEQVQDAEG3mVZ3UHkxAAAAAElFTkSuQmCC",
+                        "width": 35,
+                        "height": 35
+                      }
+                    }
+                  }
+                ]
+              },
+              {
+                "id": "webfixture-4",
+                "type": "button",
+                "box": {
+                  "x": 333.28,
+                  "y": 0,
+                  "width": 43.19,
+                  "height": 43.19
+                },
+                "style": {
+                  "foreground": "#f0f0f0",
+                  "background": "#212226",
+                  "fontSize": 14,
+                  "fontWeight": "medium",
+                  "fontFamily": "jakarta",
+                  "lineHeight": 20,
+                  "letterSpacing": 0,
+                  "radius": 40,
+                  "borderWidth": 1,
+                  "borderColor": "#33353a",
+                  "textAlign": "center",
+                  "opacity": 1,
+                  "paddingTop": 0,
+                  "paddingRight": 0,
+                  "paddingBottom": 0,
+                  "paddingLeft": 0
+                },
+                "actionId": "webfixture-4",
+                "disabled": false,
+                "accessibilityLabel": "Open capabilities panel",
+                "children": [
+                  {
+                    "id": "webfixture-visual-8",
+                    "type": "image",
+                    "text": "",
+                    "box": {
+                      "x": 12.95,
+                      "y": 12.95,
+                      "width": 17.27,
+                      "height": 17.27
+                    },
+                    "style": {
+                      "foreground": "#8c5cff",
+                      "fontSize": 14,
+                      "fontWeight": "medium",
+                      "fontFamily": "jakarta",
+                      "lineHeight": 20,
+                      "letterSpacing": 0,
+                      "radius": 0,
+                      "borderWidth": 0,
+                      "borderColor": "#33353a",
+                      "textAlign": "center",
+                      "opacity": 1,
+                      "paddingTop": 0,
+                      "paddingRight": 0,
+                      "paddingBottom": 0,
+                      "paddingLeft": 0
+                    },
+                    "props": {
+                      "raster": {
+                        "base64": "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",
+                        "width": 35,
+                        "height": 35
+                      }
+                    }
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    ],
+    "composer": [
+      {
+        "id": "webfixture-5-frame",
+        "type": "column",
+        "box": {
+          "x": 0,
+          "y": 0,
+          "width": 411,
+          "height": 187.453125
+        },
+        "style": {
+          "background": "#1a1b1e"
+        },
+        "children": [
+          {
+            "id": "webfixture-5",
+            "type": "column",
+            "box": {
+              "x": 18.265625,
+              "y": 0,
+              "width": 374.47,
+              "height": 171.45
+            },
+            "style": {
+              "foreground": "#f0f0f0",
+              "background": "#222327",
+              "fontSize": 16,
+              "fontWeight": "regular",
+              "fontFamily": "jakarta",
+              "lineHeight": 24,
+              "letterSpacing": 0,
+              "radius": 21,
+              "borderWidth": 1,
+              "borderColor": "#313338",
+              "textAlign": "left",
+              "opacity": 1,
+              "paddingTop": 0,
+              "paddingRight": 0,
+              "paddingBottom": 0,
+              "paddingLeft": 0
+            },
+            "children": [
+              {
+                "id": "webfixture-6",
+                "type": "input",
+                "text": "",
+                "value": "",
+                "actionId": "webfixture-6",
+                "disabled": false,
+                "style": {
+                  "foreground": "#f0f0f0",
+                  "fontSize": 16,
+                  "fontWeight": "regular",
+                  "fontFamily": "jakarta",
+                  "lineHeight": 24,
+                  "letterSpacing": 0,
+                  "radius": 6.4,
+                  "borderWidth": 0,
+                  "borderColor": "#33353a",
+                  "textAlign": "left",
+                  "opacity": 1,
+                  "paddingTop": 17.28,
+                  "paddingRight": 21.6,
+                  "paddingBottom": 17.28,
+                  "paddingLeft": 21.6
+                },
+                "props": {
+                  "inputType": "textarea",
+                  "placeholder": "Ask Trisha about rentals, inventory, customers, calls, routes, invoices, coupons…"
+                },
+                "box": {
+                  "x": 1,
+                  "y": 1,
+                  "width": 372.47,
+                  "height": 103.67
+                },
+                "accessibilityLabel": "Ask Trisha about rentals, inventory, customers, calls, routes, invoices, coupons…"
+              },
+              {
+                "id": "webfixture-7",
+                "type": "column",
+                "box": {
+                  "x": 1,
+                  "y": 104.67,
+                  "width": 372.47,
+                  "height": 65.78
+                },
+                "style": {
+                  "foreground": "#f0f0f0",
+                  "background": "#24262b",
+                  "fontSize": 16,
+                  "fontWeight": "regular",
+                  "fontFamily": "jakarta",
+                  "lineHeight": 24,
+                  "letterSpacing": 0,
+                  "radius": 0,
+                  "borderWidth": 1,
+                  "borderColor": "#2c2e32",
+                  "textAlign": "left",
+                  "opacity": 1,
+                  "paddingTop": 12.96,
+                  "paddingRight": 17.28,
+                  "paddingBottom": 12.96,
+                  "paddingLeft": 17.28
+                },
+                "children": [
+                  {
+                    "id": "webfixture-8",
+                    "type": "button",
+                    "box": {
+                      "x": 17.27,
+                      "y": 16.11,
+                      "width": 34.55,
+                      "height": 34.55
+                    },
+                    "style": {
+                      "foreground": "#f0f0f0",
+                      "fontSize": 14,
+                      "fontWeight": "medium",
+                      "fontFamily": "jakarta",
+                      "lineHeight": 20,
+                      "letterSpacing": 0,
+                      "radius": 40,
+                      "borderWidth": 0,
+                      "borderColor": "#33353a",
+                      "textAlign": "center",
+                      "opacity": 1,
+                      "paddingTop": 0,
+                      "paddingRight": 0,
+                      "paddingBottom": 0,
+                      "paddingLeft": 0
+                    },
+                    "actionId": "webfixture-8",
+                    "disabled": false,
+                    "accessibilityLabel": "Add file or import data",
+                    "children": [
+                      {
+                        "id": "webfixture-visual-9",
+                        "type": "image",
+                        "text": "",
+                        "box": {
+                          "x": 8.64,
+                          "y": 8.64,
+                          "width": 17.27,
+                          "height": 17.27
+                        },
+                        "style": {
+                          "foreground": "#f0f0f0",
+                          "fontSize": 14,
+                          "fontWeight": "medium",
+                          "fontFamily": "jakarta",
+                          "lineHeight": 20,
+                          "letterSpacing": 0,
+                          "radius": 0,
+                          "borderWidth": 0,
+                          "borderColor": "#33353a",
+                          "textAlign": "center",
+                          "opacity": 1,
+                          "paddingTop": 0,
+                          "paddingRight": 0,
+                          "paddingBottom": 0,
+                          "paddingLeft": 0
+                        },
+                        "props": {
+                          "raster": {
+                            "base64": "iVBORw0KGgoAAAANSUhEUgAAACMAAAAjCAYAAAAe2bNZAAABMElEQVR4AexXMQ6CQBAElcRgAnzCxNJYWfIPSxu+xBPsrGx5gb2FjwASrVScNXeFxx1BDhJi1txkZG/YHQcDYeKM6MNmTBeDkxksmaqq/DzPN+C5aUjbuvVlgpEThp2LojiCrZa1GUxfAw6S2RLboA8znjAwE9yZ+jDTebh6IptRE5HHnIxMQmVORk1EHhuTwZ01A55A1QTXdX1qBl406cQe9ctIr4PWTFmWK4hjQLuPetdF/WLRv9aDNmvFIAguKKbAC+hzPdAsFf3x9XtpzZAkiqIEmAJuE/BMupMefGvSiT0PnJBeB6MZnXjoGpsxJczJcDKmBEz1//rP4Jn0eSsAH0y/uG1dJNNWXtfhjrqDkSV4X9/9rWJthsaFYXgltkUvZmxNyPPZjExC5VEl8wYAAP//NdOABQAAAAZJREFUAwBQ2nxHlkM24wAAAABJRU5ErkJggg==",
+                            "width": 35,
+                            "height": 35
+                          }
+                        }
+                      }
+                    ]
+                  },
+                  {
+                    "id": "webfixture-9",
+                    "type": "button",
+                    "box": {
+                      "x": 60.44,
+                      "y": 16.11,
+                      "width": 96.63,
+                      "height": 34.55
+                    },
+                    "style": {
+                      "foreground": "#8c5cff",
+                      "background": "#1d1e22",
+                      "fontSize": 12,
+                      "fontWeight": "medium",
+                      "fontFamily": "jakarta",
+                      "lineHeight": 16,
+                      "letterSpacing": 0,
+                      "radius": 40,
+                      "borderWidth": 1,
+                      "borderColor": "#3e3460",
+                      "textAlign": "center",
+                      "opacity": 1,
+                      "paddingTop": 0,
+                      "paddingRight": 12.96,
+                      "paddingBottom": 0,
+                      "paddingLeft": 12.96
+                    },
+                    "actionId": "webfixture-9",
+                    "disabled": false,
+                    "accessibilityLabel": "Show Trisha capabilities",
+                    "children": [
+                      {
+                        "id": "webfixture-visual-10-0",
+                        "type": "text",
+                        "text": "Capabilities",
+                        "box": {
+                          "x": 13.95,
+                          "y": 9.27,
+                          "width": 68.72,
+                          "height": 15
+                        },
+                        "style": {
+                          "foreground": "#8c5cff",
+                          "fontSize": 12,
+                          "fontWeight": "medium",
+                          "fontFamily": "jakarta",
+                          "lineHeight": 15,
+                          "letterSpacing": 0,
+                          "radius": 40,
+                          "borderWidth": 0,
+                          "borderColor": "#3e3460",
+                          "textAlign": "center",
+                          "opacity": 1,
+                          "paddingTop": 0,
+                          "paddingRight": 0,
+                          "paddingBottom": 0,
+                          "paddingLeft": 0
+                        }
+                      }
+                    ]
+                  },
+                  {
+                    "id": "webfixture-10",
+                    "type": "column",
+                    "box": {
+                      "x": 268.83,
+                      "y": 13.95,
+                      "width": 86.38,
+                      "height": 38.88
+                    },
+                    "style": {
+                      "foreground": "#f0f0f0",
+                      "fontSize": 16,
+                      "fontWeight": "regular",
+                      "fontFamily": "jakarta",
+                      "lineHeight": 24,
+                      "letterSpacing": 0,
+                      "radius": 0,
+                      "borderWidth": 0,
+                      "borderColor": "#33353a",
+                      "textAlign": "left",
+                      "opacity": 1,
+                      "paddingTop": 0,
+                      "paddingRight": 0,
+                      "paddingBottom": 0,
+                      "paddingLeft": 0
+                    },
+                    "children": [
+                      {
+                        "id": "webfixture-11",
+                        "type": "button",
+                        "box": {
+                          "x": 0,
+                          "y": 0,
+                          "width": 38.88,
+                          "height": 38.88
+                        },
+                        "style": {
+                          "foreground": "#a0a0a0",
+                          "fontSize": 14,
+                          "fontWeight": "medium",
+                          "fontFamily": "jakarta",
+                          "lineHeight": 20,
+                          "letterSpacing": 0,
+                          "radius": 8,
+                          "borderWidth": 0,
+                          "borderColor": "#33353a",
+                          "textAlign": "center",
+                          "opacity": 1,
+                          "paddingTop": 0,
+                          "paddingRight": 0,
+                          "paddingBottom": 0,
+                          "paddingLeft": 0
+                        },
+                        "actionId": "webfixture-11",
+                        "disabled": false,
+                        "accessibilityLabel": "Start voice dictation",
+                        "children": [
+                          {
+                            "id": "webfixture-visual-11",
+                            "type": "image",
+                            "text": "",
+                            "box": {
+                              "x": 10.8,
+                              "y": 10.8,
+                              "width": 17.27,
+                              "height": 17.27
+                            },
+                            "style": {
+                              "foreground": "#a0a0a0",
+                              "fontSize": 14,
+                              "fontWeight": "medium",
+                              "fontFamily": "jakarta",
+                              "lineHeight": 20,
+                              "letterSpacing": 0,
+                              "radius": 0,
+                              "borderWidth": 0,
+                              "borderColor": "#33353a",
+                              "textAlign": "center",
+                              "opacity": 1,
+                              "paddingTop": 0,
+                              "paddingRight": 0,
+                              "paddingBottom": 0,
+                              "paddingLeft": 0
+                            },
+                            "props": {
+                              "raster": {
+                                "base64": "iVBORw0KGgoAAAANSUhEUgAAACMAAAAjCAYAAAAe2bNZAAAEPklEQVR4AeyWS2xUZRTHZ6bTVqYquGlXktYYExONaKQmomCJiXaMJG6a9JG+UlPFRGODRoNiNdWI8lgQHk1I36suICwosGEWBFJIWcGGDemWFCgQhkczneH3/7jf5DJzb5k7AwQSJud/z/nOd75z/nO/142EnqJfSWQmJyeXDw8Pfw76xsbGPpuYmHi5lP9WFJlEIhGFQH8ymZwLh8NHwPZ0On00lUrNjYyMbFZ/MaQCk8lkMuHZ2dnjEPgDlOcUraA9QP8xxWEHksBkmI7vIfGxqlAwDaawt4Mj2Gl0iP71o6OjG2UHQSAy/f39EQr+5RTIlJWVfdDV1fVFZ2fnJhCHxFqnT2pAjyAIRKauru4tkttFeqy9vX2GdlYgdJJGAkhW8BbflFEoApEh6RvACG/oojHyHxesa3Fx8fGRgUAh5DOWDLoMFCyFJC84WamBz8n4vcFn481wrA+AQ2zPdX7/JIif6+MT5QN/+o3zfDNDQ0OvMmAz2MCdswn9KOQnkmwAW5z8mA+KJ5lIJGIPthDb+aUHhxTdqnKN9MzpScY16ImanmS4c1KWBfeNbmLTxL5rjPsPzwONNxm93x3ShZmNZ2w2jzt/yPXzI3PFxpD8HZd93tro10CeUPR162S9ueNXWX80Gp2ztlt7kmlubhYZc6yTPMaCM4U7Ojp0H91WAvyfskNWy7Yg7kPsBiC51t3drfjQ+Pi4CC6TE6RaW1vn0XniSYZCvJBM9kZmQb+rkY7/N9kgDKbZqlPgfzBF/wl8RkiwxRg8uDDfQ1k5bY1c7UnGCTrgaKkfSa7iIb5fduDYCbQmNL4RW9u/ETJqawduJW4Xftlhxv4g28FBR+cpMzjPi6OysnIYdQdI1vDl1idD4Lulj8LrsWcoZL7uHH0GvRYiv9BnhEPzZ2I1fWon+U5WXtl58CXT0tJyiehtwAhF/maNvG0aPFg/CUitXlhY0JnxflVV1Yu09eWXnSriVzHOfhnqLW3t6em5ynBP8SWj6Fgs9g/arB3+XSX2NAW+QWelt7f3FiTONjU1mYVtO4jbyJhTtO2WnqmpqfmPtq8sSUYF2J5xRs8CrZEYBfZS6DDTVj84OBiT30Jt+dVP3G78Zgfxdi5WVFQ0xuPx7LlDX54sSUbRbM85CNVjTwMjFIpT4DTrKknha+ykq2BebfnVbwJ50D7Fbqxn2i/TXFIeSkajRYgp0+39O8mvy2dB4eXYr4AVwC3zxP5aW1u7jvWlc8vd52kXREYjmbIF1sZAeXn5Sop8B7Qe1JWLk/R9C/mV7Kp/GxoasldLbmBu2yGT6/Zvt7W13aDIHrCGosvAbaCdcqu6uvoFCH9E3z7I3/TP4t0TmIw7DUV1DmWYKi3uzMMWqHusl10SGa+EpfgeBZlzIsBUmfNIdrEomQwkvmSavuYc+apYEnZcyWS07dm6+/0+C2yhQvQ9AAAA//8x0PBfAAAABklEQVQDALYSoFa91kUeAAAAAElFTkSuQmCC",
+                                "width": 35,
+                                "height": 35
+                              }
+                            }
+                          }
+                        ]
+                      },
+                      {
+                        "id": "webfixture-12",
+                        "type": "button",
+                        "box": {
+                          "x": 47.5,
+                          "y": 0,
+                          "width": 38.88,
+                          "height": 38.88
+                        },
+                        "style": {
+                          "foreground": "#ffffff",
+                          "background": "#8c5cff",
+                          "fontSize": 14,
+                          "fontWeight": "medium",
+                          "fontFamily": "jakarta",
+                          "lineHeight": 20,
+                          "letterSpacing": 0,
+                          "radius": 40,
+                          "borderWidth": 0,
+                          "borderColor": "#33353a",
+                          "textAlign": "center",
+                          "opacity": 0.5,
+                          "paddingTop": 0,
+                          "paddingRight": 0,
+                          "paddingBottom": 0,
+                          "paddingLeft": 0
+                        },
+                        "actionId": "webfixture-12",
+                        "disabled": true,
+                        "accessibilityLabel": "Send message",
+                        "children": [
+                          {
+                            "id": "webfixture-visual-12",
+                            "type": "column",
+                            "box": {
+                              "x": 10.8,
+                              "y": 10.8,
+                              "width": 17.27,
+                              "height": 17.27
+                            },
+                            "style": {
+                              "foreground": "#ffffff",
+                              "fontSize": 14,
+                              "fontWeight": "medium",
+                              "fontFamily": "jakarta",
+                              "lineHeight": 20,
+                              "letterSpacing": 0,
+                              "radius": 0,
+                              "borderWidth": 0,
+                              "borderColor": "#33353a",
+                              "textAlign": "center",
+                              "opacity": 1,
+                              "paddingTop": 0,
+                              "paddingRight": 0,
+                              "paddingBottom": 0,
+                              "paddingLeft": 0
+                            },
+                            "children": [
+                              {
+                                "id": "webfixture-visual-13",
+                                "type": "image",
+                                "text": "",
+                                "box": {
+                                  "x": 0,
+                                  "y": 0,
+                                  "width": 17.27,
+                                  "height": 17.27
+                                },
+                                "style": {
+                                  "foreground": "#ffffff",
+                                  "fontSize": 14,
+                                  "fontWeight": "medium",
+                                  "fontFamily": "jakarta",
+                                  "lineHeight": 20,
+                                  "letterSpacing": 0,
+                                  "radius": 0,
+                                  "borderWidth": 0,
+                                  "borderColor": "#33353a",
+                                  "textAlign": "center",
+                                  "opacity": 1,
+                                  "paddingTop": 0,
+                                  "paddingRight": 0,
+                                  "paddingBottom": 0,
+                                  "paddingLeft": 0
+                                },
+                                "props": {
+                                  "raster": {
+                                    "base64": "iVBORw0KGgoAAAANSUhEUgAAACMAAAAjCAYAAAAe2bNZAAABr0lEQVR4AeyUy0oDMRSGZ0REXQpuxY0vogguXNl6w6XP5sJLvdT2bVxIfQkFdfz+cgKlM+lkMhZKSTl/Tk6anPP1JHQlW6BPgvFdRurM3DpTFMUmOkbrviKh662uyQA+KPaKRhYzjbNoGCs8oOwWkm0zDGydaXOLgqHgBqUEcoCfNMXRQI1hANHb0LWo8CSIm2u9b/vcWpBvBGMFhmRWQVz2zfCFZJ8MinHZIcPQ9jMNs2AYSyyQfUutwh3mP0gmr1jrirWvEVAQjA8kz/O+qjpZXAW05vbM8rUwoSCuiAfohTy1QDNhSKDHWroaK+jql7x9rw7p6vT9EUMtkBcmFoSiYzOgC4JgIC8MSW6QHiEuU8IzK6A4SOx/YKOAfvEydUh5NS+pEoau7LLzBMkEckriJwVNxblpoC75d6ryVMKQ4J3Nj0gg58RRIJwfG+fvmVwi5esRj5iXrBJGuzjQQauop7ityHOHlK/ry+WF8R2Y53qC8XU3dSZ1xtcB3/rSvZln+6W35qOddSb6fMa/6hWn9/DX+FbWGkbVAXmTb6t/gWkL4c4nGNeJab9QnfkDAAD//xvmsc8AAAAGSURBVAMAWNePR2S+PyEAAAAASUVORK5CYII=",
+                                    "width": 35,
+                                    "height": 35
+                                  }
+                                }
+                              }
+                            ]
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    ],
+    "accessory": [],
+    "overlay": [],
+    "footer": [
+      {
+        "id": "webfixture-13-frame",
+        "type": "column",
+        "box": {
+          "x": 0,
+          "y": 0,
+          "width": 411,
+          "height": 44.171875
+        },
+        "style": {
+          "background": "#1a1b1e"
+        },
+        "children": [
+          {
+            "id": "webfixture-13",
+            "type": "column",
+            "box": {
+              "x": 0,
+              "y": 0,
+              "width": 411,
+              "height": 44.17
+            },
+            "style": {
+              "foreground": "#f0f0f0",
+              "background": "#1a1b1e",
+              "fontSize": 16,
+              "fontWeight": "regular",
+              "fontFamily": "jakarta",
+              "lineHeight": 24,
+              "letterSpacing": 0,
+              "radius": 0,
+              "borderWidth": 1,
+              "borderColor": "#292b2f",
+              "textAlign": "left",
+              "opacity": 1,
+              "paddingTop": 6.48,
+              "paddingRight": 17.28,
+              "paddingBottom": 6.48,
+              "paddingLeft": 17.28
+            },
+            "children": [
+              {
+                "id": "webfixture-14",
+                "type": "column",
+                "box": {
+                  "x": 17.27,
+                  "y": 7.47,
+                  "width": 376.47,
+                  "height": 30.23
+                },
+                "style": {
+                  "foreground": "#a0a0a0",
+                  "fontSize": 11,
+                  "fontWeight": "regular",
+                  "fontFamily": "jakarta",
+                  "lineHeight": 16.5,
+                  "letterSpacing": 0,
+                  "radius": 0,
+                  "borderWidth": 0,
+                  "borderColor": "#33353a",
+                  "textAlign": "left",
+                  "opacity": 1,
+                  "paddingTop": 0,
+                  "paddingRight": 0,
+                  "paddingBottom": 0,
+                  "paddingLeft": 0
+                },
+                "children": [
+                  {
+                    "id": "webfixture-15",
+                    "type": "column",
+                    "box": {
+                      "x": 0,
+                      "y": 6.86,
+                      "width": 125.13,
+                      "height": 16.5
+                    },
+                    "style": {
+                      "foreground": "#a0a0a0",
+                      "fontSize": 11,
+                      "fontWeight": "regular",
+                      "fontFamily": "jakarta",
+                      "lineHeight": 16.5,
+                      "letterSpacing": 0,
+                      "radius": 0,
+                      "borderWidth": 0,
+                      "borderColor": "#33353a",
+                      "textAlign": "left",
+                      "opacity": 1,
+                      "paddingTop": 0,
+                      "paddingRight": 0,
+                      "paddingBottom": 0,
+                      "paddingLeft": 0
+                    },
+                    "children": [
+                      {
+                        "id": "webfixture-16",
+                        "type": "link",
+                        "box": {
+                          "x": 0,
+                          "y": 0,
+                          "width": 71.03,
+                          "height": 16.5
+                        },
+                        "style": {
+                          "foreground": "#a0a0a0",
+                          "fontSize": 11,
+                          "fontWeight": "regular",
+                          "fontFamily": "jakarta",
+                          "lineHeight": 16.5,
+                          "letterSpacing": 0,
+                          "radius": 0,
+                          "borderWidth": 0,
+                          "borderColor": "#33353a",
+                          "textAlign": "left",
+                          "opacity": 1,
+                          "paddingTop": 0,
+                          "paddingRight": 0,
+                          "paddingBottom": 0,
+                          "paddingLeft": 0
+                        },
+                        "actionId": "webfixture-16",
+                        "disabled": false,
+                        "accessibilityLabel": "Privacy Policy",
+                        "children": [
+                          {
+                            "id": "webfixture-visual-14-0",
+                            "type": "text",
+                            "text": "Privacy Policy",
+                            "box": {
+                              "x": 0,
+                              "y": 1,
+                              "width": 71.03,
+                              "height": 13
+                            },
+                            "style": {
+                              "foreground": "#a0a0a0",
+                              "fontSize": 11,
+                              "fontWeight": "regular",
+                              "fontFamily": "jakarta",
+                              "lineHeight": 13,
+                              "letterSpacing": 0,
+                              "radius": 0,
+                              "borderWidth": 0,
+                              "borderColor": "#33353a",
+                              "textAlign": "left",
+                              "opacity": 1,
+                              "paddingTop": 0,
+                              "paddingRight": 0,
+                              "paddingBottom": 0,
+                              "paddingLeft": 0
+                            }
+                          }
+                        ]
+                      },
+                      {
+                        "id": "webfixture-visual-15",
+                        "type": "column",
+                        "box": {
+                          "x": 79.66,
+                          "y": 0,
+                          "width": 5.91,
+                          "height": 16.5
+                        },
+                        "style": {
+                          "foreground": "#a0a0a0",
+                          "fontSize": 11,
+                          "fontWeight": "regular",
+                          "fontFamily": "jakarta",
+                          "lineHeight": 16.5,
+                          "letterSpacing": 0,
+                          "radius": 0,
+                          "borderWidth": 0,
+                          "borderColor": "#33353a",
+                          "textAlign": "left",
+                          "opacity": 1,
+                          "paddingTop": 0,
+                          "paddingRight": 0,
+                          "paddingBottom": 0,
+                          "paddingLeft": 0
+                        },
+                        "children": [
+                          {
+                            "id": "webfixture-visual-16-0",
+                            "type": "text",
+                            "text": "•",
+                            "box": {
+                              "x": 0,
+                              "y": 1,
+                              "width": 5.91,
+                              "height": 13
+                            },
+                            "style": {
+                              "foreground": "#a0a0a0",
+                              "fontSize": 11,
+                              "fontWeight": "regular",
+                              "fontFamily": "jakarta",
+                              "lineHeight": 13,
+                              "letterSpacing": 0,
+                              "radius": 0,
+                              "borderWidth": 0,
+                              "borderColor": "#33353a",
+                              "textAlign": "left",
+                              "opacity": 1,
+                              "paddingTop": 0,
+                              "paddingRight": 0,
+                              "paddingBottom": 0,
+                              "paddingLeft": 0
+                            }
+                          }
+                        ]
+                      },
+                      {
+                        "id": "webfixture-17",
+                        "type": "link",
+                        "box": {
+                          "x": 94.19,
+                          "y": 0,
+                          "width": 30.94,
+                          "height": 16.5
+                        },
+                        "style": {
+                          "foreground": "#a0a0a0",
+                          "fontSize": 11,
+                          "fontWeight": "regular",
+                          "fontFamily": "jakarta",
+                          "lineHeight": 16.5,
+                          "letterSpacing": 0,
+                          "radius": 0,
+                          "borderWidth": 0,
+                          "borderColor": "#33353a",
+                          "textAlign": "left",
+                          "opacity": 1,
+                          "paddingTop": 0,
+                          "paddingRight": 0,
+                          "paddingBottom": 0,
+                          "paddingLeft": 0
+                        },
+                        "actionId": "webfixture-17",
+                        "disabled": false,
+                        "accessibilityLabel": "Terms",
+                        "children": [
+                          {
+                            "id": "webfixture-visual-17-0",
+                            "type": "text",
+                            "text": "Terms",
+                            "box": {
+                              "x": 0,
+                              "y": 1,
+                              "width": 30.94,
+                              "height": 13
+                            },
+                            "style": {
+                              "foreground": "#a0a0a0",
+                              "fontSize": 11,
+                              "fontWeight": "regular",
+                              "fontFamily": "jakarta",
+                              "lineHeight": 13,
+                              "letterSpacing": 0,
+                              "radius": 0,
+                              "borderWidth": 0,
+                              "borderColor": "#33353a",
+                              "textAlign": "left",
+                              "opacity": 1,
+                              "paddingTop": 0,
+                              "paddingRight": 0,
+                              "paddingBottom": 0,
+                              "paddingLeft": 0
+                            }
+                          }
+                        ]
+                      }
+                    ]
+                  },
+                  {
+                    "id": "webfixture-18",
+                    "type": "button",
+                    "box": {
+                      "x": 298.72,
+                      "y": 0,
+                      "width": 77.75,
+                      "height": 30.23
+                    },
+                    "style": {
+                      "foreground": "#a0a0a0",
+                      "fontSize": 11,
+                      "fontWeight": "medium",
+                      "fontFamily": "jakarta",
+                      "lineHeight": 16.5,
+                      "letterSpacing": 0,
+                      "radius": 40,
+                      "borderWidth": 0,
+                      "borderColor": "#33353a",
+                      "textAlign": "center",
+                      "opacity": 1,
+                      "paddingTop": 0,
+                      "paddingRight": 8.64,
+                      "paddingBottom": 0,
+                      "paddingLeft": 8.64
+                    },
+                    "actionId": "webfixture-18",
+                    "disabled": false,
+                    "accessibilityLabel": "Reset",
+                    "children": [
+                      {
+                        "id": "webfixture-visual-18",
+                        "type": "image",
+                        "text": "",
+                        "box": {
+                          "x": 8.63,
+                          "y": 6.48,
+                          "width": 17.27,
+                          "height": 17.27
+                        },
+                        "style": {
+                          "foreground": "#a0a0a0",
+                          "fontSize": 11,
+                          "fontWeight": "medium",
+                          "fontFamily": "jakarta",
+                          "lineHeight": 16.5,
+                          "letterSpacing": 0,
+                          "radius": 0,
+                          "borderWidth": 0,
+                          "borderColor": "#33353a",
+                          "textAlign": "center",
+                          "opacity": 1,
+                          "paddingTop": 0,
+                          "paddingRight": 0,
+                          "paddingBottom": 0,
+                          "paddingLeft": 0
+                        },
+                        "props": {
+                          "raster": {
+                            "base64": "iVBORw0KGgoAAAANSUhEUgAAACMAAAAjCAYAAAAe2bNZAAAE7klEQVR4AeyXW2xUVRSGZzrT6lQwEdr6QgwRLyigkGA0rVKBmKjEBE1sQq8zbWJNCA8ELyF4aQRjX+DBEH2w6b0+VBMeDCURtNzURMEooSVGCKkaFNCQCB1oM9Ph+0/O3szlDDOUacIDzfq71llr7bX/fTn77Cny3UJ/t8lkW4yUmenu7t4FLoKNXg2Gh4eDPT09T4P3ydkHRsF5EOvq6jqHPg6GwEawyKvG9XyWTH9//90krgWzEonEOnSKUHzd2NjYaWKHQBvB1eARUAYCfr+/HC0CL6B3ABE70NfX9zB2XmLJTE1N3ZnU4i5jM+IHIXKY58/BPJAs4xD7HccP4BS4ApJlRTweH6H91sHBwUBywMu2ZLyCEAkz4l+JVQFH1Dl4r6ioaEk4HJ4ViUQeQleCB0AI/6PEXyP5OJCIxDvj4+Pf9Pb2VsiRDVnJQORjiHTRMAQkJ3h+laVaCIGtjY2NpjPFLPCfIP5ZaWnpUkhtJhAHPtpWM/tH2Q7ps6uwA08yNKwAG5wM/lH0wMTExPKmpqYv29rapnDllJqamjik2iGwguQLQDIvFot9xZKZAcpn4UmGzstMBvYXk5OTz7W2tkaN70Z0c3Pz9+Q/Af4DkqXRaPRDGemwZGCcSA9C5Dy+ipKSkr0s23424rdAU487f2EvnWIvPU+9CbfVBuotdG2rLBk6vMN4WSLHRJeDagOcK8EHFEp+83DlFvbSEQh95GYGqbnTta2yZOrr6//C+z/IJT+zF9Jf4VxtnHgoFNqO8S+QrObtWizDwJKRo7i4eD5TuR6s9AKbsYpN/JRypwM29SXadQJH6GONY7j/UsjU1dVdYNSfgP1e0GZkejP2llsrX7XbJELmJWNLp5CRY6bBvjlq+oDMY8aWTiHDm7ILZP1QqsHNgo2sT8hF1WGWZ3Pm6ITWo8+SYTPpe7QWrz6U9eiZFB0ZTn3OMPXr2JZMQ0ODDrWEvDC+T3qmQP173Nox9qkzS3q2ZEgQkbNygrmspx9dcNGdiKKGzD9uv7h815bJefL5jrnaz95Z7toFVXxon0wqqBuBfbQz43r2utrHrn/F2AXWL5t6zP4+Y0unkEkOcsBFpnPsq2g26CWhj4iJs0R28PKlkOGg+wXnj0D3j3tJ3iS7UGCAb1FzjlvvSDgcHnFtR6WQcTw+35uultrCaAqyd1SHWXlbRQVIZVz6M8jA9iDJXwNJiDvsEMs1Xw/TRWdn5/3Myh4ImJvBbr5xulenlMwgoygEIoziT9kU0DXiJ0aW/BYolBcgUsnLoKV3LmyqS33dkTPae5JpaWk5EwwGV5H9N5CUUeAQr/u2gYEBc0bInxUdHR1zmNF2iGim5yoRImcCgUC16us5HZ5klMSJfJIL1zJsZzqZoWLsLRzfY5DaCewvBvyO0JkfAs8Q+5TB/EEb7RHz7TkIkWV8m047yR7/XDIeEVy1tbVnueU/S9F2OnIu4tizCa0Hh+n0MjgJge+k+aUZJa6ZeJ24+ebo18E26qyCyDn8WeW6ZNSKC1GczbYZMkuALtdyG+j6uQAClTgWAD2jrGg2FvFSvKs61pvFyEnGtONiNco5VEXHj+N7A+yB3Cha18g4tr7EI+ghsEl5kKhmuX8jJy/Jm4ypxiwdo5Pt4EXIadTl2EHsCvRi9BqwQ3mmTb76hsnkW3g6ebcUmasAAAD//44WqhoAAAAGSURBVAMAuIQcZVM3ds0AAAAASUVORK5CYII=",
+                            "width": 35,
+                            "height": 35
+                          }
+                        }
+                      },
+                      {
+                        "id": "webfixture-visual-19-0",
+                        "type": "text",
+                        "text": "Reset",
+                        "box": {
+                          "x": 38.83,
+                          "y": 7.86,
+                          "width": 30.3,
+                          "height": 13
+                        },
+                        "style": {
+                          "foreground": "#a0a0a0",
+                          "fontSize": 11,
+                          "fontWeight": "medium",
+                          "fontFamily": "jakarta",
+                          "lineHeight": 13,
+                          "letterSpacing": 0,
+                          "radius": 40,
+                          "borderWidth": 0,
+                          "borderColor": "#33353a",
+                          "textAlign": "center",
+                          "opacity": 1,
+                          "paddingTop": 0,
+                          "paddingRight": 0,
+                          "paddingBottom": 0,
+                          "paddingLeft": 0
+                        }
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "unsupported": []
+}

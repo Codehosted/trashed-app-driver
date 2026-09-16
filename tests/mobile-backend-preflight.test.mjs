@@ -83,7 +83,7 @@ test('release scripts stop before artifact deletion, dependency installation, or
       assert.equal(existsSync(join(directory, 'appstoreconnect')), false);
     }
     const android = readFileSync(join(root, 'scripts/ci-build-android.sh'), 'utf8');
-    assert.match(android, /if \[\[ "\$MODE" == release \]\]; then\s+node scripts\/check-mobile-backend\.mjs\s+fi/);
+    assert.match(android, /if \[\[ "\$MODE" == release \]\]; then\s+node scripts\/check-mobile-backend\.mjs\s+node scripts\/check-mobile-push-config\.mjs\s+fi/);
   } finally {
     rmSync(directory, { recursive: true, force: true });
   }

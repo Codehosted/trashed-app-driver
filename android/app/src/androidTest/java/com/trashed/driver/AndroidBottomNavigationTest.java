@@ -40,7 +40,7 @@ public class AndroidBottomNavigationTest {
         public void reset(String context) { resets.add(context); }
     }
     private ActivityScenario<NavigationTestActivity> launch() {
-        return ActivityScenario.launch(new Intent(InstrumentationRegistry.getInstrumentation().getContext(), NavigationTestActivity.class));
+        return ActivityScenario.launch(new Intent(InstrumentationRegistry.getInstrumentation().getTargetContext(), NavigationTestActivity.class));
     }
     private static BottomNavigationView bar(NavigationTestActivity activity) { return activity.findViewById(android.R.id.content).findViewWithTag("native-bottom-navigation"); }
     private static BottomSheetDialog sheet(NavigationTestActivity activity) {

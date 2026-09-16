@@ -1,0 +1,33 @@
+{
+  "version": 1,
+  "context": "native_fixture_context",
+  "revision": 1,
+  "appearance": "light",
+  "scopeKey": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "conversationId": "native-fixture-conversation",
+  "title": "Trisha for Demo Workspace",
+  "subtitle": "Local UI fixture · no live business data",
+  "input": { "value": "", "placeholder": "Ask Trisha about your business…", "disabled": false, "sendActionId": "send", "stopActionId": "stop" },
+  "messages": [
+    { "id": "message-user", "role": "user", "text": "Show my schedule and help me prepare an import.", "time": "Today" },
+    { "id": "message-assistant", "role": "assistant", "text": "Here is a **local demonstration**.\nNothing has been sent or changed.", "components": [
+      { "id": "schedule-card", "type": "card", "style": { "background": "#FFFFFF", "foreground": "#201A2A", "radius": 16, "padding": 12, "gap": 8 }, "children": [
+        { "id": "schedule-title", "type": "text", "text": "Schedule", "style": { "fontSize": 18, "fontWeight": "semibold" } },
+        { "id": "schedule-event", "type": "row", "children": [ { "id": "schedule-time", "type": "badge", "text": "9:00 AM" }, { "id": "schedule-label", "type": "text", "text": "Demo delivery" } ] },
+        { "id": "fixture-input", "type": "input", "text": "Import label", "value": "Sample import", "actionId": "component-label", "props": { "inputType": "text", "placeholder": "Label" } },
+        { "id": "fixture-approve", "type": "button", "text": "Approve demonstration", "actionId": "component-approve", "style": { "background": "#7033FF", "foreground": "#FFFFFF", "radius": 12 } }
+      ] }
+    ] }
+  ],
+  "conversations": [ { "id": "conversation-demo", "title": "Demonstration", "detail": "Local only", "selected": true } ],
+  "suggestions": [],
+  "actions": [
+    { "id": "send", "kind": "send", "label": "Send" },
+    { "id": "stop", "kind": "stop", "label": "Stop", "disabled": true },
+    { "id": "reset", "kind": "reset", "label": "New chat" },
+    { "id": "conversation-demo", "kind": "conversation", "label": "Demonstration", "disabled": true },
+    { "id": "component-label", "kind": "component", "label": "Import label" },
+    { "id": "component-approve", "kind": "component", "label": "Approve demonstration" }
+  ],
+  "unsupported": []
+}
