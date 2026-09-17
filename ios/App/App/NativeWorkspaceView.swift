@@ -13,6 +13,8 @@ struct WorkspaceScreen: View {
         NavigationStack {
             Group {
                 switch route {
+                case .dashboard:
+                    WorkspaceDashboardView(model: model)
                 case .profile:
                     WorkspaceProfileView(model: model, openWeb: openWeb)
                 case .calls(let query):
@@ -38,13 +40,12 @@ struct WorkspaceScreen: View {
         }
         .tint(WorkspaceStyle.accent)
         .environment(\.defaultMinListRowHeight, 44)
-        .onDisappear { model.audio.stop() }
         .disabled(model.suspended)
     }
 }
 
 @available(iOS 16.0, *)
-private enum WorkspaceStyle {
+enum WorkspaceStyle {
     static let accent = Color(uiColor: UIColor { traits in
         traits.userInterfaceStyle == .dark
             ? UIColor(red: 190.0 / 255, green: 159.0 / 255, blue: 1, alpha: 1)
@@ -303,6 +304,7 @@ private struct WorkspaceCallsView: View {
     @ObservedObject var model: WorkspaceModel
     @State private var query: WorkspaceCallsQuery
     @State private var expanded: String?
+    @State private var transcriptCall: WorkspaceCall?
 
     init(model: WorkspaceModel, initialQuery: WorkspaceCallsQuery) {
         self.model = model
@@ -334,7 +336,7 @@ private struct WorkspaceCallsView: View {
                             WorkspaceCallRow(model: model, call: call, expanded: Binding(
                                 get: { expanded == call.id },
                                 set: { expanded = $0 ? call.id : nil }
-                            ))
+                            ), openTranscript: { transcriptCall = $0 })
                         }
                     } header: {
                         Text("\(model.pagination.calls.count) of \(model.pagination.totalCalls) calls")
@@ -372,6 +374,12 @@ private struct WorkspaceCallsView: View {
             WorkspacePlayer(model: model, audio: model.audio)
         }
         .accessibilityIdentifier("workspace-call-history")
+        .fullScreenCover(item: $transcriptCall) { selected in
+            WorkspaceTranscriptScreen(model: model, call: selected)
+        }
+        .onChange(of: model.invalidated) { invalidated in
+            if invalidated { transcriptCall = nil }
+        }
     }
 
     private var controls: some View {
@@ -405,7 +413,8 @@ private struct WorkspaceCallRow: View {
     @ObservedObject var model: WorkspaceModel
     let call: WorkspaceCall
     @Binding var expanded: Bool
-    @State private var fullTranscript = false
+    let openTranscript: (WorkspaceCall) -> Void
+    private var turns: [NativeCallTranscript.Turn] { NativeCallTranscript.parse(call.transcript) }
 
     var body: some View {
         DisclosureGroup(isExpanded: $expanded) {
@@ -430,12 +439,14 @@ private struct WorkspaceCallRow: View {
                     if call.transcript.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
                         Text("No transcript available").foregroundStyle(.secondary)
                     } else {
-                        Text(verbatim: call.transcript)
-                            .lineLimit(fullTranscript ? nil : 6)
-                            .textSelection(.enabled)
-                        Button(fullTranscript ? "Show less transcript" : "Show full transcript") {
-                            fullTranscript.toggle()
-                        }.frame(minHeight: 44)
+                        ForEach(Array(turns.prefix(2))) { turn in
+                            WorkspaceTranscriptBubble(turn: turn, preview: true)
+                        }
+                        Button("Open conversation") { openTranscript(call) }
+                            .buttonStyle(.borderless)
+                            .frame(minHeight: 44)
+                            .accessibilityIdentifier("workspace-open-transcript-\(call.id)")
+                        Text("\(turns.count) speaker turns").font(.caption).foregroundStyle(.secondary)
                     }
                 }
             }.padding(.vertical, 12)
@@ -452,6 +463,76 @@ private struct WorkspaceCallRow: View {
             }.frame(minHeight: 44, alignment: .leading).padding(.vertical, 6)
         }
         .accessibilityIdentifier("workspace-call-\(call.id)")
+
+    }
+}
+
+@available(iOS 16.0, *)
+private struct WorkspaceTranscriptBubble: View {
+    let turn: NativeCallTranscript.Turn
+    var preview = false
+    private var caller: Bool { turn.role == .caller }
+    var body: some View {
+        HStack(alignment: .top, spacing: 0) {
+            if caller { Spacer(minLength: 28) }
+            VStack(alignment: .leading, spacing: 6) {
+                HStack(spacing: 8) {
+                    Label(turn.label, systemImage: caller ? "person.fill" : turn.role == .assistant ? "sparkles" : "text.bubble")
+                        .font(.caption.weight(.semibold))
+                    if let timestamp = turn.timestamp { Text(timestamp).font(.caption.monospacedDigit()) }
+                }.foregroundStyle(.secondary)
+                Text(verbatim: turn.text.isEmpty ? "No speech captured" : turn.text)
+                    .font(.body).lineSpacing(4)
+                    .lineLimit(preview ? 3 : nil)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .textSelection(.enabled)
+            }
+            .padding(14)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(caller ? WorkspaceStyle.accent.opacity(0.12) : Color(uiColor: .secondarySystemGroupedBackground))
+            .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+            .accessibilityElement(children: .combine)
+            .accessibilityIdentifier("transcript-turn-\(turn.id)")
+            if !caller { Spacer(minLength: 28) }
+        }
+    }
+}
+
+@available(iOS 16.0, *)
+@MainActor
+private struct WorkspaceTranscriptScreen: View {
+    @ObservedObject var model: WorkspaceModel
+    let call: WorkspaceCall
+    @Environment(\.dismiss) private var dismiss
+    private var turns: [NativeCallTranscript.Turn] { NativeCallTranscript.parse(call.transcript) }
+    var body: some View {
+        NavigationStack {
+            ScrollView {
+                LazyVStack(alignment: .leading, spacing: 14) {
+                    VStack(alignment: .leading, spacing: 5) {
+                        Text(call.customerName.isEmpty ? "Unknown caller" : call.customerName).font(.title2.weight(.semibold))
+                        Text("\(call.status.capitalized) · \(call.durationFormatted)").font(.subheadline).foregroundStyle(.secondary)
+                        Text("Call transcript").font(.caption).foregroundStyle(.secondary)
+                        if call.hasRecording { WorkspaceRecordingButton(model: model, audio: model.audio, call: call) }
+                    }.padding(.bottom, 8)
+                    ForEach(turns) { WorkspaceTranscriptBubble(turn: $0) }
+                }.padding(20)
+            }
+            .background(Color(uiColor: .systemGroupedBackground))
+            .navigationTitle("Conversation")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarLeading) {
+                    Button { dismiss() } label: { Label("Calls", systemImage: "chevron.left") }
+                        .accessibilityIdentifier("workspace-transcript-back")
+                }
+            }
+            .safeAreaInset(edge: .bottom, spacing: 0) { WorkspacePlayer(model: model, audio: model.audio) }
+            .accessibilityIdentifier("workspace-transcript-conversation")
+        }
+        .tint(WorkspaceStyle.accent)
+        .disabled(model.suspended)
+        .onChange(of: model.invalidated) { invalidated in if invalidated { dismiss() } }
     }
 }
 

@@ -3,10 +3,11 @@
 No database/provider credentials or production data. Start with --port 3421.
 """
 import argparse, io, json, math, struct, threading, wave
+from pathlib import Path
 from http.server import ThreadingHTTPServer, BaseHTTPRequestHandler
 from urllib.parse import urlparse, parse_qs
 
-state={'name':'Morgan Ellis (Fixture)','email':'morgan@example.test','phone':'+15555550123','userId':12,'failSave':False,'expired':False,'requests':[]}
+state={'name':'Morgan Ellis (Fixture)','email':'morgan@example.test','phone':'+15555550123','userId':12,'failSave':False,'expired':False,'dashboardError':0,'dashboardZero':False,'requests':[]}
 lock=threading.Lock()
 def profile():
     return {'user':{'id':state['userId'],'name':state['name'],'email':state['email'],'phone':state['phone'],'image':None,'emailVerified':True,'roles':['vendor'],'vendor':{'id':29,'businessName':'Local fixture workspace'},'vendorPermissions':{'callCenter':True,'settings':True}},'capabilities':{'calls':True}}
@@ -34,6 +35,17 @@ class Handler(BaseHTTPRequestHandler):
         with lock:state['requests'].append({'method':'GET','path':self.path,'authenticated':self.headers.get('Cookie','').find('next-auth.session-token=local-ui-fixture')>=0})
         if state['expired'] or 'next-auth.session-token=local-ui-fixture' not in self.headers.get('Cookie',''):return self.send(401,{'error':'Unauthorized local fixture'})
         if url.path=='/api/user/profile':return self.send(200,profile())
+        if url.path=='/api/mobile/dashboard':
+            if dashboard_fixture is None:return self.send(503,{'error':'No synthetic dashboard fixture configured'})
+            if state['dashboardError']:return self.send(state['dashboardError'],{'error':'Synthetic dashboard failure'})
+            data=json.loads(dashboard_fixture.read_text())
+            data['scope']={'userId':state['userId'],'vendorId':29}
+            if state['dashboardZero']:
+                for group in ['revenue','rentals','inventory','customers']:
+                    data[group]={key:0 for key in data[group]}
+                for month in data['monthlyRevenue']:month['revenue']=0
+                data['inventoryByType']=[]
+            return self.send(200,data)
         if url.path=='/api/ai-features/calls':
             q=parse_qs(url.query);return self.send(200,calls(int(q.get('page',['1'])[0]),q.get('search',[''])[0]))
         if url.path.startswith('/api/calls/fixture-call-') and url.path.endswith('/recording'):return self.send(200,audio_bytes,'audio/wav')
@@ -42,7 +54,7 @@ class Handler(BaseHTTPRequestHandler):
         if self.path!='/__control':return self.send(404,{})
         data=json.loads(self.rfile.read(int(self.headers.get('Content-Length','0'))))
         with lock:
-            for key in ['failSave','expired','userId']:
+            for key in ['failSave','expired','userId','dashboardError','dashboardZero']:
                 if key in data:state[key]=data[key]
         self.send(200,{'fixtureOnly':True})
     def do_PATCH(self):
@@ -56,6 +68,8 @@ class Handler(BaseHTTPRequestHandler):
             state['name']=data['name'].strip();state['email']=data['email'].strip().lower();state['phone']=data['phone'].strip() or None
         self.send(200,{'success':True,'user':profile()['user']})
 if __name__=='__main__':
-    parser=argparse.ArgumentParser();parser.add_argument('--port',type=int,default=3421);args=parser.parse_args()
+    parser=argparse.ArgumentParser();parser.add_argument('--port',type=int,default=3421);parser.add_argument('--dashboard-fixture',type=Path,required=False);args=parser.parse_args()
+    dashboard_fixture=args.dashboard_fixture
+    if dashboard_fixture is not None:assert dashboard_fixture.is_file(), 'Missing synthetic dashboard fixture'
     print(f'Local synthetic native workspace fixture on 127.0.0.1:{args.port}',flush=True)
     ThreadingHTTPServer(('127.0.0.1',args.port),Handler).serve_forever()

@@ -1,0 +1,14 @@
+# iOS direct native navigation — bounded correction
+
+Implemented direct synchronous native entry for `vendor-profile` and `vendor-call-history` (iOS 16+). The plugin checks visibility, context, exact revision, membership, workspace origin and modal availability before offering an action to the native host. Consumed actions never emit the JS `select` event. Unknown actions retain existing web routing. Older iOS retains web fallback.
+
+The existing authenticated WorkspaceAPI and real SwiftUI hosting controller are used immediately; API data can still load after the native frame appears. No new WebView, HTML renderer, or pre-entry web navigation is created. The original web URL/document/history stays in place; direct-native Back dismisses only. Calls use explicit canonical default search/filter/sort values rather than inheriting unrelated source queries.
+
+Direct entry is invalidated by source URL/loading changes or navigation-context removal/replacement. Existing API cookie identity/tenant scope validation, model invalidation, background suspension and resume revalidation remain unchanged. Selection revision is rechecked after menu dismissal. Explicit Open Web remains an intentional, same-origin web navigation; legacy URL interception and its return behavior remain for other entry paths.
+
+This is NOT a 100% native migration: arbitrary web links, profile account/preferences/team actions, inventory, orders and other unconverted routes remain web-owned. Tests added for direct routing, state retention and executable Swift policy/host decisions; focused verification results will be recorded below. Full app build/runtime verification is owned by the parent agent. No commit, archive, upload or release is authorized.
+
+## Verification
+Passed: `node --test tests/ios-native-direct-navigation.test.mjs tests/ios-native-workspace-policy.test.mjs tests/ios-workspace-lifecycle.test.mjs tests/native-bottom-navigation-ios.test.mjs tests/native-history.test.mjs` — 18 tests, 18 passed, 0 failed/skipped. The new Swift harness compiles the production policy plus extracted production host entry, invalidation and Back methods against recording presenter/WebView doubles; verifies zero web loads on native entry/Back, preserved exact source, canonical calls queries, unknown/cross-origin rejection, loading/modal races, context removal, and stable resume decisions. Existing executable lifecycle suite also reports 8 lifecycle scenarios passed. Source checks enforce consumption-before-JS and fallback/lifecycle wiring. These are not simulator UI or network-trace proof; the parent owns full Xcode/simulator verification.
+
+A full-screen native presentation can detach the presenting view from its window. Existing native-screen session validity therefore uses onboarding/login/loading state, not the window-presence gate used for accepting fresh menu taps. Menu-dismissal completion also rechecks the exact source URL and revision before selecting.

@@ -3,12 +3,14 @@ import Foundation
 // Foundation-only contracts shared by the native screens and executable policy tests.
 // No DOM state, HTML, persistent response cache, or web-renderer dependency.
 enum WorkspaceRoute: Equatable {
+    case dashboard
     case profile
     case calls(WorkspaceCallsQuery)
 
     static func parse(_ url: URL, origin: URL) -> WorkspaceRoute? {
         guard WorkspacePolicy.sameOrigin(url, origin), let c = URLComponents(url: url, resolvingAgainstBaseURL: false) else { return nil }
         switch c.percentEncodedPath {
+        case "/vendor/dashboard": return .dashboard
         case "/vendor/profile":
             // These existing account actions remain web-owned in this slice.
             // Never intercept their links and strand the user on the overview.
@@ -21,6 +23,45 @@ enum WorkspaceRoute: Equatable {
             return .calls(WorkspaceCallsQuery(search: value("search", ""), filter: value("filter", "all"), sort: value("sort", "timestamp-desc")))
         default: return nil
         }
+    }
+}
+
+// Only these menu actions have native destinations. Never infer from arbitrary IDs.
+struct WorkspaceDirectNavigation: Equatable {
+    let sourceURL: URL
+    let context: String
+    let route: WorkspaceRoute
+    let destinationURL: URL
+
+    static func route(action: String) -> WorkspaceRoute? {
+        switch action {
+        case "vendor-dashboard": return .dashboard
+        case "vendor-profile": return .profile
+        case "vendor-call-history": return .calls(WorkspaceCallsQuery())
+        default: return nil
+        }
+    }
+
+    static func begin(action: String, sourceURL: URL, origin: URL, context: String,
+                      workspace: Bool, loading: Bool, modalBusy: Bool) -> Self? {
+        guard workspace, !loading, !modalBusy, !context.isEmpty,
+              WorkspacePolicy.sameOrigin(sourceURL, origin), let route = route(action: action) else { return nil }
+        var destination = URLComponents(url: origin, resolvingAgainstBaseURL: false)!
+        destination.query = nil; destination.fragment = nil
+        switch route {
+        case .dashboard: destination.path = "/vendor/dashboard"
+        case .profile: destination.path = "/vendor/profile"
+        case .calls(let query):
+            destination.path = "/calls/history"
+            destination.queryItems = [URLQueryItem(name: "search", value: query.search),
+                URLQueryItem(name: "filter", value: query.filter), URLQueryItem(name: "sort", value: query.sort)]
+        }
+        guard let url = destination.url else { return nil }
+        return Self(sourceURL: sourceURL, context: context, route: route, destinationURL: url)
+    }
+
+    func remainsValid(currentURL: URL?, loading: Bool, context: String, visible: Bool) -> Bool {
+        visible && !loading && currentURL == sourceURL && context == self.context
     }
 }
 
@@ -99,6 +140,48 @@ struct WorkspaceProfile: Decodable {
     func scope(origin: URL) -> String {
         let permissions = (user.vendorPermissions ?? [:]).keys.sorted().map { "\($0)=\(user.vendorPermissions?[$0] == true)" }.joined(separator: ",")
         return "\(origin.scheme ?? "")://\(origin.host ?? ""):\(origin.port ?? (origin.scheme == "https" ? 443 : 80))|\(user.id)|\(user.vendor?.id.description ?? "none")|\(user.roles.sorted().joined(separator: ","))|\(permissions)|\(capabilities.calls)"
+    }
+}
+
+// Only a versioned, authenticated workspace snapshot, never a disk cache.
+struct WorkspaceDashboard: Decodable {
+    let version: Int
+    let generatedAt: String
+    let scope: Scope
+    let businessName: String
+    let currency: String
+    let revenue: Revenue
+    let monthlyRevenue: [Month]
+    let rentals: Rentals
+    let inventory: Inventory
+    let customers: Customers
+    let inventoryByType: [InventoryType]
+    struct Scope: Decodable { let userId: Int; let vendorId: Int }
+    struct Revenue: Decodable {
+        let today: Double; let thisWeek: Double; let thisMonth: Double
+        let thisQuarter: Double; let thisYear: Double; let monthlyGrowthPercent: Double?
+    }
+    struct Month: Decodable, Identifiable { let month: String; let revenue: Double; var id: String { month } }
+    struct Rentals: Decodable { let total: Int; let active: Int; let pending: Int; let completed: Int }
+    struct Inventory: Decodable { let total: Int; let available: Int; let rented: Int; let maintenance: Int }
+    struct Customers: Decodable { let total: Int }
+    struct InventoryType: Decodable { let name: String; let count: Int }
+
+    func validated(for profile: WorkspaceProfile) throws -> Self {
+        guard scope.userId == profile.user.id, scope.vendorId == profile.user.vendor?.id else { throw WorkspaceError.scopeChanged }
+        return try validated()
+    }
+    func validated() throws -> Self {
+        let amounts = [revenue.today, revenue.thisWeek, revenue.thisMonth, revenue.thisQuarter, revenue.thisYear] + monthlyRevenue.map(\.revenue)
+        let counts = [rentals.total, rentals.active, rentals.pending, rentals.completed, inventory.total, inventory.available, inventory.rented, inventory.maintenance, customers.total] + inventoryByType.map(\.count)
+        let date = ISO8601DateFormatter(); date.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        guard version == 1, currency == "USD", scope.userId > 0, scope.vendorId > 0,
+              date.date(from: generatedAt) != nil || ISO8601DateFormatter().date(from: generatedAt) != nil,
+              monthlyRevenue.count <= 12, Set(monthlyRevenue.map(\.month)).count == monthlyRevenue.count,
+              monthlyRevenue.allSatisfy({ !$0.month.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }),
+              amounts.allSatisfy({ $0.isFinite }), counts.allSatisfy({ $0 >= 0 }),
+              revenue.monthlyGrowthPercent?.isFinite != false else { throw WorkspaceError.invalidResponse }
+        return self
     }
 }
 

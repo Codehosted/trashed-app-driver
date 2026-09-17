@@ -93,8 +93,7 @@ struct NativeChatView: View {
                     .accessibilityIdentifier("trashed-native-chat-overlay")
             }
         })
-        .background(state.screen?.toolbar.first?.style?.background.flatMap(NativeChatPalette.color) ?? Color(.systemBackground))
-        .preferredColorScheme(state.appearance == "dark" ? .dark : .light)
+        .background(Color(.systemBackground))
         .accentColor(NativeChatPalette.primary)
         .accessibilityIdentifier("trashed-native-chat")
     }
@@ -135,7 +134,7 @@ private struct NativeChatConversations: View {
                         }.padding(.horizontal, 12).padding(.vertical, 8).frame(minHeight: 44)
                     }
                     .foregroundColor(item.selected ? .white : .primary)
-                    .background(item.selected ? NativeChatPalette.primary : Color(.secondarySystemBackground))
+                    .background(item.selected ? NativeChatPalette.fill : Color(.secondarySystemBackground))
                     .clipShape(RoundedRectangle(cornerRadius: 12))
                     .disabled(!state.offers(item.id))
                     .accessibilityIdentifier("trashed-native-chat-conversation-" + item.id)
@@ -180,14 +179,15 @@ private struct NativeChatBubble: View {
                 }
                 ForEach(message.actions ?? []) { action in
                     Button(action.label) { onAction(action.id, nil) }
-                        .foregroundColor(.white).padding(.horizontal, 12).frame(minHeight: 44)
-                        .background(action.destructive == true ? Color.red : NativeChatPalette.primary)
+                        .foregroundColor(action.destructive == true ? .black : .white).padding(.horizontal, 12).frame(minHeight: 44)
+                        .background(action.destructive == true ? Color.red : NativeChatPalette.fill)
                         .clipShape(RoundedRectangle(cornerRadius: 10)).disabled(action.isDisabled)
                         .accessibilityIdentifier("trashed-native-action-" + action.id)
                 }
             }
+            .environment(\.nativeBrandedSurface, isUser ? "#7033ff" : nil)
             .padding(12).foregroundColor(isUser ? .white : .primary)
-            .background(isUser ? NativeChatPalette.primary : Color(.secondarySystemBackground))
+            .background(isUser ? NativeChatPalette.fill : Color(.secondarySystemBackground))
             .clipShape(RoundedRectangle(cornerRadius: 24)).frame(maxWidth: 720, alignment: isUser ? .trailing : .leading)
         }.frame(maxWidth: .infinity, alignment: isUser ? .trailing : .leading)
             .accessibilityIdentifier("trashed-native-chat-message-" + message.id)
@@ -217,7 +217,7 @@ private struct NativeChatComposer: View {
             }
             Button(loading ? "Stop" : "Send", action: submit)
                 .foregroundColor(.white).padding(.horizontal, 14).frame(minHeight: 44)
-                .background(NativeChatPalette.primary).clipShape(RoundedRectangle(cornerRadius: 12))
+                .background(NativeChatPalette.fill).clipShape(RoundedRectangle(cornerRadius: 12))
                 .disabled(!canSubmit).opacity(canSubmit ? 1 : 0.45)
                 .accessibilityIdentifier("trashed-native-chat-send")
         }.padding(12).onChange(of: state.input.value) { buffer.receive($0) }

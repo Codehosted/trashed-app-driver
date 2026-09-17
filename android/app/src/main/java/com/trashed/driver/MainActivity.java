@@ -99,6 +99,8 @@ public class MainActivity extends BridgeActivity {
     private volatile long navigationDocument;
     private boolean navigationLoading = true;
     private NativeWorkspaceView nativeWorkspace;
+    private NativeWorkspaceRoute nativeRoute;
+    private NativeNavigationState.Selection nativeWorkspaceSelection;
     private String nativeWorkspaceURL;
     private String nativeWorkspaceBypass = "";
     private String nativeWorkspaceBypassSession = "";
@@ -198,6 +200,7 @@ public class MainActivity extends BridgeActivity {
             @Override public void handleOnBackPressed() {
                 if (nativeNavigation.dismissSheet()) return;
                 if (nativeWorkspace != null && nativeWorkspace.back()) return;
+                if (dismissDirectWorkspace()) return;
                 if (nativeChat != null && nativeChat.dismissDialog()) return;
                 if (backCheckPending) return;
                 WebView view = getBridge().getWebView();
@@ -262,6 +265,7 @@ public class MainActivity extends BridgeActivity {
             @Override public void onPageFinished(WebView view, String url) {
                 super.onPageFinished(view, url);
                 if (java.util.Objects.equals(url, view.getUrl())) navigationLoading = false;
+                synchronizeAppearance();
                 updateWorkspaceHistory(view.getProgress() == 100);
             }
         });
@@ -328,28 +332,83 @@ public class MainActivity extends BridgeActivity {
     void setNativeNavigation(NativeNavigationState state, NativeBottomNavigation.Listener listener) {
         nativeNavigation.set(state, new NativeBottomNavigation.Listener() {
             @Override public void select(NativeNavigationState.Selection selection) {
-                Runnable next = () -> listener.select(selection);
+                long document = navigationDocument;
+                String session = workspaceSession();
+                Runnable next = () -> {
+                    if (document != navigationDocument || !session.equals(workspaceSession()) || !canPresentNavigation()
+                        || !nativeNavigation.accepts(selection)) return;
+                    if (openDirectWorkspace(selection)) return;
+                    closeNativeWorkspace();
+                    android.util.Log.i("NativeNavigation", "Unconverted action: " + selection.id);
+                    listener.select(selection);
+                };
                 if (nativeWorkspace != null) nativeWorkspace.confirmLeave(next); else next.run();
             }
-            @Override public void reset(String context) { listener.reset(context); }
+            @Override public void reset(String context) {
+                revalidateNativeWorkspaceNavigation();
+                listener.reset(context);
+            }
         });
+        revalidateNativeWorkspaceNavigation();
+    }
+    private void revalidateNativeWorkspaceNavigation() {
+        if (nativeRoute == null) return;
+        NativeNavigationState current = nativeNavigation.currentState();
+        if (nativeWorkspaceSelection == null || current == null
+            || !current.context.equals(nativeWorkspaceSelection.context) || !current.offers(nativeWorkspaceSelection.id)) {
+            dismissDirectWorkspace();
+        }
     }
     private String workspaceSession() {
         String identity = NativeWorkspacePolicy.identityFingerprint(CookieManager.getInstance().getCookie(chatOrigin()));
         return identity.isEmpty() ? "" : NativeChatCache.digest(chatOrigin() + ":" + identity);
     }
     private void closeNativeWorkspace() {
+        nativeRoute = null;
+        nativeWorkspaceSelection = null;
         if (nativeWorkspace == null) return;
         if (nativeWorkspace.hasFocus()) hideKeyboard();
         nativeWorkspace.dispose(); chatContainer.removeView(nativeWorkspace);
         nativeWorkspace = null; nativeWorkspaceURL = null;
         getBridge().getWebView().setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_AUTO);
     }
+    private boolean openDirectWorkspace(NativeNavigationState.Selection selection) {
+        String id = selection.id;
+        if (NativeWorkspacePolicy.selection(id).isEmpty()) return false;
+        if (!canPresentNavigation() || !chatResumed) return true;
+        if (workspaceSession().isEmpty()) { showNativeLogin(); return true; }
+        NativeWorkspaceRoute route = NativeWorkspaceRoute.select(id, getBridge().getWebView().getUrl(),
+            chatOrigin(), workspaceSession(), navigationDocument);
+        if (route == null) return false;
+        closeNativeWorkspace();
+        nativeRoute = route;
+        nativeWorkspaceSelection = selection;
+        updateNativeWorkspace();
+        return true;
+    }
+    private boolean dismissDirectWorkspace() {
+        if (nativeRoute == null) return false;
+        closeNativeWorkspace();
+        // Do not reopen an underlying URL-backed native screen on resume.
+        nativeWorkspaceBypass = getBridge().getWebView().getUrl();
+        nativeWorkspaceBypassSession = workspaceSession();
+        return true;
+    }
     private void updateNativeWorkspace() {
         if (getBridge() == null || chatContainer == null) return;
         String url = getBridge().getWebView().getUrl();
         String destination = NativeWorkspacePolicy.destination(url, chatOrigin());
         String session = workspaceSession();
+        if (nativeRoute != null) {
+            if (!nativeRoute.valid(url, session, navigationDocument) || !canPresentNavigation()) {
+                closeNativeWorkspace();
+                return;
+            }
+            // Pause suspends requests/audio but retains the independently owned route.
+            if (!chatResumed) return;
+            url = nativeRoute.url;
+            destination = nativeRoute.destination;
+        }
         // Loading/pausing is not route departure. Keep the explicit web choice
         // through callbacks and resume, scoped to the exact URL and identity.
         if ((!navigationLoading && !java.util.Objects.equals(url, nativeWorkspaceBypass))
@@ -358,10 +417,14 @@ public class MainActivity extends BridgeActivity {
             nativeWorkspaceBypassSession = "";
         }
         if (!canPresentNavigation() || !chatResumed || destination.isEmpty()
-            || java.util.Objects.equals(url, nativeWorkspaceBypass) || session.isEmpty()) { closeNativeWorkspace(); return; }
+            || (nativeRoute == null && java.util.Objects.equals(url, nativeWorkspaceBypass)) || session.isEmpty()) { closeNativeWorkspace(); return; }
         if (nativeWorkspace != null && java.util.Objects.equals(url, nativeWorkspaceURL)
             && nativeWorkspace.session.equals(workspaceSession())) return;
+        NativeWorkspaceRoute retainedRoute = nativeRoute;
+        NativeNavigationState.Selection retainedSelection = nativeWorkspaceSelection;
         closeNativeWorkspace();
+        nativeRoute = retainedRoute;
+        nativeWorkspaceSelection = retainedSelection;
         boolean dark = (getResources().getConfiguration().uiMode & Configuration.UI_MODE_NIGHT_MASK) == Configuration.UI_MODE_NIGHT_YES;
         nativeWorkspaceURL = url;
         nativeWorkspace = new NativeWorkspaceView(this, new NativeWorkspaceView.Host() {
@@ -378,16 +441,53 @@ public class MainActivity extends BridgeActivity {
                 navigationLoading = true;
                 closeNativeWorkspace(); getBridge().getWebView().loadUrl(target);
             }
-            public void back() { getOnBackPressedDispatcher().onBackPressed(); }
+            public void back() {
+                if (!dismissDirectWorkspace()) getOnBackPressedDispatcher().onBackPressed();
+            }
+            public void invalidated() { dismissDirectWorkspace(); }
         }, chatOrigin(), url, destination, dark);
         chatContainer.addView(nativeWorkspace, fullFrameParams());
         getBridge().getWebView().setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_NO_HIDE_DESCENDANTS);
     }
-    void clearNativeNavigation(String context) { nativeNavigation.clear(context); }
+    void clearNativeNavigation(String context) {
+        nativeNavigation.clear(context);
+        revalidateNativeWorkspaceNavigation();
+    }
 
     @Override public void onConfigurationChanged(Configuration configuration) {
         super.onConfigurationChanged(configuration);
-        if (nativeNavigation != null) nativeNavigation.dismissSheet();
+        synchronizeAppearance();
+        // Framework theme application can update bar flags after config callbacks.
+        getWindow().getDecorView().postOnAnimation(this::synchronizeSystemBars);
+    }
+
+    @Override public void onWindowFocusChanged(boolean focused) {
+        super.onWindowFocusChanged(focused);
+        if (focused) synchronizeSystemBars();
+    }
+
+    private void synchronizeSystemBars() {
+        boolean dark = NativeSystemAppearance.dark(this);
+        int mask = View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR | View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR;
+        View decor = getWindow().getDecorView();
+        // Keep legacy flags consistent on edge-to-edge Android; preserve unrelated flags.
+        decor.setSystemUiVisibility((decor.getSystemUiVisibility() & ~mask) | (dark ? 0 : mask));
+        WindowCompat.getInsetsController(getWindow(), decor).setAppearanceLightStatusBars(!dark);
+        WindowCompat.getInsetsController(getWindow(), decor).setAppearanceLightNavigationBars(!dark);
+    }
+
+    private void synchronizeAppearance() {
+        boolean dark=NativeSystemAppearance.dark(this);
+        NativeSystemAppearance.repaint(findViewById(android.R.id.content));
+        findViewById(android.R.id.content).setBackgroundColor(dark?0xff131315:0xfffafafb);
+        synchronizeSystemBars();
+        getWindow().setStatusBarColor(dark?0xff131315:0xfffafafb);getWindow().setNavigationBarColor(dark?0xff131315:0xfffafafb);
+        if(nativeNavigation!=null)nativeNavigation.appearanceChanged();
+        if(nativeWorkspace!=null)nativeWorkspace.appearanceChanged();
+        if(nativeChat!=null)nativeChat.appearanceChanged();
+        if(getBridge()!=null && authConfig!=null){WebView web=getBridge().getWebView();
+            if(NativeWorkspaceHistory.isSameOriginURL(web.getUrl(),authConfig.origin)) web.evaluateJavascript("if(location.origin === "+JSONObject.quote(authConfig.origin)+"){window.__TRASHED_SYSTEM_APPEARANCE__='"+(dark?"dark":"light")+"';window.dispatchEvent(new CustomEvent('trashed:system-appearance',{detail:{appearance:window.__TRASHED_SYSTEM_APPEARANCE__}}));}",null);
+        }
     }
 
     @Override public void onPause() {
@@ -401,6 +501,7 @@ public class MainActivity extends BridgeActivity {
     @Override public void onResume() {
         super.onResume();
         chatResumed = true;
+        synchronizeAppearance();
         if (nativeChat != null) nativeChat.resume();
         if (nativeWorkspace != null) nativeWorkspace.resume();
         updateNativeWorkspace();

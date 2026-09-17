@@ -186,5 +186,6 @@ public class TrashedChatPlugin extends Plugin implements NativeChatView.Events {
     void newDocument() { reset(true, !MainActivity.isAssistantURL(getBridge().getWebView().getUrl(), host().chatOrigin())); retired.clear(); }
     boolean dismissDialog() { return view != null && view.dismissDialog(); }
     void pause() { dismissDialog(); if (view != null) view.setVisibility(View.INVISIBLE); }
+    void appearanceChanged() { if(view!=null)view.appearanceChanged(); }
     void resume() { if (state != null && !allowed()) reset(true, true); else if (view != null) view.setVisibility(View.VISIBLE); }
 }

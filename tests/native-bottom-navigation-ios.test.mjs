@@ -99,7 +99,7 @@ test('iOS uses real UIKit controls and preserves one safe-area bounded WebView',
   assert.match(source,/heightAnchor.constraint\(greaterThanOrEqualToConstant: 56\)/);
   assert.match(source,/adjustsFontForContentSizeCategory = true/);
   assert.match(source,/appearance.configureWithOpaqueBackground\(\)/);
-  assert.match(source,/red: 112 \/ 255, green: 51 \/ 255, blue: 1/);
+  assert.match(source,/private let primary = NativeAdaptivePalette.accent/);
   assert.match(controller,/bridge\?\.registerPluginInstance\(nativeNavigation\)/);
   assert.match(controller,/nativeWebBottom\?\.constant = -height/);
   assert.match(source,/bar.bottomAnchor.constraint\(equalTo: container.safeAreaLayoutGuide.bottomAnchor\)/);

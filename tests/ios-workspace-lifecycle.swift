@@ -7,6 +7,7 @@
     func profile() async throws -> WorkspaceProfile { try await withCheckedThrowingContinuation { reads.append($0) } }
     func save(_ edit: WorkspaceProfileEdit, scope: String) async throws -> WorkspaceProfile { try await withCheckedThrowingContinuation { writes.append($0) } }
     func calls(query: WorkspaceCallsQuery, page: Int, scope: String) async throws -> WorkspaceCallsPage { throw WorkspaceError.invalidResponse }
+    func dashboard() async throws -> WorkspaceDashboard { throw WorkspaceError.invalidResponse }
     func recording(_ call: WorkspaceCall, scope: String) async throws -> (Data, String) { throw WorkspaceError.invalidResponse }
     func cancelPending() {} // Intentionally non-cooperative transport.
     func close() {}

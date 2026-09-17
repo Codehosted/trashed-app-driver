@@ -37,6 +37,8 @@ final class NativeChatView extends LinearLayout {
     private final Map<EditText, Binding> bindings = new HashMap<>();
     private final ExecutorService images = Executors.newFixedThreadPool(2);
     private androidx.appcompat.app.AlertDialog conversationDialog;
+    private final Set<android.app.Dialog> transientDialogs = new HashSet<>();
+    private final Map<View, Runnable> appearanceBindings = new LinkedHashMap<>();
     private final Map<String, android.graphics.Bitmap> imageCache = new LinkedHashMap<>();
     private int foreground, muted, surface, background;
     private static final int PRIMARY = Color.rgb(112, 51, 255);
@@ -67,17 +69,23 @@ final class NativeChatView extends LinearLayout {
         send.setOnClickListener(v -> { if (state != null && !draft.getText().toString().trim().isEmpty()) emit("action", state.json.optJSONObject("input").optString("sendActionId"), draft.getText().toString()); });
         stop.setOnClickListener(v -> { if (state != null) emit("action", state.json.optJSONObject("input").optString("stopActionId"), null); });
     }
+    void appearanceChanged() {
+        NativeSystemAppearance.repaint(this);
+        for(Runnable painter : appearanceBindings.values()) painter.run();
+        if(conversationDialog!=null)NativeSystemAppearance.dialog(conversationDialog);
+        for(android.app.Dialog dialog : transientDialogs)NativeSystemAppearance.dialog(dialog);
+    }
     void render(NativeChatState next, boolean cached) {
         boolean sameConversation = state != null && state.scopeKey.equals(next.scopeKey) && state.conversationId.equals(next.conversationId);
         boolean bottom = scroll.getChildAt(0).getHeight() - scroll.getScrollY() - scroll.getHeight() < dp(64);
         int oldY = scroll.getScrollY();
         if (!sameConversation) { disposeMaps(); views.clear(); Iterator<EditText> fields = bindings.keySet().iterator(); while (fields.hasNext()) { if (fields.next() != draft) fields.remove(); } messages.removeAllViews(); screenToolbar.removeAllViews(); screenComposer.removeAllViews(); screenOverlay.removeAllViews(); screenFooter.removeAllViews(); Binding b = bindings.get(draft); b.local = b.server = ""; b.pending.clear(); }
         if (state != null && (!state.context.equals(next.context) || state.revision != next.revision)) closeHistoryDialog();
-        state = next; readOnly = cached;
-        foreground = next.dark ? Color.rgb(242, 237, 249) : Color.rgb(33, 26, 43);
-        muted = next.dark ? Color.rgb(191, 184, 204) : Color.rgb(98, 89, 110);
-        surface = next.dark ? Color.rgb(31, 26, 38) : Color.WHITE;
-        background = next.dark ? Color.rgb(20, 18, 26) : Color.rgb(250, 250, 252);
+        state = next; readOnly = cached; appearanceBindings.clear();
+        foreground = NativeSystemAppearance.dark(getContext()) ? Color.rgb(242, 237, 249) : Color.rgb(33, 26, 43);
+        muted = NativeSystemAppearance.dark(getContext()) ? Color.rgb(191, 184, 204) : Color.rgb(98, 89, 110);
+        surface = NativeSystemAppearance.dark(getContext()) ? Color.rgb(31, 26, 38) : Color.WHITE;
+        background = NativeSystemAppearance.dark(getContext()) ? Color.rgb(20, 18, 26) : Color.rgb(250, 250, 252);
         // The measured root carries the web canvas color, including the flexible transcript gap.
         JSONObject projectedScreen = next.json.optJSONObject("screen");
         if (projectedScreen != null) {
@@ -90,12 +98,14 @@ final class NativeChatView extends LinearLayout {
                 }
             }
         }
+        final int projectedBackground=background;
+        appearanceBindings.put(this, () -> setBackgroundColor(NativeSystemAppearance.projected(projectedBackground,next.dark,NativeSystemAppearance.dark(getContext()),"background",false)));
         setBackgroundColor(background); header.setBackgroundColor(surface); composer.setBackgroundColor(surface);
         avatar.setImageTintList(null);
         history.setBackgroundTintList(android.content.res.ColorStateList.valueOf(surface));
         title.setText(next.json.optString("title")); title.setTextColor(foreground); subtitle.setText(next.json.optString("subtitle")); subtitle.setTextColor(muted);
         JSONObject notice = next.json.optJSONObject("status"); status.setText(cached ? "Saved conversation · Read only while refreshing" : notice == null ? "" : notice.optString("text"));
-        status.setVisibility(status.length() == 0 ? GONE : VISIBLE); status.setTextColor(notice != null && "error".equals(notice.optString("kind")) ? (next.dark ? 0xffffaaaa : 0xffa51e1e) : muted);
+        status.setVisibility(status.length() == 0 ? GONE : VISIBLE); status.setTextColor(notice != null && "error".equals(notice.optString("kind")) ? (NativeSystemAppearance.dark(getContext()) ? 0xffffaaaa : 0xffa51e1e) : muted);
         JSONObject input = next.json.optJSONObject("input"); bind(draft, input.optString("value"), null, input.optString("placeholder"), input.optBoolean("disabled"));
         draft.setTextColor(foreground); draft.setHintTextColor(muted); draft.setBackground(fill(background, 14));
         send.setEnabled(!cached && !input.optBoolean("disabled") && next.enabled(input.optString("sendActionId")));
@@ -114,7 +124,7 @@ final class NativeChatView extends LinearLayout {
             JSONArray components = message.optJSONArray("components"); if (components != null) for (int c = 0; c < components.length(); c++) children.put(components.optJSONObject(c));
             JSONArray actions = message.optJSONArray("actions"); if (actions != null) for (int a = 0; a < actions.length(); a++) { JSONObject action = actions.optJSONObject(a); children.put(actionNode("ma_" + action.optString("id"), action.optString("label"), action.optString("id"))); }
             if (!message.optString("time").isEmpty()) children.put(node("time_" + id, "badge", message.optString("time")));
-            put(card, "children", children); put(card, "style", object("background", user ? "#7033FF" : (next.dark ? "#1F1A26" : "#FFFFFF"), "foreground", user ? "#FFFFFF" : (next.dark ? "#F2EDF9" : "#211A2B"), "radius", 24, "padding", 12, "gap", 8)); roots.add(card);
+            put(card, "children", children); put(card, "style", object("background", user ? "#7033FF" : (NativeSystemAppearance.dark(getContext()) ? "#1F1A26" : "#FFFFFF"), "foreground", user ? "#FFFFFF" : (NativeSystemAppearance.dark(getContext()) ? "#F2EDF9" : "#211A2B"), "radius", 24, "padding", 12, "gap", 8)); roots.add(card);
         }
         if (messageList.length() == 0 && !next.json.has("screen")) roots.add(node("empty", "text", "What can I help you with?"));
         JSONArray suggestions = next.json.optJSONArray("suggestions"); if (messageList.length() == 0) for (int i = 0; i < suggestions.length(); i++) { JSONObject suggestion = suggestions.optJSONObject(i); roots.add(actionNode("suggestion_" + suggestion.optString("id"), (suggestion.optBoolean("starred") ? "★ " : "") + suggestion.optString("title") + "\n" + suggestion.optString("prompt"), suggestion.optString("id"))); }
@@ -140,6 +150,7 @@ final class NativeChatView extends LinearLayout {
         regionPadding(messages, roots, 16, 8);
         reconcile(messages, roots, seen, foreground);
         Iterator<Map.Entry<String, View>> iterator = views.entrySet().iterator(); while (iterator.hasNext()) { Map.Entry<String, View> item = iterator.next(); if (!seen.contains(item.getKey())) { if (item.getValue() instanceof EditText) bindings.remove(item.getValue()); if (item.getValue() instanceof NativeChatStreetMap) ((NativeChatStreetMap)item.getValue()).dispose(); iterator.remove(); } }
+        appearanceChanged();
         scroll.post(() -> { if (state != next) return; if (!sameConversation || bottom) scroll.scrollTo(0, messages.getHeight()); else scroll.scrollTo(0, oldY); });
     }
     private void reconcile(LinearLayout parent, List<JSONObject> children, Set<String> seen, int inheritedForeground) {
@@ -157,6 +168,7 @@ final class NativeChatView extends LinearLayout {
                 parent.addView(view, index, new LayoutParams(parent.getOrientation() == HORIZONTAL ? 0 : -1, -2, parent.getOrientation() == HORIZONTAL ? 1 : 0));
             }
             update(view, node, key, inheritedForeground);
+            bindAppearance(view,node,inheritedForeground);
             if (view instanceof LinearLayout) {
                 List<JSONObject> descendants = new ArrayList<>(); JSONArray list = node.optJSONArray("children");
                 if (!node.optString("text").isEmpty()) descendants.add(node(key + "_label", "text", node.optString("text")));
@@ -258,7 +270,7 @@ final class NativeChatView extends LinearLayout {
         }
         if (view instanceof NativeChatStreetMap) {
             final NativeChatStreetMap mapView = (NativeChatStreetMap)view;
-            mapView.setData(props, state.dark);
+            mapView.setData(props, NativeSystemAppearance.dark(getContext()));
             mapView.setMarkerSelection(marker -> { if (views.get(key) == mapView && !readOnly && actionId != null) emit("action", actionId, marker); });
         }
         FrameLayout descendants = view instanceof BoxButton ? ((BoxButton)view).graphics : view instanceof FrameLayout ? (FrameLayout)view : null;
@@ -266,7 +278,52 @@ final class NativeChatView extends LinearLayout {
             for (int c = 0; c < children.size(); c++) reconcileBox(descendants, children.get(c), c, seen, color, decoration || button);
             while (descendants.getChildCount() > children.size()) descendants.removeViewAt(descendants.getChildCount() - 1);
         }
+        bindAppearance(view,node,inheritedColor);
         if (decoration) { view.setClickable(false); view.setFocusable(false); view.setImportantForAccessibility(IMPORTANT_FOR_ACCESSIBILITY_NO_HIDE_DESCENDANTS); if (view instanceof TextView) ((TextView)view).setTextIsSelectable(false); }
+    }
+    /** Reapply only paint, never reconcile/bind text or emit edits on a configuration change. */
+    private void bindAppearance(View view, JSONObject node, int inherited) {
+        JSONObject supplied=node.optJSONObject("style"); final JSONObject style=supplied==null?new JSONObject():supplied;
+        final boolean sourceDark=node.optString("id").startsWith("__native_")?NativeSystemAppearance.dark(getContext()):state.dark;
+        final int fg=style.has("foreground")?Color.parseColor(style.optString("foreground")):inherited;
+        final int bg=style.has("background")?Color.parseColor(style.optString("background")):NativeSystemAppearance.background(view);
+        final boolean onAccent=isChromatic(bg) || (view.getParent() instanceof View && isChromatic(NativeSystemAppearance.background((View)view.getParent())));
+        final TextView text=view instanceof BoxButton?((BoxButton)view).control:view instanceof TextView?(TextView)view:null;
+        final android.graphics.drawable.Drawable originalBackground=view.getBackground();
+        JSONObject props=node.optJSONObject("props");
+        final Bitmap raster=view instanceof ImageView && props!=null && props.has("raster")?imageCache.get(view.getTag(R.id.native_chat_image_source)):null;
+        final Boolean[] painted={null};
+        appearanceBindings.put(view,()->{
+            boolean night=NativeSystemAppearance.dark(getContext());
+            int fill=NativeSystemAppearance.projected(bg,sourceDark,night,"background",false);
+            if(originalBackground instanceof GradientDrawable){GradientDrawable gradient=(GradientDrawable)originalBackground;gradient.setColor(fill);if(style.has("borderColor"))gradient.setStroke(px(style.optDouble("borderWidth",0)),NativeSystemAppearance.projected(Color.parseColor(style.optString("borderColor")),sourceDark,night,"border",false));}
+            else if(originalBackground instanceof android.graphics.drawable.ColorDrawable)((android.graphics.drawable.ColorDrawable)originalBackground).setColor(fill);
+            if(view.getBackgroundTintList()!=null)view.setBackgroundTintList(android.content.res.ColorStateList.valueOf(fill));
+            if(text!=null){text.setTextColor(NativeSystemAppearance.projected(fg,sourceDark,night,"foreground",onAccent));
+                // Span foregrounds override TextView paint. Preserve content/selection and replace only the color span.
+                if(text.getText() instanceof Spanned && !(text instanceof EditText)){
+                    android.text.Spannable spans=text.getText() instanceof android.text.Spannable?(android.text.Spannable)text.getText():new SpannableString(text.getText());
+                    for(ForegroundColorSpan span:spans.getSpans(0,spans.length(),ForegroundColorSpan.class)){
+                        if(span instanceof ProjectedSpan)((ProjectedSpan)span).night=night;
+                    }
+                    text.invalidate();
+                }
+            }
+            if(raster!=null && !Objects.equals(painted[0],night)){
+                if(sourceDark==night)((ImageView)view).setImageBitmap(raster);
+                else {Bitmap adapted=raster.copy(Bitmap.Config.ARGB_8888,true);int[] pixels=new int[adapted.getWidth()*adapted.getHeight()];adapted.getPixels(pixels,0,adapted.getWidth(),0,0,adapted.getWidth(),adapted.getHeight());
+                    for(int i=0;i<pixels.length;i++)pixels[i]=NativeSystemAppearance.projected(pixels[i],sourceDark,night,"foreground",onAccent);
+                    adapted.setPixels(pixels,0,adapted.getWidth(),0,0,adapted.getWidth(),adapted.getHeight());((ImageView)view).setImageBitmap(adapted);}
+                painted[0]=night;
+            }
+            view.invalidate();
+        });
+    }
+    private static boolean isChromatic(int c){float[] hsl=new float[3];androidx.core.graphics.ColorUtils.colorToHSL(c,hsl);return Color.alpha(c)>0 && hsl[1]>.3f;}
+    private final class ProjectedSpan extends ForegroundColorSpan {
+        final int source;final boolean sourceDark;boolean night;
+        ProjectedSpan(int value){super(value);source=value;sourceDark=state.dark;night=NativeSystemAppearance.dark(getContext());}
+        @Override public void updateDrawState(TextPaint paint){paint.setColor(NativeSystemAppearance.projected(source,sourceDark,night,"foreground",false));}
     }
     private void loadRaster(ImageView view, JSONObject raster) {
         byte[] bytes = NativeChatState.rasterBytes(raster);
@@ -332,7 +389,8 @@ final class NativeChatView extends LinearLayout {
                 android.app.DatePickerDialog picker = new android.app.DatePickerDialog(getContext(), (v, year, month, day) -> {
                     if (state == shown && field.isEnabled() && views.get(key) == field) field.setText(String.format(java.util.Locale.ROOT, "%04d-%02d-%02d", year, month+1, day));
                 }, calendar.get(java.util.Calendar.YEAR), calendar.get(java.util.Calendar.MONTH), calendar.get(java.util.Calendar.DAY_OF_MONTH));
-                picker.setButton(android.content.DialogInterface.BUTTON_NEUTRAL, "Clear", (dialog, which) -> { if (state == shown && field.isEnabled() && views.get(key) == field) field.setText(""); }); picker.show();
+                picker.setButton(android.content.DialogInterface.BUTTON_NEUTRAL, "Clear", (dialog, which) -> { if (state == shown && field.isEnabled() && views.get(key) == field) field.setText(""); });
+                transientDialogs.add(picker);picker.setOnDismissListener(ignored -> transientDialogs.remove(picker));picker.show();NativeSystemAppearance.dialog(picker);
             } : null);
         } else {
             view.setContentDescription(text);
@@ -343,7 +401,7 @@ final class NativeChatView extends LinearLayout {
             view.setOnClickListener(v -> { if (views.get(key) == v && v.isEnabled()) emit("action", actionId, node.has("value") ? node.optString("value") : null); });
         }
         if (view instanceof ImageView) { if (props.has("raster")) loadRaster((ImageView)view, props.optJSONObject("raster")); else loadImage((ImageView) view, props.optString("src"), key); }
-        if (view instanceof NativeChatStreetMap) ((NativeChatStreetMap) view).setData(props, state.dark);
+        if (view instanceof NativeChatStreetMap) ((NativeChatStreetMap) view).setData(props, NativeSystemAppearance.dark(getContext()));
     }
     private void bind(EditText field, String value, String action, String placeholder, boolean disabled) {
         Binding binding = bindings.get(field); binding.action = action;
@@ -385,12 +443,12 @@ final class NativeChatView extends LinearLayout {
         if (state == null || readOnly || !events.allowed()) return;
         NativeChatState shown = state; JSONArray list = state.json.optJSONArray("conversations"); String[] titles = new String[list.length()];
         for (int i = 0; i < titles.length; i++) { JSONObject item = list.optJSONObject(i); titles[i] = (item.optBoolean("selected") ? "✓ " : "") + (item.optBoolean("pinned") ? "★ " : "") + item.optString("title") + "\n" + item.optString("detail"); }
-        conversationDialog = new androidx.appcompat.app.AlertDialog.Builder(getContext()).setTitle("Conversations").setItems(titles, (dialog, which) -> { if (state == shown) emit("action", list.optJSONObject(which).optString("id"), null); }).setNegativeButton("Close", null).create(); conversationDialog.show();
+        conversationDialog = new androidx.appcompat.app.AlertDialog.Builder(getContext()).setTitle("Conversations").setItems(titles, (dialog, which) -> { if (state == shown) emit("action", list.optJSONObject(which).optString("id"), null); }).setNegativeButton("Close", null).create(); conversationDialog.show(); NativeSystemAppearance.dialog(conversationDialog);
     }
     boolean dismissDialog() { if (state != null && state.json.optJSONObject("screen") != null && state.json.optJSONObject("screen").optJSONArray("overlay").length() > 0) { emit("action", "screen-dismiss", null); return true; } return closeHistoryDialog(); }
     private boolean closeHistoryDialog() { if (conversationDialog == null) return false; conversationDialog.dismiss(); conversationDialog = null; return true; }
     private void disposeMaps() { for (View view : views.values()) if (view instanceof NativeChatStreetMap) ((NativeChatStreetMap)view).dispose(); }
-    void dispose() { closeHistoryDialog(); disposeMaps(); images.shutdownNow(); imageCache.clear(); state = null; views.clear(); bindings.clear(); }
+    void dispose() { for(android.app.Dialog dialog : new ArrayList<>(transientDialogs))dialog.dismiss(); transientDialogs.clear(); appearanceBindings.clear(); closeHistoryDialog(); disposeMaps(); images.shutdownNow(); imageCache.clear(); state = null; views.clear(); bindings.clear(); }
     private void loadImage(ImageView view, String src, String key) {
         if (Objects.equals(view.getTag(R.id.native_chat_image_source), src)) return;
         view.setTag(R.id.native_chat_image_source, src); view.setImageDrawable(null);
@@ -416,7 +474,7 @@ final class NativeChatView extends LinearLayout {
         JSONObject style = node.optJSONObject("style");
         if (style != null && text.length() > 0) {
             if (Arrays.asList("bold", "semibold", "medium").contains(style.optString("fontWeight"))) text.setSpan(new StyleSpan(Typeface.BOLD), 0, text.length(), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
-            if (style.has("foreground")) text.setSpan(new ForegroundColorSpan(Color.parseColor(style.optString("foreground"))), 0, text.length(), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+            if (style.has("foreground")) text.setSpan(new ProjectedSpan(Color.parseColor(style.optString("foreground"))), 0, text.length(), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
         }
         return text;
     }

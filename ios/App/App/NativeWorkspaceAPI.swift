@@ -7,6 +7,7 @@ protocol WorkspaceServing: AnyObject {
     var origin: URL { get }
     var onSessionChange: (() -> Void)? { get set }
     func profile() async throws -> WorkspaceProfile
+    func dashboard() async throws -> WorkspaceDashboard
     func save(_ edit: WorkspaceProfileEdit, scope: String) async throws -> WorkspaceProfile
     func calls(query: WorkspaceCallsQuery, page: Int, scope: String) async throws -> WorkspaceCallsPage
     func recording(_ call: WorkspaceCall, scope: String) async throws -> (Data, String)
@@ -132,6 +133,16 @@ final class WorkspaceAPI: NSObject, WKHTTPCookieStoreObserver, WorkspaceServing 
         guard profile.scope(origin: origin) == scope else { throw WorkspaceError.scopeChanged }
         if calls && !profile.capabilities.calls { throw WorkspaceError.forbidden }
         return profile
+    }
+
+    func dashboard() async throws -> WorkspaceDashboard {
+        // This endpoint authorizes the current persisted actor/workspace itself.
+        // Request cookie fingerprint and generation guards reject account changes.
+        let generation = requestGeneration
+        let result: WorkspaceDashboard = try await json("/api/mobile/dashboard")
+        try Task.checkCancellation()
+        guard generation == requestGeneration, !invalidated else { throw CancellationError() }
+        return try result.validated()
     }
 
     func calls(query: WorkspaceCallsQuery, page: Int, scope: String) async throws -> WorkspaceCallsPage {

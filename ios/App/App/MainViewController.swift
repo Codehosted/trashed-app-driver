@@ -214,13 +214,20 @@ class MainViewController: CAPBridgeViewController, UIGestureRecognizerDelegate {
     private var nativeWorkspaceURL: URL?
     private var nativeWorkspaceBypass: WorkspaceRoute?
     private var nativeWorkspaceDismissing = false
+    private var directWorkspace: WorkspaceDirectNavigation?
+    private var workspaceNavigationGeneration = UUID()
     private var lastWebWorkspaceURL: URL?
     #if DEBUG && targetEnvironment(simulator)
     private var workspaceFixtureStore: WKWebsiteDataStore?
     #endif
 
     override func webView(with frame: CGRect, configuration: WKWebViewConfiguration) -> WKWebView {
-        OnboardingWebView(frame: frame, configuration: configuration)
+        // Runs before web providers mount, including login and fresh documents.
+        if let raw = bundledServerURLString(), let origin = URL(string: raw),
+           let script = NativeSystemAppearance.script(origin: origin) {
+            configuration.userContentController.addUserScript(WKUserScript(source: script, injectionTime: .atDocumentStart, forMainFrameOnly: true))
+        }
+        return OnboardingWebView(frame: frame, configuration: configuration)
     }
 
     override func capacitorDidLoad() {
@@ -258,6 +265,29 @@ class MainViewController: CAPBridgeViewController, UIGestureRecognizerDelegate {
         nativeChat.attach(to: container)
     }
 
+    // Called synchronously after the plugin validates the live selection. No router
+    // event, WebView load, history mutation, or API await precedes the native frame.
+    func consumeNativeWorkspaceAction(_ action: String, context: String) -> Bool {
+        guard #available(iOS 16.0, *), nativeNavigationAvailable,
+              let source = webView?.url, let store = webView?.configuration.websiteDataStore.httpCookieStore else { return false }
+        let origin = makeDriverAuthConfig().origin
+        guard let entry = WorkspaceDirectNavigation.begin(action: action, sourceURL: source, origin: origin,
+            context: context, workspace: NativeWorkspaceHistory.isWorkspaceURL(source, origin: origin),
+            loading: webView?.isLoading != false,
+            modalBusy: presentedViewController != nil || nativeWorkspaceController != nil || nativeWorkspaceDismissing) else { return false }
+        directWorkspace = entry
+        presentNativeWorkspace(route: entry.route, url: entry.destinationURL, origin: origin, store: store)
+        return true
+    }
+
+    func nativeWorkspaceNavigationChanged(context: String?, visible: Bool) {
+        workspaceNavigationGeneration = UUID()
+        guard let entry = directWorkspace,
+              !entry.remainsValid(currentURL: webView?.url, loading: webView?.isLoading != false,
+                                  context: context ?? "", visible: visible) else { return }
+        dismissNativeWorkspace()
+    }
+
     // Transition named routes to real native screens. Only URL routing is shared;
     // loading, edits, paging and playback are independent of the HTML document.
     private func updateNativeWorkspace(for url: URL?) {
@@ -266,6 +296,13 @@ class MainViewController: CAPBridgeViewController, UIGestureRecognizerDelegate {
         if workspaceFixtureStore != nil { return }
         #endif
         let origin = makeDriverAuthConfig().origin
+        if let entry = directWorkspace {
+            if !entry.remainsValid(currentURL: url, loading: webView?.isLoading != false,
+                                   context: entry.context, visible: nativeWorkspaceSessionAvailable) {
+                dismissNativeWorkspace()
+            }
+            return // Unchanged source KVO/resume must not dismiss or route behind the native screen.
+        }
         let route = WorkspaceRoute.parse(url, origin: origin)
         // URL KVO also reports about:blank and /app during redirects. Neither
         // consumes an explicit web fallback; only a committed different workspace does.
@@ -327,6 +364,7 @@ class MainViewController: CAPBridgeViewController, UIGestureRecognizerDelegate {
         controller.dismiss(animated: false) { [weak self] in
             guard let self = self else { return }
             self.nativeWorkspaceController = nil; self.nativeWorkspaceURL = nil
+            self.directWorkspace = nil
             self.nativeWorkspaceDismissing = false
             completion?()
             self.updateHistoryGestures()
@@ -334,6 +372,12 @@ class MainViewController: CAPBridgeViewController, UIGestureRecognizerDelegate {
     }
 
     private func closeNativeWorkspace() {
+        if let entry = directWorkspace {
+            // If the source itself was native-capable, do not re-intercept it on dismissal.
+            nativeWorkspaceBypass = WorkspaceRoute.parse(entry.sourceURL, origin: makeDriverAuthConfig().origin)
+            dismissNativeWorkspace()
+            return // Preserve the existing web document and its exact history/scroll state.
+        }
         guard let current = nativeWorkspaceURL else { return }
         let origin = makeDriverAuthConfig().origin
         nativeWorkspaceBypass = WorkspaceRoute.parse(current, origin: origin)
@@ -352,6 +396,10 @@ class MainViewController: CAPBridgeViewController, UIGestureRecognizerDelegate {
     }
 
     private func openWorkspaceWeb(_ path: String, origin: URL) {
+        guard !nativeWorkspaceDismissing, nativeWorkspaceSessionAvailable else { return }
+        if let entry = directWorkspace,
+           !entry.remainsValid(currentURL: webView?.url, loading: webView?.isLoading != false,
+                               context: entry.context, visible: nativeWorkspaceSessionAvailable) { return }
         guard let url = URL(string: path, relativeTo: origin)?.absoluteURL,
               NativeWorkspaceHistory.isWorkspaceURL(url, origin: origin) else { return }
         // A deliberate web fallback must not immediately reopen the native overview.
@@ -365,8 +413,10 @@ class MainViewController: CAPBridgeViewController, UIGestureRecognizerDelegate {
         }
         #endif
         let sourceURL = webView?.url
+        let generation = workspaceNavigationGeneration
         dismissNativeWorkspace { [weak self] in
-            guard let self = self, self.webView?.url == sourceURL else { return }
+            guard let self = self, self.webView?.url == sourceURL, self.nativeNavigationAvailable,
+                  self.workspaceNavigationGeneration == generation else { return }
             self.webView?.load(URLRequest(url: url))
         }
     }
@@ -392,6 +442,13 @@ class MainViewController: CAPBridgeViewController, UIGestureRecognizerDelegate {
         return true
     }
     #endif
+
+    // Full-screen UIKit presentations may detach the presenting view from its window.
+    // That is not logout and must not invalidate an already-presented native screen.
+    private var nativeWorkspaceSessionAvailable: Bool {
+        onboardingReady && nativeOnboardingController == nil && nativeLoginController == nil
+            && webView?.isLoading == false
+    }
 
     var nativeNavigationAvailable: Bool {
         onboardingReady && nativeOnboardingController == nil && nativeLoginController == nil
@@ -449,6 +506,8 @@ class MainViewController: CAPBridgeViewController, UIGestureRecognizerDelegate {
 
     override func viewDidLoad() {
         super.viewDidLoad()
+        overrideUserInterfaceStyle = .unspecified
+        NotificationCenter.default.addObserver(self, selector: #selector(publishSystemAppearance), name: UIApplication.didBecomeActiveNotification, object: nil)
         #if DEBUG && targetEnvironment(simulator)
         if startWorkspaceFixtureIfRequested() { return }
         #endif
@@ -470,14 +529,14 @@ class MainViewController: CAPBridgeViewController, UIGestureRecognizerDelegate {
                 webView.observe(\.canGoBack, options: [.new]) { [weak self] _, _ in self?.updateHistoryGestures() },
                 webView.observe(\.isLoading, options: [.new]) { [weak self] webView, _ in
                     if webView.isLoading { self?.nativeNavigation.reset(); self?.nativeChat.reset(purge: !NativeChatPolicy.isAssistant(webView.url, configured: self?.bridge?.config.serverURL)) }
-                    else { self?.nativeNavigation.refresh() }
+                    else { self?.nativeNavigation.refresh(); self?.publishSystemAppearance() }
                     self?.updateHistoryGestures()
                 },
             ]
         }
         loginURLObservation = webView?.observe(\.url, options: [.new]) { [weak self] webView, _ in
             guard let self = self else { return }
-            guard let url = webView.url else { self.nativeChat.reset(); return }
+            guard let url = webView.url else { self.nativeNavigation.reset(); self.nativeChat.reset(); return }
             self.updateHistoryGestures()
             if !NativeNavigationPolicy.isWorkspace(url, configured: self.bridge?.config.serverURL) { self.nativeNavigation.reset(); self.nativeChat.reset() }
             if url.path != "/vendor/assistant" { self.nativeChat.reset() }
@@ -521,11 +580,21 @@ class MainViewController: CAPBridgeViewController, UIGestureRecognizerDelegate {
 
         if previousTraitCollection?.userInterfaceStyle != traitCollection.userInterfaceStyle {
             setNeedsStatusBarAppearanceUpdate()
+            publishSystemAppearance()
         }
     }
 
+    @objc private func publishSystemAppearance() {
+        // Native UIKit/SwiftUI surfaces inherit dynamic traits automatically. This
+        // signal repaints the existing safe web document; never reload or reset it.
+        guard let webView = webView, !webView.isLoading, let url = webView.url,
+              WorkspacePolicy.sameOrigin(url, makeDriverAuthConfig().origin),
+              let script = NativeSystemAppearance.script(origin: makeDriverAuthConfig().origin) else { return }
+        webView.evaluateJavaScript(script, completionHandler: nil)
+    }
+
     private var currentDriverTheme: DriverTheme {
-        traitCollection.userInterfaceStyle == .light ? .light : .dark
+        traitCollection.userInterfaceStyle == .dark ? .dark : .light
     }
 
     private func updateHistoryGestures() {

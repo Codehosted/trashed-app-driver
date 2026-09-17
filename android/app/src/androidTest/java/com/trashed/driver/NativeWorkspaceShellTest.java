@@ -97,6 +97,81 @@ public class NativeWorkspaceShellTest {
                     scenario.onActivity(a->a.getWindow().getDecorView().findViewWithTag("native-onboarding-back").performClick());
                     await(scenario,"onboarding resumes synthetic session",a->!a.navigationLoading() && (server.origin()+"/vendor").equals(a.getBridge().getWebView().getUrl()));
                     scenario.onActivity(a->{assertNull(field(a,"loginOverlay"));assertTrue(a.canPresentNavigation());});
+                    assertEquals("true",js(scenario,"document.getElementById('draft').value='direct retained draft';true"));
+                    AtomicInteger forwarded = new AtomicInteger();
+                    NativeNavigationState directState = new NativeNavigationState(Map.of(
+                        "version", 1, "context", "direct-fixture", "revision", 1, "visible", true, "appearance", "light",
+                        "tabs", Arrays.asList(
+                            Map.of("id", "vendor-profile", "label", "Profile", "icon", "profile", "badge", 0, "selected", false, "items", Collections.emptyList()),
+                            Map.of("id", "vendor-call-history", "label", "Calls", "icon", "calls", "badge", 0, "selected", false, "items", Collections.emptyList()),
+                            Map.of("id", "vendor-orders", "label", "Orders", "icon", "manage", "badge", 0, "selected", false, "items", Collections.emptyList()))));
+                    scenario.onActivity(a -> a.setNativeNavigation(directState, new NativeBottomNavigation.Listener() {
+                        public void select(NativeNavigationState.Selection selection) { forwarded.incrementAndGet(); }
+                        public void reset(String context) { }
+                    }));
+                    long[] sourceDocument = {0}; int[] sourceHistory = {0};
+                    scenario.onActivity(a -> { sourceDocument[0] = a.navigationDocument(); sourceHistory[0] = originalWeb.get().copyBackForwardList().getSize(); });
+                    for (String id : new String[]{"vendor-profile", "vendor-call-history"}) {
+                        scenario.onActivity(a -> ((NativeBottomNavigation.Listener)field(field(a,"nativeNavigation"),"listener")).select(new NativeNavigationState.Selection(directState,id)));
+                        await(scenario,"direct native " + id,a -> workspace(a)!=null);
+                        scenario.moveToState(Lifecycle.State.CREATED); scenario.moveToState(Lifecycle.State.RESUMED);
+                        scenario.onActivity(a -> {
+                            assertNotNull(workspace(a)); assertEquals(server.origin()+"/vendor", originalWeb.get().getUrl());
+                            assertEquals(sourceDocument[0],a.navigationDocument()); assertEquals(sourceHistory[0],originalWeb.get().copyBackForwardList().getSize());
+                            if (id.equals("vendor-profile")) a.getOnBackPressedDispatcher().onBackPressed();
+                            else {
+                                MaterialToolbar toolbar = (MaterialToolbar)workspace(a).getChildAt(0);
+                                boolean clicked = false;
+                                for (int i = 0; i < toolbar.getChildCount(); i++) {
+                                    View child = toolbar.getChildAt(i);
+                                    if ("Back".contentEquals(child.getContentDescription() == null ? "" : child.getContentDescription())) { child.performClick(); clicked = true; break; }
+                                }
+                                assertTrue("Actual toolbar Back control",clicked);
+                            }
+                            assertNull(workspace(a)); assertEquals(server.origin()+"/vendor",originalWeb.get().getUrl());
+                            assertEquals(sourceDocument[0],a.navigationDocument()); assertEquals(sourceHistory[0],originalWeb.get().copyBackForwardList().getSize());
+                        });
+                        assertEquals("\"direct retained draft\"",js(scenario,"document.getElementById('draft').value"));
+                        assertEquals("Native selection must not invoke JS fallback",0,forwarded.get());
+                    }
+                    AtomicReference<NativeBottomNavigation.Listener> retiredListener = new AtomicReference<>();
+                    scenario.onActivity(a -> {
+                        retiredListener.set((NativeBottomNavigation.Listener)field(field(a,"nativeNavigation"),"listener"));
+                        retiredListener.get().select(new NativeNavigationState.Selection(directState,"vendor-profile"));
+                        assertNotNull(workspace(a));
+                        a.clearNativeNavigation("unrelated-context");
+                        assertNotNull("Late clear from unrelated owner must not dismiss",workspace(a));
+                        a.clearNativeNavigation(directState.context);
+                        assertNull("Clearing current navigation owner must revoke direct screen",workspace(a));
+                        retiredListener.get().select(new NativeNavigationState.Selection(directState,"vendor-profile"));
+                        assertNull("Retired listener cannot reopen direct screen",workspace(a));
+                        NativeNavigationState replacement = new NativeNavigationState(Map.of(
+                            "version",1,"context","replacement-fixture","revision",1,"visible",true,"appearance","light",
+                            "tabs",Collections.singletonList(Map.of("id","vendor-profile","label","Profile","icon","profile","badge",0,"selected",false,"items",Collections.emptyList()))));
+                        a.setNativeNavigation(replacement,new NativeBottomNavigation.Listener(){
+                            public void select(NativeNavigationState.Selection s){forwarded.incrementAndGet();}
+                            public void reset(String context){}
+                        });
+                        retiredListener.get().select(new NativeNavigationState.Selection(directState,"vendor-profile"));
+                        assertNull("Same session with a new owner rejects stale selection",workspace(a));
+                        ((NativeBottomNavigation.Listener)field(field(a,"nativeNavigation"),"listener")).select(new NativeNavigationState.Selection(replacement,"vendor-profile"));
+                        assertNotNull(workspace(a));
+                        a.setNativeNavigation(directState,new NativeBottomNavigation.Listener(){
+                            public void select(NativeNavigationState.Selection s){forwarded.incrementAndGet();}
+                            public void reset(String context){}
+                        });
+                        assertNull("Owner replacement must dismiss existing native screen",workspace(a));
+                        assertEquals(sourceDocument[0],a.navigationDocument());
+                    });
+                    assertEquals("Retired actions never reach fallback",0,forwarded.get());
+                    scenario.onActivity(a -> ((NativeBottomNavigation.Listener)field(field(a,"nativeNavigation"),"listener")).select(new NativeNavigationState.Selection(directState,"vendor-orders")));
+                    assertEquals("Unconverted action remains functional",1,forwarded.get());
+                    scenario.onActivity(a -> ((NativeBottomNavigation.Listener)field(field(a,"nativeNavigation"),"listener")).select(new NativeNavigationState.Selection(directState,"vendor-profile")));
+                    await(scenario,"direct profile before cookie revoke",a -> workspace(a)!=null);
+                    cookie(server.origin(),COOKIE+"=; Path=/; Max-Age=0");
+                    await(scenario,"cookie revocation dismisses direct lease",a -> workspace(a)==null && field(a,"nativeRoute")==null);
+                    scenario.onActivity(a -> { assertEquals(sourceDocument[0],a.navigationDocument()); assertEquals(server.origin()+"/vendor",originalWeb.get().getUrl()); });
+                    cookie(server.origin(),COOKIE+"=local-shell-fixture; Path=/; HttpOnly; SameSite=Lax");
                     assertEquals("true",js(scenario,"document.getElementById('draft').value='shell draft';history.pushState({},'', '/vendor/profile');true"));
                     await(scenario,"real shell native profile",a->workspace(a)!=null && NativeWorkspaceRegressionTest.text(workspace(a),"Shell Fixture")!=null);
                     scenario.onActivity(a->{assertSame(originalWeb.get().getParent(),workspace(a).getParent());assertEquals(View.IMPORTANT_FOR_ACCESSIBILITY_NO_HIDE_DESCENDANTS,originalWeb.get().getImportantForAccessibility());});

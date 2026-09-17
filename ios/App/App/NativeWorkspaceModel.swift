@@ -114,6 +114,7 @@ final class WorkspaceModel: ObservableObject {
     let api: any WorkspaceServing
     let audio = WorkspaceAudio() // A single player owned above every collapsible row.
     @Published private(set) var profile: WorkspaceProfile?
+    @Published private(set) var dashboard: WorkspaceDashboard?
     @Published private(set) var loading = false
     @Published private(set) var saving = false
     @Published private(set) var error: String?
@@ -138,7 +139,7 @@ final class WorkspaceModel: ObservableObject {
     func close() {
         closed = true; lifecycleID = UUID(); loadID = UUID(); audio.stop(); api.close()
         loading = false; paging = false; saving = false
-        profile = nil; pagination.reset()
+        profile = nil; dashboard = nil; pagination.reset()
     }
 
     func suspend() {
@@ -151,6 +152,12 @@ final class WorkspaceModel: ObservableObject {
     func resume() async {
         guard !closed, !invalidated, suspended else { return }
         let id = UUID(); lifecycleID = id
+        if dashboard != nil {
+            // Reauthorize the dashboard with one server-owned snapshot on resume.
+            suspended = false
+            await loadDashboard()
+            return
+        }
         do {
             let current = try await api.profile()
             guard lifecycleID == id, !Task.isCancelled, !closed, !invalidated else { return }
@@ -164,7 +171,8 @@ final class WorkspaceModel: ObservableObject {
 
     func invalidate(_ failure: Error) {
         guard !closed, !invalidated else { return }
-        lifecycleID = UUID(); invalidated = true; profile = nil; pagination.reset(); audio.stop()
+        lifecycleID = UUID(); invalidated = true; profile = nil; dashboard = nil; pagination.reset(); audio.stop()
+        api.cancelPending()
         loadID = UUID(); loading = false; paging = false; saving = false
         error = failure.localizedDescription
         if case WorkspaceError.expired = failure { onExpired?() }
@@ -208,6 +216,25 @@ final class WorkspaceModel: ObservableObject {
         } catch {
             guard lifecycleID == lifetime, saveID == id, !Task.isCancelled, !closed, !invalidated, !suspended else { return false }
             self.error = error.localizedDescription; handle(error); return false
+        }
+    }
+
+    func loadDashboard() async {
+        guard !closed, !invalidated, !suspended else { return }
+        let id = UUID(), lifetime = lifecycleID; loadID = id
+        loading = true; error = nil // Keep the last validated snapshot during refresh.
+        defer { if lifecycleID == lifetime, loadID == id { loading = false } }
+        do {
+            let result = try await api.dashboard()
+            try Task.checkCancellation()
+            guard lifecycleID == lifetime, loadID == id, !closed, !invalidated, !suspended else { return }
+            if let previous = dashboard,
+               previous.scope.userId != result.scope.userId || previous.scope.vendorId != result.scope.vendorId { throw WorkspaceError.scopeChanged }
+            if let current = profile { _ = try result.validated(for: current) }
+            dashboard = try result.validated()
+        } catch {
+            guard !Task.isCancelled, lifecycleID == lifetime, loadID == id, !closed, !invalidated, !suspended else { return }
+            self.error = error.localizedDescription; handle(error)
         }
     }
 

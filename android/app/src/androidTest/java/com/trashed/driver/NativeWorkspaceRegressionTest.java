@@ -178,7 +178,7 @@ public class NativeWorkspaceRegressionTest {
     static final class Fixture implements AutoCloseable {
         final ServerSocket socket; final Thread thread;
         volatile boolean closed, failSave, expired; volatile Throwable failure; volatile String name="Fixture User";
-        final AtomicInteger audioReads = new AtomicInteger();
+        final AtomicInteger audioReads = new AtomicInteger(), dashboardReads = new AtomicInteger();
         final AtomicInteger patches=new AtomicInteger(), profileReads=new AtomicInteger(), callReads=new AtomicInteger();
         Fixture() throws Exception {
             socket=new ServerSocket(0,20,InetAddress.getByName("127.0.0.1"));
@@ -203,12 +203,15 @@ public class NativeWorkspaceRegressionTest {
                 if(request[0].equals("PATCH")) { name=new JSONObject(new String(data)).getString("name"); patches.incrementAndGet(); response=new JSONObject().put("success",true).put("user",new JSONObject().put("id",1).put("name",name).put("email","fixture@example.invalid").put("phone", "")); }
                 else { profileReads.incrementAndGet(); response=new JSONObject().put("user",new JSONObject().put("id",1).put("name",name).put("email","fixture@example.invalid").put("phone","").put("roles",new JSONArray().put("vendor"))
                     .put("vendorPermissions",new JSONObject()).put("vendor",new JSONObject().put("id",2).put("businessName","Loopback only"))).put("capabilities",new JSONObject().put("calls",true)); }
+            } else if(request[1].equals("/api/mobile/dashboard")) {
+                dashboardReads.incrementAndGet();
+                response=new JSONObject(NativeAppearanceActivityTest.DASHBOARD);
             } else if(request[1].startsWith("/api/ai-features/calls?")) {
                 callReads.incrementAndGet(); int page=request[1].contains("page=2")?2:1;
                 String query=NativeWorkspacePolicy.query(origin()+request[1],"search","");
                 int which=query.equals("Caller 2")?2:page;
                 JSONArray rows=new JSONArray();
-                if(query.isEmpty() || query.equals("Caller 2")) rows.put(new JSONObject().put("id","call-"+which).put("customerName","Caller "+which).put("customerPhone","5550100").put("status","completed").put("timestamp","2026-01-01T12:00:00Z").put("duration",20).put("transcript","Caller: Synthetic local recording. Trisha: No real customer data is used.").put("hasRecording",true).put("recordingUrl","/api/calls/call-"+which+"/recording"));
+                if(query.isEmpty() || query.equals("Caller 2")) rows.put(new JSONObject().put("id","call-"+which).put("customerName","Caller "+which).put("customerPhone","5550100").put("status","completed").put("timestamp","2026-01-01T12:00:00Z").put("duration",20).put("transcript","Caller: Synthetic local recording.\nTrisha: No real customer data is used.").put("hasRecording",true).put("recordingUrl","/api/calls/call-"+which+"/recording"));
                 response=new JSONObject().put("currentPage",page).put("totalPages",query.isEmpty()?2:rows.length()).put("totalCalls",query.isEmpty()?2:rows.length()).put("calls",rows);
             } else throw new AssertionError("Unexpected local route: "+request[1]);
             byte[] bytes=response.toString().getBytes(StandardCharsets.UTF_8);

@@ -35,6 +35,7 @@ final class NativeWorkspaceView extends LinearLayout {
         void web(String path);
         default void back() { web("/vendor"); }
         default void signIn() { web("/app/login"); }
+        default void invalidated() { }
     }
     final String destination, origin, session;
     private final Host host;
@@ -45,12 +46,16 @@ final class NativeWorkspaceView extends LinearLayout {
     private int generation, audioGeneration;
     private boolean disposed, suspended, loading, loadingMore;
     private NativeWorkspaceApi.Profile profile;
+    private NativeDashboard dashboard;
+    private NativeDashboardView dashboardView;
     private TextView status;
     private LinearLayout body, playerStrip;
     private RecyclerView list;
     private CallsAdapter adapter;
     private final LinkedHashMap<String, NativeWorkspaceApi.Call> rows = new LinkedHashMap<>();
-    private final Set<String> expanded = new HashSet<>(), fullTranscript = new HashSet<>();
+    private final Set<String> expanded = new HashSet<>();
+    private NativeCallTranscriptView transcriptScreen;
+    private final Map<View, Integer> transcriptHiddenViews = new HashMap<>();
     private String search, filter, sort;
     private int page, pages, total;
     private Runnable debounce;
@@ -59,6 +64,16 @@ final class NativeWorkspaceView extends LinearLayout {
     private SeekBar seek;
     final NativeWorkspaceAudio audio;
     private AlertDialog editor;
+    private final Set<AlertDialog> transientDialogs = new HashSet<>();
+    private void showTransient(AlertDialog dialog) {
+        transientDialogs.add(dialog);
+        dialog.setOnDismissListener(ignored -> transientDialogs.remove(dialog));
+        dialog.show(); NativeSystemAppearance.dialog(dialog);
+    }
+    private void dismissTransient() {
+        for (AlertDialog dialog : new ArrayList<>(transientDialogs)) dialog.dismiss();
+        transientDialogs.clear();
+    }
     private TextInputEditText nameInput, emailInput, phoneInput;
     private TextView editError;
     private boolean saving;
@@ -78,18 +93,18 @@ final class NativeWorkspaceView extends LinearLayout {
         setOrientation(VERTICAL); setBackgroundColor(tokens.background); setPadding(tokens.dp(20), tokens.dp(8), tokens.dp(20), tokens.dp(8));
         setTag("native-workspace-" + destination);
         audio = new NativeWorkspaceAudio(context, this::updateAudio);
-        ViewCompat.setAccessibilityPaneTitle(this, "profile".equals(destination) ? "Profile" : "Call history");
+        ViewCompat.setAccessibilityPaneTitle(this, "dashboard".equals(destination) ? "Dashboard" : "profile".equals(destination) ? "Profile" : "Call history");
         build(); refresh(); main.post(sessionWatch);
     }
     private void build() {
         removeAllViews();
         com.google.android.material.appbar.MaterialToolbar header = new com.google.android.material.appbar.MaterialToolbar(tokens.context);
-        header.setTitle("profile".equals(destination) ? "Your account" : "Call history");
+        header.setTitle("dashboard".equals(destination) ? "Dashboard" : "profile".equals(destination) ? "Your account" : "Call history");
         header.setTitleTextColor(tokens.foreground);header.setBackgroundColor(tokens.background);header.setElevation(0);
         header.setNavigationIcon(R.drawable.native_workspace_back);header.setNavigationIconTint(tokens.accent);
         header.setNavigationContentDescription("Back");header.setNavigationOnClickListener(view -> confirmLeave(host::back));
         header.getMenu().add("Refresh").setShowAsAction(android.view.MenuItem.SHOW_AS_ACTION_NEVER);
-        if (!"profile".equals(destination)) header.getMenu().add("More call tools · Web").setShowAsAction(android.view.MenuItem.SHOW_AS_ACTION_NEVER);
+        if ("calls".equals(destination)) header.getMenu().add("More call tools · Web").setShowAsAction(android.view.MenuItem.SHOW_AS_ACTION_NEVER);
         header.setOnMenuItemClickListener(item -> {
             if ("Refresh".contentEquals(item.getTitle())) confirmLeave(this::refresh);
             else showWebCallTools();
@@ -98,9 +113,10 @@ final class NativeWorkspaceView extends LinearLayout {
         addView(header, tokens.row());
         status = tokens.text("Loading…", 13, false); status.setTextColor(tokens.secondary);
         status.setAccessibilityLiveRegion(View.ACCESSIBILITY_LIVE_REGION_POLITE); addView(status, tokens.row());
-        if ("profile".equals(destination)) {
+        if (!"calls".equals(destination)) {
             ScrollView scroll = new ScrollView(tokens.context); body = tokens.column();
             scroll.addView(body, tokens.row()); addView(scroll, new LinearLayout.LayoutParams(-1, 0, 1));
+            if("dashboard".equals(destination)) scroll.setOnTouchListener(new View.OnTouchListener(){float start=-1;public boolean onTouch(View v,MotionEvent e){if(e.getActionMasked()==MotionEvent.ACTION_DOWN)start=scroll.canScrollVertically(-1)?-1:e.getY();if(e.getActionMasked()==MotionEvent.ACTION_UP && start>=0 && e.getY()-start>tokens.dp(100)){start=-1;refresh();}return false;}});
         } else buildCalls();
     }
     private void buildCalls() {
@@ -113,7 +129,7 @@ final class NativeWorkspaceView extends LinearLayout {
         input.addTextChangedListener(new TextWatcher() {
             @Override public void beforeTextChanged(CharSequence s, int start, int count, int after) { }
             @Override public void onTextChanged(CharSequence s, int start, int before, int count) {
-                search = s.toString(); invalidateRequests(); rows.clear(); expanded.clear(); fullTranscript.clear(); adapter.submitList(new ArrayList<>()); page = 0; pages = 0;
+                search = s.toString(); invalidateRequests(); rows.clear(); expanded.clear(); adapter.submitList(new ArrayList<>()); page = 0; pages = 0;
                 audioGeneration++; audio.release(); updateAudio(); loading = false; more.setEnabled(false); status.setText("Searching…");
                 if (debounce != null) main.removeCallbacks(debounce);
                 debounce = () -> loadPage(1); main.postDelayed(debounce, 350);
@@ -164,15 +180,15 @@ final class NativeWorkspaceView extends LinearLayout {
         playerStrip.addView(transport); addView(playerStrip, tokens.row()); playerStrip.setVisibility(GONE);
     }
     private void showWebCallTools() {
-        new MaterialAlertDialogBuilder(tokens.context).setTitle("Call tools on the website")
+        showTransient(new MaterialAlertDialogBuilder(tokens.context).setTitle("Call tools on the website")
             .setItems(new String[]{"Live call monitor", "Full call workspace (favorites & forwarding)"},
                 (dialog, which) -> host.web(new String[]{"/calls/monitor", "/calls/history"}[which]))
-            .setNegativeButton("Cancel",null).show();
+            .setNegativeButton("Cancel",null).create());
     }
     private void choices(String title, String[] labels, String[] values, boolean isFilter) {
-        new MaterialAlertDialogBuilder(tokens.context).setTitle(title).setItems(labels, (dialog, which) -> {
+        showTransient(new MaterialAlertDialogBuilder(tokens.context).setTitle(title).setItems(labels, (dialog, which) -> {
             if (isFilter) filter = values[which]; else sort = values[which]; refresh();
-        }).setNegativeButton("Cancel", null).show();
+        }).setNegativeButton("Cancel", null).create());
     }
     private NativeWorkspaceApi request() { NativeWorkspaceApi api = new NativeWorkspaceApi(origin, host.cookieSource()); requests.add(api); return api; }
     private interface Work<T> { T run(NativeWorkspaceApi api) throws Exception; }
@@ -188,10 +204,12 @@ final class NativeWorkspaceView extends LinearLayout {
     private boolean current(int ticket) { return !disposed && !suspended && ticket == generation && session.equals(host.session()); }
     private void invalidateRequests() { generation++; for (NativeWorkspaceApi api : requests) api.cancel(); requests.clear(); }
     void refresh() {
+        dismissTranscript();
         if (disposed || suspended) return;
+        if ("dashboard".equals(destination)) { refreshDashboard(); return; }
         if (debounce != null) main.removeCallbacks(debounce);
         invalidateRequests(); audioGeneration++; audio.release(); updateAudio(); profile = null;
-        rows.clear(); expanded.clear(); fullTranscript.clear(); page = 0; pages = 0; total = 0;
+        rows.clear(); expanded.clear(); page = 0; pages = 0; total = 0;
         if (adapter != null) { adapter.submitList(new ArrayList<>()); more.setEnabled(false); }
         else body.removeAllViews();
         loading = true; status.setText("Loading…");
@@ -201,6 +219,26 @@ final class NativeWorkspaceView extends LinearLayout {
             else if (!profile.calls) { status.setText("Call history is not available for your role."); more.setEnabled(false); }
             else loadPage(1);
         }, this::failure);
+    }
+    private void refreshDashboard() {
+        invalidateRequests(); loading=true; status.setText(dashboard==null?"Loading dashboard…":"Refreshing · showing previous snapshot");
+        run(NativeWorkspaceApi::dashboard, result -> {
+            try { result.requireSameScope(dashboard); } catch (Exception error) { dashboard=null; body.removeAllViews(); failure(error); return; }
+            dashboard=result; loading=false; body.removeAllViews();
+            if(dashboardView==null) dashboardView=new NativeDashboardView(tokens);
+            dashboardView.show(result); body.addView(dashboardView,tokens.row()); status.setText("Up to date");
+        }, error -> { loading=false;
+            if(error instanceof NativeWorkspaceApi.Failure && (((NativeWorkspaceApi.Failure)error).status==401 || ((NativeWorkspaceApi.Failure)error).status==403)){dashboard=null;failure(error);return;}
+            status.setText((dashboard==null?"Dashboard unavailable. ":"Refresh failed · showing previous snapshot. ")+"Check your connection and retry.");
+            View previous=body.findViewWithTag("dashboard-retry");if(previous!=null)body.removeView(previous);
+            View retry=tokens.button("Retry",true,this::refreshDashboard);retry.setTag("dashboard-retry");body.addView(retry,tokens.row());
+        });
+    }
+    void appearanceChanged() {
+        tokens.updateAppearance(); NativeSystemAppearance.repaint(this);
+        if(editor!=null) NativeSystemAppearance.dialog(editor);
+        for(AlertDialog dialog : transientDialogs) NativeSystemAppearance.dialog(dialog);
+        if(dashboardView!=null)dashboardView.invalidate();
     }
     private void renderProfile(String message) {
         body.removeAllViews(); status.setText(message);
@@ -249,11 +287,14 @@ final class NativeWorkspaceView extends LinearLayout {
         else { body.removeAllViews(); body.addView(tokens.button("Retry", true, this::refresh)); }
     }
     private void invalidate(String message) {
-        invalidateRequests(); audioGeneration++; audio.release(); updateAudio(); profile = null; rows.clear(); expanded.clear(); fullTranscript.clear();
+        dismissTransient();
+        dismissTranscript();
+        invalidateRequests(); audioGeneration++; audio.release(); updateAudio(); profile = null; rows.clear(); expanded.clear();
         if (editor != null) { editor.dismiss(); editor = null; }
         saving = false; loading = false;
         if (adapter != null) { adapter.submitList(new ArrayList<>()); more.setEnabled(false); } else body.removeAllViews();
         status.setText(message); main.removeCallbacks(sessionWatch);
+        host.invalidated();
     }
     private void edit() {
         if (profile == null || editor != null) return;
@@ -270,7 +311,7 @@ final class NativeWorkspaceView extends LinearLayout {
             return false;
         });
         editor.setOnShowListener(ignored -> { editor.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener(view -> save()); editor.getButton(AlertDialog.BUTTON_NEGATIVE).setOnClickListener(view -> confirmLeave(() -> {})); });
-        editor.show();
+        editor.show(); NativeSystemAppearance.dialog(editor);
     }
     private TextInputEditText editField(LinearLayout form, String label, String value, int type) {
         TextInputLayout wrapper = new TextInputLayout(tokens.context); wrapper.setHint(label);
@@ -286,10 +327,10 @@ final class NativeWorkspaceView extends LinearLayout {
         if (saving) { editError.setText("Wait for the save to finish."); return; }
         Runnable leave = () -> { editor.dismiss(); editor = null; action.run(); };
         if (!dirty()) { leave.run(); return; }
-        new MaterialAlertDialogBuilder(tokens.context).setTitle("Discard changes?").setMessage("Your unsaved profile changes will be lost.")
-            .setNegativeButton("Keep editing", null).setPositiveButton("Discard", (dialog, which) -> { if (!disposed && editor != null && !saving) leave.run(); }).show();
+        showTransient(new MaterialAlertDialogBuilder(tokens.context).setTitle("Discard changes?").setMessage("Your unsaved profile changes will be lost.")
+            .setNegativeButton("Keep editing", null).setPositiveButton("Discard", (dialog, which) -> { if (!disposed && editor != null && !saving) leave.run(); }).create());
     }
-    boolean back() { if (editor == null) return false; confirmLeave(() -> {}); return true; }
+    boolean back() { if (dismissTranscript()) return true; if (editor == null) return false; confirmLeave(() -> {}); return true; }
     private void save() {
         if (saving || profile == null) return;
         String name = value(nameInput), email = value(emailInput), phone = value(phoneInput);
@@ -339,6 +380,7 @@ final class NativeWorkspaceView extends LinearLayout {
         ((TextView) playerStrip.findViewWithTag("workspace-speed")).setText(String.format(Locale.ROOT, "%s×", audio.speed));
     }
     void suspend() {
+        dismissTranscript();
         suspended = true; invalidateRequests(); audioGeneration++; audio.release(); updateAudio(); main.removeCallbacks(sessionWatch);
         if (debounce != null) main.removeCallbacks(debounce);
         loading = false;
@@ -355,6 +397,8 @@ final class NativeWorkspaceView extends LinearLayout {
         }
     }
     void dispose() {
+        dismissTransient();
+        dismissTranscript();
         if (disposed) return; disposed = true; invalidateRequests(); audioGeneration++; audio.release(); executor.shutdownNow(); main.removeCallbacksAndMessages(null);
         if (editor != null) { editor.dismiss(); editor = null; }
         rows.clear(); profile = null; if (adapter != null) adapter.submitList(new ArrayList<>());
@@ -374,7 +418,7 @@ final class NativeWorkspaceView extends LinearLayout {
         CallHolder(LinearLayout column) { super(column); this.column = column; column.setPadding(tokens.dp(14), tokens.dp(8), tokens.dp(14), tokens.dp(12)); column.setBackgroundColor(tokens.surface);
             RecyclerView.LayoutParams params = new RecyclerView.LayoutParams(-1, -2); params.bottomMargin = tokens.dp(10); column.setLayoutParams(params); }
         void bind(NativeWorkspaceApi.Call call) {
-            column.removeAllViews(); boolean open = expanded.contains(call.id);
+            column.removeAllViews(); column.setBackgroundColor(tokens.surface); boolean open = expanded.contains(call.id);
             TextView name = tokens.text(call.name.isEmpty() ? "Unknown customer" : call.name, 18, false); name.setTypeface(tokens.semibold); column.addView(name);
             TextView metadata = tokens.text(date(call.timestamp) + " · " + call.duration + "\n" + call.phone + " · " + call.status, 12, false); metadata.setTextColor(tokens.secondary); column.addView(metadata);
             if (call.satisfaction >= 1 && call.satisfaction <= 10) column.addView(tokens.text("Customer satisfaction " + call.satisfaction + "/10", 12, false));
@@ -385,11 +429,31 @@ final class NativeWorkspaceView extends LinearLayout {
             if (!call.recording.isEmpty()) { column.addView(tokens.text("Recording", 15, true)); column.addView(tokens.button(call.id.equals(audio.id) ? "Play / pause recording" : "Play recording", true, () -> play(call)), tokens.row()); }
             else column.addView(tokens.text("No recording available", 13, false));
             column.addView(tokens.text("Transcript", 15, true));
-            String transcript = call.transcript.isEmpty() ? "Transcript not available yet." : call.transcript;
-            boolean full = fullTranscript.contains(call.id); boolean longText = transcript.length() > 500;
-            TextView text = tokens.text(!full && longText ? transcript.substring(0, 500) + "…" : transcript, 14, false); text.setTextIsSelectable(true); column.addView(text);
-            if (longText) column.addView(tokens.button(full ? "Read less" : "Read full transcript", false, () -> { if (fullTranscript.contains(call.id)) fullTranscript.remove(call.id); else fullTranscript.add(call.id); bind(call); }), tokens.row());
+            List<NativeCallTranscript.Turn> turns = NativeCallTranscript.parse(call.transcript);
+            if (turns.isEmpty()) column.addView(tokens.text("Transcript not available yet.", 14, false));
+            else {
+                for (int i = 0; i < Math.min(2, turns.size()); i++) column.addView(NativeCallTranscriptView.bubble(tokens, turns.get(i), true), tokens.row());
+                com.google.android.material.button.MaterialButton openTranscript = tokens.button("Open conversation", false, () -> showTranscript(call));
+                openTranscript.setTag("workspace-open-transcript-" + call.id); column.addView(openTranscript, tokens.row());
+                column.addView(tokens.text(turns.size() + " speaker turns", 12, false));
+            }
         }
+    }
+    private void showTranscript(NativeWorkspaceApi.Call call) {
+        if (disposed || suspended || profile == null || transcriptScreen != null || !session.equals(host.session())) return;
+        for (int i = 0; i < getChildCount(); i++) {
+            View child = getChildAt(i);
+            if (child != playerStrip) { transcriptHiddenViews.put(child, child.getVisibility()); child.setVisibility(GONE); }
+        }
+        transcriptScreen = new NativeCallTranscriptView(tokens, call.name, call.transcript, !call.recording.isEmpty(), this::dismissTranscript, () -> play(call));
+        addView(transcriptScreen, 0, new LinearLayout.LayoutParams(-1, 0, 1));
+    }
+    boolean dismissTranscript() {
+        if (transcriptScreen == null) return false;
+        removeView(transcriptScreen); transcriptScreen = null;
+        for (Map.Entry<View, Integer> entry : transcriptHiddenViews.entrySet()) entry.getKey().setVisibility(entry.getValue());
+        transcriptHiddenViews.clear();
+        return true;
     }
     private String date(String raw) {
         try {
