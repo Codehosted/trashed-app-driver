@@ -4,6 +4,7 @@ import Foundation
 // No DOM state, HTML, persistent response cache, or web-renderer dependency.
 enum WorkspaceRoute: Hashable {
     case dashboard
+    case rentals
     case profile
     case calls(WorkspaceCallsQuery)
 
@@ -11,6 +12,7 @@ enum WorkspaceRoute: Hashable {
         guard WorkspacePolicy.sameOrigin(url, origin), let c = URLComponents(url: url, resolvingAgainstBaseURL: false) else { return nil }
         switch c.percentEncodedPath {
         case "/vendor/dashboard", "/vendor/dashboard/": return .dashboard
+        case "/vendor/rentals": return .rentals
         case "/vendor/profile":
             // These existing account actions remain web-owned in this slice.
             // Never intercept their links and strand the user on the overview.
@@ -71,6 +73,7 @@ struct WorkspaceDirectNavigation: Equatable {
     static func route(action: String) -> WorkspaceRoute? {
         switch action {
         case "vendor-dashboard": return .dashboard
+        case "vendor-rentals": return .rentals
         case "vendor-profile": return .profile
         case "vendor-call-history": return .calls(WorkspaceCallsQuery())
         default: return nil
@@ -85,6 +88,7 @@ struct WorkspaceDirectNavigation: Equatable {
         destination.query = nil; destination.fragment = nil
         switch route {
         case .dashboard: destination.path = "/vendor/dashboard"
+        case .rentals: destination.path = "/vendor/rentals"
         case .profile: destination.path = "/vendor/profile"
         case .calls(let query):
             destination.path = "/calls/history"
@@ -217,6 +221,95 @@ struct WorkspaceDashboard: Decodable {
               amounts.allSatisfy({ $0.isFinite }), counts.allSatisfy({ $0 >= 0 }),
               revenue.monthlyGrowthPercent?.isFinite != false else { throw WorkspaceError.invalidResponse }
         return self
+    }
+}
+
+// Rentals use the same authenticated workspace contract as profile/dashboard.
+// Keep IDs from the server (never UUIDs generated while rendering).
+struct WorkspaceRentalsMap: Decodable {
+    let version: Int
+    let generatedAt: String
+    let scope: WorkspaceDashboard.Scope
+    let orders: [WorkspaceRental]
+    let count: Int
+    let totalRentalCount: Int
+    let unmappedCount: Int
+
+    func validated(for profile: WorkspaceProfile, origin: URL) throws -> Self {
+        guard scope.userId == profile.user.id, scope.vendorId == profile.user.vendor?.id else { throw WorkspaceError.scopeChanged }
+        guard WorkspaceRentalsPolicy.allowed(profile) else { throw WorkspaceError.forbidden }
+        guard version == 1, WorkspaceRentalsPolicy.date(generatedAt) != nil,
+              count == orders.count, unmappedCount >= 0, totalRentalCount >= count,
+              totalRentalCount - count == unmappedCount,
+              Set(orders.map(\.id)).count == count,
+              orders.allSatisfy({ $0.isValid(origin: origin) }) else { throw WorkspaceError.invalidResponse }
+        return self
+    }
+
+    func filtered(search: String, status: String?) -> [WorkspaceRental] {
+        let needle = search.trimmingCharacters(in: .whitespacesAndNewlines)
+        return orders.filter { order in
+            (status == nil || order.status == status) && (needle.isEmpty ||
+                [order.label, order.customerName, order.address, order.confirmationCode, order.dumpsterSize,
+                 order.dumpsterDescription, order.status].compactMap { $0 }.joined(separator: " ")
+                    .localizedStandardContains(needle))
+        }
+    }
+    var statuses: [String] { Set(orders.map(\.status)).sorted() }
+}
+
+struct WorkspaceRental: Decodable, Identifiable, Equatable {
+    let id: String
+    let label: String
+    let status: String
+    var source: String? = nil
+    var address: String? = nil
+    var customerName: String? = nil
+    var confirmationCode: String? = nil
+    var totalPrice: Price? = nil
+    var dumpsterSize: String? = nil
+    var dumpsterDescription: String? = nil
+    let href: String
+    var deliveryDate: String? = nil
+    var pickupDate: String? = nil
+    let lat: Double
+    let lng: Double
+
+    enum Price: Decodable, Equatable {
+        case text(String), number(Double)
+        init(from decoder: Decoder) throws {
+            let value = try decoder.singleValueContainer()
+            if let text = try? value.decode(String.self) { self = .text(text) }
+            else { self = .number(try value.decode(Double.self)) }
+        }
+    }
+    func isValid(origin: URL) -> Bool {
+        !id.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && !label.isEmpty && !status.isEmpty
+            && lat.isFinite && lng.isFinite && (-90...90).contains(lat) && (-180...180).contains(lng)
+            && WorkspaceRentalsPolicy.detailPath(href, origin: origin) != nil
+    }
+    var statusLabel: String { status.replacingOccurrences(of: "_", with: " ").replacingOccurrences(of: "-", with: " ").capitalized }
+}
+
+enum WorkspaceRentalsPolicy {
+    static func allowed(_ profile: WorkspaceProfile) -> Bool {
+        profile.user.id > 0 && (profile.user.vendor?.id ?? 0) > 0
+            && profile.user.roles.contains(where: { ["vendor", "manager", "admin"].contains($0) })
+            && (profile.user.vendorPermissions == nil || profile.user.vendorPermissions?["rentals"] == true)
+    }
+    static func date(_ raw: String) -> Date? {
+        let parser = ISO8601DateFormatter(); parser.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        return parser.date(from: raw) ?? ISO8601DateFormatter().date(from: raw)
+    }
+    static func detailPath(_ raw: String, origin: URL) -> String? {
+        guard let url = URL(string: raw, relativeTo: origin)?.absoluteURL,
+              WorkspacePolicy.sameOrigin(url, origin), let parts = URLComponents(url: url, resolvingAgainstBaseURL: false),
+              parts.query == nil, parts.fragment == nil else { return nil }
+        let prefix = "/vendor/rentals/"
+        guard parts.percentEncodedPath.hasPrefix(prefix) else { return nil }
+        let identifier = parts.percentEncodedPath.dropFirst(prefix.count)
+        guard !identifier.isEmpty, identifier.allSatisfy({ $0.isASCII && ($0.isLetter || $0.isNumber || $0 == "-" || $0 == "_") }) else { return nil }
+        return parts.percentEncodedPath
     }
 }
 

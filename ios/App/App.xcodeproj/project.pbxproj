@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		B70000011FED79650016851F /* NativeRentalsMapView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B70000021FED79650016851F /* NativeRentalsMapView.swift */; };
 		B60000011FED79650016851F /* NativeWorkspacePush.swift in Sources */ = {isa = PBXBuildFile; fileRef = B60000021FED79650016851F /* NativeWorkspacePush.swift */; };
 		B40000011FED79650016851F /* NativeDashboardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B40000021FED79650016851F /* NativeDashboardView.swift */; };
 		B50000011FED79650016851F /* NativeSystemAppearance.swift in Sources */ = {isa = PBXBuildFile; fileRef = B50000021FED79650016851F /* NativeSystemAppearance.swift */; };
@@ -39,6 +40,7 @@
 		AA0000011FED79650016851F /* NativeChatInput.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA0000021FED79650016851F /* NativeChatInput.swift */; };
 
 /* Begin PBXFileReference section */
+		B70000021FED79650016851F /* NativeRentalsMapView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NativeRentalsMapView.swift; sourceTree = "<group>"; };
 		B60000021FED79650016851F /* NativeWorkspacePush.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NativeWorkspacePush.swift; sourceTree = "<group>"; };
 		B40000021FED79650016851F /* NativeDashboardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NativeDashboardView.swift; sourceTree = "<group>"; };
 		B50000021FED79650016851F /* NativeSystemAppearance.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NativeSystemAppearance.swift; sourceTree = "<group>"; };
@@ -126,6 +128,7 @@
 				AF0000021FED79650016851F /* NativeWorkspaceModel.swift */,
 				B30000021FED79650016851F /* NativeCallTranscript.swift */,
 				B40000021FED79650016851F /* NativeDashboardView.swift */,
+				B70000021FED79650016851F /* NativeRentalsMapView.swift */,
 				B50000021FED79650016851F /* NativeSystemAppearance.swift */,
 				B10000021FED79650016851F /* NativeWorkspaceView.swift */,
 				B20000021FED79650016851F /* NativeWorkspaceHost.swift */,
@@ -314,6 +317,7 @@
 				AF0000011FED79650016851F /* NativeWorkspaceModel.swift in Sources */,
 				B30000011FED79650016851F /* NativeCallTranscript.swift in Sources */,
 				B40000011FED79650016851F /* NativeDashboardView.swift in Sources */,
+				B70000011FED79650016851F /* NativeRentalsMapView.swift in Sources */,
 				B50000011FED79650016851F /* NativeSystemAppearance.swift in Sources */,
 				B10000011FED79650016851F /* NativeWorkspaceView.swift in Sources */,
 				B20000011FED79650016851F /* NativeWorkspaceHost.swift in Sources */,

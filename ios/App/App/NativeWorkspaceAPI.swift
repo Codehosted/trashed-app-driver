@@ -8,6 +8,7 @@ protocol WorkspaceServing: AnyObject {
     var onSessionChange: (() -> Void)? { get set }
     func profile() async throws -> WorkspaceProfile
     func dashboard() async throws -> WorkspaceDashboard
+    func rentals(scope: String) async throws -> WorkspaceRentalsMap
     func save(_ edit: WorkspaceProfileEdit, scope: String) async throws -> WorkspaceProfile
     func calls(query: WorkspaceCallsQuery, page: Int, scope: String) async throws -> WorkspaceCallsPage
     func recording(_ call: WorkspaceCall, scope: String) async throws -> (Data, String)
@@ -20,6 +21,8 @@ protocol WorkspaceServing: AnyObject {
 @MainActor
 extension WorkspaceServing {
     func renewedSession() -> (any WorkspaceServing)? { nil }
+    // Existing clients/mocks fail explicitly until they implement the new endpoint.
+    func rentals(scope: String) async throws -> WorkspaceRentalsMap { throw WorkspaceError.invalidResponse }
 }
 
 // The identity check and outgoing header MUST use the same immutable snapshot.
@@ -158,6 +161,17 @@ final class WorkspaceAPI: NSObject, WKHTTPCookieStoreObserver, WorkspaceServing 
         try Task.checkCancellation()
         guard generation == requestGeneration, !invalidated else { throw CancellationError() }
         return try result.validated()
+    }
+
+    func rentals(scope: String) async throws -> WorkspaceRentalsMap {
+        let generation = requestGeneration
+        let before = try await validateScope(scope)
+        guard WorkspaceRentalsPolicy.allowed(before) else { throw WorkspaceError.forbidden }
+        let result: WorkspaceRentalsMap = try await json("/api/vendor/rentals/map")
+        let after = try await validateScope(scope)
+        try Task.checkCancellation()
+        guard generation == requestGeneration, !invalidated else { throw CancellationError() }
+        return try result.validated(for: after, origin: origin)
     }
 
     func calls(query: WorkspaceCallsQuery, page: Int, scope: String) async throws -> WorkspaceCallsPage {

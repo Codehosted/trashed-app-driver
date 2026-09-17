@@ -31,6 +31,7 @@ test('root-only dock consumes sibling layout space and leaves legacy modals unch
   assert.match(screen, /\.task\(id: model\.dashboard\?\.generatedAt\)/);
   assert.match(screen, /if isRoot && model\.profile == nil \{ await model\.loadProfile\(\) \}/);
   assert.match(screen, /case \.dashboard: path = \[\]/);
+  assert.match(screen, /case \.rentals: path = \[\.rentals\]/);
   assert.match(screen, /case \.profile: path = \[\.profile\]/);
   assert.match(screen, /case \.calls: path = \[\.calls\(WorkspaceCallsQuery\(\)\)\]/);
   assert.match(screen, /case \.web\(let destination\): openWeb\(destination\)/);
@@ -100,10 +101,13 @@ func ids(_ group: WorkspaceDockGroup, _ p: WorkspaceProfile?) -> [String] { Work
   check(ids(.account, profile(["admin", "vendor"])).contains("vendor-admin"), "admin retained only for admin")
   check(!ids(.account, full).contains("vendor-admin"), "vendor cannot see administration")
   check(WorkspaceDockNavigation.selectedGroup(.dashboard) == .manage, "dashboard selection")
+  check(WorkspaceDockNavigation.selectedGroup(.rentals) == .manage, "rentals selection")
   check(WorkspaceDockNavigation.selectedGroup(.profile) == .account, "profile selection")
   check(WorkspaceDockNavigation.selectedGroup(.calls(.init(search: "fixture"))) == .calls, "calls selection follows current route")
   let manage = WorkspaceDockNavigation.entries(in: .manage, profile: full)
   check(manage.first?.action == .dashboard, "dashboard is native, not web fallback")
+  check(manage.first(where: { $0.id == "vendor-rentals" })?.action == .rentals, "rentals is native, not web fallback")
+  check(!ids(.manage, limited).contains("vendor-rentals"), "denied rentals action absent")
   check(WorkspaceDockNavigation.entries(in: .account, profile: full).first?.action == .profile, "profile is native")
   check(WorkspaceDockNavigation.entries(in: .calls, profile: full).first?.action == .calls, "calls is native")
   for group in WorkspaceDockGroup.allCases {
@@ -117,6 +121,8 @@ func ids(_ group: WorkspaceDockGroup, _ p: WorkspaceProfile?) -> [String] { Work
   }
   check(!ids(.manage, limited).contains("vendor-inventory"), "stale inventory action removed after permission update")
   let screen = Screen(full)
+  screen.selectDockEntry(.manage, "vendor-rentals")
+  check(screen.path == [.rentals] && screen.web.isEmpty, "rentals dispatch never loads web")
   screen.selectDockEntry(.account, "vendor-profile")
   check(screen.path == [.profile] && screen.web.isEmpty, "profile dispatch never loads web")
   screen.selectDockEntry(.calls, "vendor-call-history")
@@ -127,6 +133,7 @@ func ids(_ group: WorkspaceDockGroup, _ p: WorkspaceProfile?) -> [String] { Work
   check(screen.web == ["/vendor/assistant"], "only explicit web action dispatches fallback")
   screen.web = []
   screen.model.profile = limited
+  screen.selectDockEntry(.manage, "vendor-rentals")
   screen.selectDockEntry(.manage, "vendor-inventory")
   screen.selectDockEntry(.calls, "vendor-call-history")
   check(screen.path.isEmpty && screen.web.isEmpty, "stale selected actions recheck current permissions")

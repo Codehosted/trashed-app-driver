@@ -104,6 +104,7 @@ final class NativeWorkspaceApi {
     }
     void cancel() { cancelled = true; synchronized (active) { for (HttpURLConnection c : active) c.disconnect(); active.clear(); } }
     NativeDashboard dashboard() throws Exception { return new NativeDashboard(json("GET", "/api/mobile/dashboard", null)); }
+    NativeRentalsMap rentalsMap() throws Exception { return new NativeRentalsMap(json("GET", "/api/vendor/rentals/map", null)); }
     Profile profile() throws Exception { return new Profile(json("GET", "/api/user/profile", null)); }
     Profile save(Profile previous, String name, String email, String phone) throws Exception {
         Profile verified = profile();
@@ -131,7 +132,7 @@ final class NativeWorkspaceApi {
         if (!expected.scope().equals(current.scope())) throw new Failure(401, "Your account or workspace changed. Reopen this screen.");
     }
     private JSONObject json(String method, String path, JSONObject body) throws Exception {
-        if (!(path.equals("/api/user/profile") || (method.equals("GET") && (path.equals("/api/mobile/dashboard") || path.startsWith("/api/ai-features/calls?"))))) throw new IOException("Unsupported API route");
+        if (!(path.equals("/api/user/profile") || (method.equals("GET") && (path.equals("/api/mobile/dashboard") || path.equals("/api/vendor/rentals/map") || path.startsWith("/api/ai-features/calls?"))))) throw new IOException("Unsupported API route");
         URL url = new URL(origin + path);
         if (!NativeWorkspaceHistory.isSameOriginURL(url.toString(), origin)) throw new IOException("Untrusted API origin");
         HttpURLConnection connection = connection(url, method, true);

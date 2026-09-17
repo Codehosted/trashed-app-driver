@@ -78,7 +78,7 @@ ${close.replace('private func closeNativeWorkspace', 'func closeNativeWorkspace'
 }
 func check(_ value: @autoclosure () -> Bool, _ label: String) { if !value() { fatalError(label) } }
 let origin = Config().origin
-for action in ["vendor-dashboard", "vendor-profile", "vendor-call-history"] {
+for action in ["vendor-dashboard", "vendor-rentals", "vendor-profile", "vendor-call-history"] {
  let host = Host(); let source = host.webView!.url
  check(host.consumeNativeWorkspaceAction(action, context:"session1"), "known action consumed")
  check(host.presentations == 1 && host.webView!.loads.isEmpty, "frame without web request")

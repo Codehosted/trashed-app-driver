@@ -115,6 +115,11 @@ final class WorkspaceModel: ObservableObject {
     let audio = WorkspaceAudio() // A single player owned above every collapsible row.
     @Published private(set) var profile: WorkspaceProfile?
     @Published private(set) var dashboard: WorkspaceDashboard?
+    @Published private(set) var rentals: WorkspaceRentalsMap?
+    @Published private(set) var rentalsLoading = false
+    @Published private(set) var rentalsError: String?
+    private var rentalsID = UUID()
+    private var rentalsActive = false
     @Published private(set) var loading = false
     @Published private(set) var saving = false
     @Published private(set) var error: String?
@@ -165,6 +170,7 @@ final class WorkspaceModel: ObservableObject {
 
     private func beginSessionRenewal(_ replacement: any WorkspaceServing, expected: WorkspaceDashboard.Scope) {
         // Never leave old private data/actions visible while accepting new credentials.
+        clearRentals()
         dashboard = nil; profile = nil; pagination.reset(); audio.stop()
         lifecycleID = UUID(); loadID = UUID(); let lifetime = lifecycleID
         loading = true; paging = false; saving = false; error = nil; renewingSession = true
@@ -183,6 +189,8 @@ final class WorkspaceModel: ObservableObject {
                 self.api = replacement; self.renewalAPI = nil; self.observeSession()
                 self.dashboard = verified
                 self.onSessionValidated?()
+                self.renewingSession = false
+                if self.rentalsActive { await self.loadRentals() }
             } catch {
                 guard self.lifecycleID == lifetime, !Task.isCancelled, !self.closed, !self.invalidated, !self.suspended else { return }
                 // Even a transient validation failure cannot publish candidate credentials.
@@ -198,6 +206,7 @@ final class WorkspaceModel: ObservableObject {
         closed = true; lifecycleID = UUID(); loadID = UUID(); audio.stop(); api.close()
         loading = false; paging = false; saving = false
         profile = nil; dashboard = nil; pagination.reset()
+        clearRentals(); rentalsActive = false
     }
 
     func suspend() {
@@ -205,6 +214,7 @@ final class WorkspaceModel: ObservableObject {
         sessionRenewal?.cancel(); sessionRenewal = nil; renewingSession = false
         renewalAPI?.cancelPending()
         suspended = true; lifecycleID = UUID(); saving = false
+        clearRentals()
         loadID = UUID(); audio.stop(); api.cancelPending()
         loading = false; paging = false
     }
@@ -222,12 +232,14 @@ final class WorkspaceModel: ObservableObject {
             // Reauthorize the dashboard with one server-owned snapshot on resume.
             suspended = false
             await loadDashboard()
+            if rentalsActive { await loadRentals() }
             return
         }
         do {
             let current = try await api.profile()
             guard lifecycleID == id, !Task.isCancelled, !closed, !invalidated else { return }
             try acceptProfile(current); suspended = false
+            if rentalsActive { await loadRentals() }
         } catch {
             guard lifecycleID == id, !Task.isCancelled, !closed, !invalidated else { return }
             invalidate(error)
@@ -240,6 +252,7 @@ final class WorkspaceModel: ObservableObject {
         sessionRenewal?.cancel(); sessionRenewal = nil; renewingSession = false
         renewalAPI?.close(); renewalAPI = nil
         lifecycleID = UUID(); invalidated = true; profile = nil; dashboard = nil; pagination.reset(); audio.stop()
+        clearRentals(); rentalsActive = false
         api.cancelPending()
         loadID = UUID(); loading = false; paging = false; saving = false
         error = failure.localizedDescription
@@ -303,6 +316,55 @@ final class WorkspaceModel: ObservableObject {
         } catch {
             guard !Task.isCancelled, lifecycleID == lifetime, loadID == id, !closed, !invalidated, !suspended else { return }
             self.error = error.localizedDescription; handle(error)
+        }
+    }
+
+    private func clearRentals() {
+        rentalsID = UUID(); rentals = nil; rentalsError = nil; rentalsLoading = false
+    }
+
+    func leaveRentals() {
+        rentalsActive = false
+        clearRentals()
+    }
+
+    func loadRentals() async {
+        guard !closed, !invalidated, !suspended, !renewingSession, renewalAPI == nil else { return }
+        rentalsActive = true
+        let lifetime = lifecycleID, id = UUID(); rentalsID = id
+        // Never show old customer/address data when a permission recheck is pending.
+        rentals = nil; rentalsLoading = true; rentalsError = nil
+        defer { if lifecycleID == lifetime, rentalsID == id { rentalsLoading = false } }
+        do {
+            let current = try await api.profile()
+            try Task.checkCancellation()
+            guard lifecycleID == lifetime, rentalsID == id, !closed, !invalidated, !suspended else { return }
+            try acceptProfile(current)
+            guard WorkspaceRentalsPolicy.allowed(current) else { throw WorkspaceError.forbidden }
+            let result = try await api.rentals(scope: current.scope(origin: api.origin))
+            try Task.checkCancellation()
+            guard lifecycleID == lifetime, rentalsID == id, !closed, !invalidated, !suspended else { return }
+            rentals = try result.validated(for: current, origin: api.origin)
+        } catch {
+            guard lifecycleID == lifetime, rentalsID == id, !Task.isCancelled, !closed, !invalidated, !suspended else { return }
+            rentalsError = error.localizedDescription; handle(error)
+        }
+    }
+
+    func openRentalsWeb(_ path: String, open: (String) -> Void) async {
+        guard rentalsActive, !closed, !invalidated, !suspended, !renewingSession, renewalAPI == nil,
+              path == "/vendor/rentals" || WorkspaceRentalsPolicy.detailPath(path, origin: api.origin) == path else { return }
+        let lifetime = lifecycleID, id = rentalsID
+        do {
+            let current = try await api.profile()
+            try Task.checkCancellation()
+            guard lifecycleID == lifetime, rentalsID == id, rentalsActive, !closed, !invalidated, !suspended else { return }
+            try acceptProfile(current)
+            guard WorkspaceRentalsPolicy.allowed(current) else { throw WorkspaceError.forbidden }
+            open(path) // Only this deliberate action can navigate the retained web document.
+        } catch {
+            guard lifecycleID == lifetime, rentalsID == id, !Task.isCancelled, !closed, !invalidated else { return }
+            rentalsError = error.localizedDescription; handle(error)
         }
     }
 

@@ -25,7 +25,7 @@ enum WorkspaceDockGroup: String, CaseIterable, Identifiable {
 }
 
 enum WorkspaceDockAction: Equatable {
-    case dashboard, profile, calls, enableNotifications
+    case dashboard, rentals, profile, calls, enableNotifications
     case web(String)
 }
 
@@ -39,7 +39,7 @@ struct WorkspaceDockEntry: Identifiable {
 enum WorkspaceDockNavigation {
     static func selectedGroup(_ route: WorkspaceRoute) -> WorkspaceDockGroup {
         switch route {
-        case .dashboard: return .manage
+        case .dashboard, .rentals: return .manage
         case .profile: return .account
         case .calls: return .calls
         }
@@ -66,7 +66,7 @@ enum WorkspaceDockNavigation {
                 entries.append(web("vendor-inventory", "Inventory", "shippingbox", "/vendor/inventory"))
                 entries.append(web("vendor-pods", "Pods", "cube.box", "/vendor/pods"))
             }
-            if allowed("rentals") { entries.append(web("vendor-rentals", "Rentals", "truck.box", "/vendor/rentals")) }
+            if WorkspaceRentalsPolicy.allowed(profile) { entries.append(.init(id: "vendor-rentals", title: "Rentals", symbol: "map", action: .rentals)) }
             if allowed("customers") { entries.append(web("vendor-customers", "Customers", "person.2", "/vendor/customers")) }
             if allowed("driver") {
                 // Product entitlements are still rechecked by these web destinations.
@@ -118,6 +118,8 @@ struct WorkspaceScreen: View {
                 switch route {
                 case .dashboard:
                     WorkspaceDashboardView(model: model)
+                case .rentals:
+                    WorkspaceRentalsMapView(model: model, openWeb: openWeb)
                 case .profile:
                     WorkspaceProfileView(model: model, openWeb: openWeb)
                 case .calls(let query):
@@ -126,6 +128,7 @@ struct WorkspaceScreen: View {
             }
             .navigationDestination(for: WorkspaceRoute.self) { destination in
                 switch destination {
+                case .rentals: WorkspaceRentalsMapView(model: model, openWeb: openWeb)
                 case .profile: WorkspaceProfileView(model: model, openWeb: openWeb)
                 case .calls(let query): WorkspaceCallsView(model: model, initialQuery: query)
                 case .dashboard: WorkspaceDashboardView(model: model)
@@ -147,6 +150,9 @@ struct WorkspaceScreen: View {
                             } else {
                                 if dockEntry(.manage, "vendor-dashboard") != nil {
                                     Button("Dashboard") { guard dockEntry(.manage, "vendor-dashboard") != nil else { return }; path = [] }
+                                }
+                                if dockEntry(.manage, "vendor-rentals") != nil {
+                                    Button("Rentals") { selectDockEntry(.manage, "vendor-rentals") }
                                 }
                                 if dockEntry(.account, "vendor-profile") != nil {
                                     Button("Profile") { guard dockEntry(.account, "vendor-profile") != nil else { return }; path = [.profile] }
@@ -222,6 +228,7 @@ struct WorkspaceScreen: View {
         guard let entry = dockEntry(group, id) else { return }
         switch entry.action {
         case .dashboard: path = []
+        case .rentals: path = [.rentals]
         case .profile: path = [.profile]
         case .calls: path = [.calls(WorkspaceCallsQuery())]
         case .enableNotifications: model.onEnableNotifications?()

@@ -36,20 +36,23 @@ final class NativeBottomNavigation {
     private BottomSheetDialog sheet;
     private Listener listener;
     private boolean keyboardVisible;
-    private boolean nativeDashboardVisible;
+    private String nativeDestinationId = "";
     private String pendingId;
 
     // Presentation only: keep the web's offered actions/revision as the authority.
     void dashboard(boolean visible) {
-        if (nativeDashboardVisible == visible) return;
-        nativeDashboardVisible = visible;
+        destination(visible ? "vendor-dashboard" : "");
+    }
+    void destination(String id) {
+        if (nativeDestinationId.equals(id)) return;
+        nativeDestinationId = id;
         updateSelection();
     }
     private boolean selected(NativeNavigationState.Tab tab) {
-        if (!nativeDashboardVisible) return tab.selected;
-        if (tab.items.isEmpty()) return "vendor-dashboard".equals(tab.id);
+        if (nativeDestinationId.isEmpty()) return tab.selected;
+        if (tab.items.isEmpty()) return nativeDestinationId.equals(tab.id);
         for (NativeNavigationState.Item item : tab.items)
-            if ("vendor-dashboard".equals(item.id)) return true;
+            if (nativeDestinationId.equals(item.id)) return true;
         return false;
     }
     private void updateSelection() {
@@ -183,7 +186,7 @@ final class NativeBottomNavigation {
         column.addView(scroll, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1));
         for (NativeNavigationState.Item item : tab.items) {
             Button button = row(dialog.getContext(), item.label + (item.detail == null || item.detail.isEmpty() ? "" : "\n" + item.detail), NativeSystemAppearance.dark(host), item.destructive);
-            boolean selected = nativeDashboardVisible ? "vendor-dashboard".equals(item.id) : item.selected;
+            boolean selected = nativeDestinationId.isEmpty() ? item.selected : nativeDestinationId.equals(item.id);
             button.setSelected(selected);
             if (selected && !item.destructive) {
                 button.setTextColor(NativeSystemAppearance.dark(host) ? Color.rgb(190, 159, 255) : Color.rgb(112, 51, 255));

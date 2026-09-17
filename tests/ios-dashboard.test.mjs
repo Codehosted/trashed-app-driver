@@ -9,7 +9,12 @@ test('dashboard uses one authorized API snapshot and rejects malformed/cross-acc
  const api=read('NativeWorkspaceAPI.swift'),model=read('NativeWorkspaceModel.swift');
  const protocol=api.slice(api.indexOf('@available'),api.indexOf('// Refuse ALL redirects.'));
  const impl=model.slice(model.indexOf('@available',model.indexOf('final class WorkspaceAudio')));
- const endpoint=api.slice(api.indexOf('    func dashboard() async throws -> WorkspaceDashboard {'),api.indexOf('    func calls(query:',api.indexOf('    func dashboard() async throws -> WorkspaceDashboard {')));
+ // Stop at the method boundary, not the calls endpoint: Rentals now sits between them.
+ const dashboardStart=api.indexOf('    func dashboard() async throws -> WorkspaceDashboard {');
+ assert.ok(dashboardStart>=0);
+ const dashboardEnd=api.indexOf('\n    }',dashboardStart);
+ assert.ok(dashboardEnd>dashboardStart);
+ const endpoint=api.slice(dashboardStart,dashboardEnd);
  assert.equal((endpoint.match(/try await json/g)||[]).length,1);assert.doesNotMatch(endpoint,/validateScope|await profile/);
  const harness=`import Foundation\nimport SwiftUI\n${protocol}\n@MainActor final class WorkspaceAudio {func stop(){}}\n${impl}
  @MainActor final class API: WorkspaceServing {

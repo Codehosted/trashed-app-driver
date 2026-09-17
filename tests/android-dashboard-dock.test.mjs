@@ -19,13 +19,14 @@ test('footer gets scrollable breathing room without duplicating dock or system i
   assert.match(activity, /Math\.max\(insets\.bottom, ime\.bottom\)/);
   assert.match(dock, /ViewCompat\.setOnApplyWindowInsetsListener\(bar, \(view, insets\) -> insets\)/);
 });
-test('native dashboard projects selection and restores underlying web selection on close', () => {
-  assert.match(activity, /nativeNavigation\.dashboard\("dashboard"\.equals\(destination\)\)/);
+test('native dashboard and rentals project selection and restore underlying web selection on close', () => {
+  assert.match(activity, /nativeNavigation\.destination\("rentals"\.equals\(destination\) \? "vendor-rentals" : "dashboard"\.equals\(destination\) \? "vendor-dashboard" : ""\)/);
   assert.match(activity, /private void closeNativeWorkspace\(\) \{\s*if \(nativeNavigation != null\) nativeNavigation\.dashboard\(false\)/);
-  assert.match(dock, /if \(!nativeDashboardVisible\) return tab\.selected/);
-  assert.match(dock, /if \(tab\.items\.isEmpty\(\)\) return "vendor-dashboard"\.equals\(tab\.id\)/);
-  assert.match(dock, /for \(NativeNavigationState\.Item item : tab\.items\)\s*if \("vendor-dashboard"\.equals\(item\.id\)\) return true/);
-  assert.match(dock, /boolean selected = nativeDashboardVisible \? "vendor-dashboard"\.equals\(item\.id\) : item\.selected/);
+  assert.match(dock, /destination\(visible \? "vendor-dashboard" : ""\)/);
+  assert.match(dock, /if \(nativeDestinationId\.isEmpty\(\)\) return tab\.selected/);
+  assert.match(dock, /if \(tab\.items\.isEmpty\(\)\) return nativeDestinationId\.equals\(tab\.id\)/);
+  assert.match(dock, /for \(NativeNavigationState\.Item item : tab\.items\)\s*if \(nativeDestinationId\.equals\(item\.id\)\) return true/);
+  assert.match(dock, /boolean selected = nativeDestinationId\.isEmpty\(\) \? item\.selected : nativeDestinationId\.equals\(item\.id\)/);
 });
 test('dock continues to enforce visibility, keyboard and offered-action guards', () => {
   assert.match(dock, /state != null && state\.visible && !state\.tabs\.isEmpty\(\) && !keyboardVisible && readiness\.allowed\(\)/);

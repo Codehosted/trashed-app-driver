@@ -448,7 +448,7 @@ public class MainActivity extends BridgeActivity {
             public void invalidated() { dismissDirectWorkspace(); }
         }, chatOrigin(), url, destination, dark);
         chatContainer.addView(nativeWorkspace, fullFrameParams());
-        nativeNavigation.dashboard("dashboard".equals(destination));
+        nativeNavigation.destination("rentals".equals(destination) ? "vendor-rentals" : "dashboard".equals(destination) ? "vendor-dashboard" : "");
         getBridge().getWebView().setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_NO_HIDE_DESCENDANTS);
     }
     void clearNativeNavigation(String context) {
