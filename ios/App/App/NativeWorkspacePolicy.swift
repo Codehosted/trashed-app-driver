@@ -2,7 +2,7 @@ import Foundation
 
 // Foundation-only contracts shared by the native screens and executable policy tests.
 // No DOM state, HTML, persistent response cache, or web-renderer dependency.
-enum WorkspaceRoute: Equatable {
+enum WorkspaceRoute: Hashable {
     case dashboard
     case profile
     case calls(WorkspaceCallsQuery)
@@ -10,7 +10,7 @@ enum WorkspaceRoute: Equatable {
     static func parse(_ url: URL, origin: URL) -> WorkspaceRoute? {
         guard WorkspacePolicy.sameOrigin(url, origin), let c = URLComponents(url: url, resolvingAgainstBaseURL: false) else { return nil }
         switch c.percentEncodedPath {
-        case "/vendor/dashboard": return .dashboard
+        case "/vendor/dashboard", "/vendor/dashboard/": return .dashboard
         case "/vendor/profile":
             // These existing account actions remain web-owned in this slice.
             // Never intercept their links and strand the user on the overview.
@@ -23,6 +23,41 @@ enum WorkspaceRoute: Equatable {
             return .calls(WorkspaceCallsQuery(search: value("search", ""), filter: value("filter", "all"), sort: value("sort", "timestamp-desc")))
         default: return nil
         }
+    }
+}
+
+// Native home selection uses authenticated profile data, never WebView/JS claims.
+enum WorkspaceHomeRouting {
+    static func dashboardEligible(_ profile: WorkspaceProfile) -> Bool {
+        profile.user.id > 0 && (profile.user.vendor?.id ?? 0) > 0
+            && profile.user.roles.contains(where: { ["admin", "vendor", "manager"].contains($0) })
+            && (profile.user.vendorPermissions == nil || profile.user.vendorPermissions?["dashboard"] == true)
+    }
+
+    static func isHomeTarget(_ url: URL, origin: URL) -> Bool {
+        guard WorkspacePolicy.sameOrigin(url, origin),
+              let c = URLComponents(url: url, resolvingAgainstBaseURL: false) else { return false }
+        // Query/hash never supply a destination. Only these exact paths are consumed.
+        return ["/app", "/app/", "/vendor/dashboard", "/vendor/dashboard/"].contains(c.percentEncodedPath)
+    }
+
+    static func fallbackPath(_ profile: WorkspaceProfile) -> String {
+        let roles = profile.user.roles
+        if roles.contains("admin") { return "/admin" }
+        if roles.contains("vendor") || roles.contains("manager") {
+            for feature in ["rentals", "customers", "inventory", "driver", "profile"] {
+                if profile.user.vendorPermissions == nil || profile.user.vendorPermissions?[feature] == true {
+                    return "/vendor/" + feature
+                }
+            }
+            return "/vendor/assistant"
+        }
+        if roles.contains("driver") {
+            if profile.user.vendorPermissions == nil || profile.user.vendorPermissions?["driver"] == true { return "/driver" }
+            if profile.user.vendorPermissions?["profile"] == true { return "/vendor/profile" }
+            return "/vendor"
+        }
+        return roles.contains("customer") ? "/" : "/vendor/assistant"
     }
 }
 

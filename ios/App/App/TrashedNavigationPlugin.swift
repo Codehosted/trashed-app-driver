@@ -222,8 +222,10 @@ public class TrashedNavigationPlugin: CAPPlugin, CAPBridgedPlugin, UITabBarDeleg
     }
 
     override public func shouldOverrideLoad(_ navigationAction: WKNavigationAction) -> NSNumber? {
+        if let url = navigationAction.request.url,
+           host?.interceptWorkspaceHome(url) == true { return true }
         if navigationAction.targetFrame?.isMainFrame == true { reset() }
-        return nil // Keep every existing Capacitor navigation/dialer decision.
+        return nil // Other Capacitor navigation/dialer decisions are unchanged.
     }
 
     func refresh() {

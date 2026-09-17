@@ -13,6 +13,13 @@ protocol WorkspaceServing: AnyObject {
     func recording(_ call: WorkspaceCall, scope: String) async throws -> (Data, String)
     func cancelPending()
     func close()
+    func renewedSession() -> (any WorkspaceServing)?
+}
+
+@available(iOS 16.0, *)
+@MainActor
+extension WorkspaceServing {
+    func renewedSession() -> (any WorkspaceServing)? { nil }
 }
 
 // The identity check and outgoing header MUST use the same immutable snapshot.
@@ -26,6 +33,19 @@ struct WorkspaceCookieSnapshot {
             let host = origin.host?.lowercased()
             return host == domain || (cookie.domain.hasPrefix(".") && host?.hasSuffix("." + domain) == true)
         }.map { "\($0.domain)|\($0.name)|\($0.path)|\($0.value)" }.sorted().joined(separator: "\n")
+    }
+    var hasSession: Bool {
+        WorkspacePolicy.cookies(cookies, for: origin).contains {
+            $0.name.contains("session-token") && WorkspacePolicy.isIdentityCookie($0.name) && !$0.value.isEmpty
+        }
+    }
+    var selectorFingerprint: String {
+        cookies.filter { WorkspacePolicy.isIdentityCookie($0.name) && !$0.name.contains("session-token") }
+            .map { "\($0.domain)|\($0.name)|\($0.path)|\($0.value)" }.sorted().joined(separator: "\n")
+    }
+    func mayBeRenewal(of previous: Self) -> Bool {
+        // This only permits a server recheck; it never authorizes the new token.
+        hasSession && previous.hasSession && selectorFingerprint == previous.selectorFingerprint
     }
     func headers(for url: URL, previous: String?) throws -> [String: String] {
         if let previous = previous, fingerprint != previous { throw WorkspaceError.scopeChanged }
@@ -48,9 +68,11 @@ final class WorkspaceAPI: NSObject, WKHTTPCookieStoreObserver, WorkspaceServing 
     private let cookieStore: WKHTTPCookieStore
     private var session: URLSession
     private var fingerprint: String?
+    private var acceptedCookies: WorkspaceCookieSnapshot?
+    private var renewalCookies: WorkspaceCookieSnapshot?
     private var requestGeneration = UUID()
     private var invalidated = false
-    private var installingResponseCookies = false
+
     var onSessionChange: (() -> Void)?
 
     init(origin: URL, cookieStore: WKHTTPCookieStore) {
@@ -83,45 +105,38 @@ final class WorkspaceAPI: NSObject, WKHTTPCookieStoreObserver, WorkspaceServing 
         cookieStore.remove(self)
         session.invalidateAndCancel()
         fingerprint = nil
+        acceptedCookies = nil; renewalCookies = nil
         onSessionChange = nil
     }
 
     func cookiesDidChange(in cookieStore: WKHTTPCookieStore) {
         Task { [weak self] in
-            guard let self = self, !self.invalidated, !self.installingResponseCookies, let previous = self.fingerprint else { return }
-            let current = await self.cookieFingerprint()
-            if current != previous { self.invalidated = true; self.onSessionChange?() }
+            guard let self = self, !self.invalidated else { return }
+            let current = WorkspaceCookieSnapshot(cookies: await self.allCookies(), origin: self.origin)
+            guard !self.invalidated, let previous = self.fingerprint else { return }
+            if current.fingerprint != previous { self.retireForCookieChange(current) }
         }
+    }
+
+    private func retireForCookieChange(_ current: WorkspaceCookieSnapshot) {
+        guard !invalidated else { return }
+        renewalCookies = acceptedCookies.flatMap { current.mayBeRenewal(of: $0) ? current : nil }
+        invalidated = true
+        session.invalidateAndCancel()
+        onSessionChange?()
+    }
+
+    func renewedSession() -> (any WorkspaceServing)? {
+        guard invalidated, let candidate = renewalCookies else { return nil }
+        renewalCookies = nil // One bounded recheck per retired transport.
+        let replacement = WorkspaceAPI(origin: origin, cookieStore: cookieStore)
+        replacement.fingerprint = candidate.fingerprint
+        replacement.acceptedCookies = candidate
+        return replacement
     }
 
     private func allCookies() async -> [HTTPCookie] {
         await withCheckedContinuation { continuation in cookieStore.getAllCookies { continuation.resume(returning: $0) } }
-    }
-
-    private func cookieFingerprint() async -> String {
-        WorkspaceCookieSnapshot(cookies: await allCookies(), origin: origin).fingerprint
-    }
-
-    private func installResponseCookies(_ response: HTTPURLResponse, url: URL) async {
-        let fields = response.allHeaderFields.reduce(into: [String: String]()) { result, pair in
-            if let key = pair.key as? String, let value = pair.value as? String { result[key] = value }
-        }
-        let issued = HTTPCookie.cookies(withResponseHeaderFields: fields, for: url)
-        installingResponseCookies = true
-        defer { installingResponseCookies = false }
-        for cookie in issued {
-            // Only accept cookies scoped to this trusted response's exact host/domain.
-            let domain = cookie.domain.lowercased()
-            let bare = domain.hasPrefix(".") ? String(domain.dropFirst()) : domain
-            guard url.host?.lowercased() == bare else { continue }
-            await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
-                if let expiry = cookie.expiresDate, expiry <= Date() {
-                    cookieStore.delete(cookie) { continuation.resume() }
-                } else {
-                    cookieStore.setCookie(cookie) { continuation.resume() }
-                }
-            }
-        }
     }
 
     func profile() async throws -> WorkspaceProfile {
@@ -194,9 +209,14 @@ final class WorkspaceAPI: NSObject, WKHTTPCookieStoreObserver, WorkspaceServing 
         try Task.checkCancellation()
         guard generation == requestGeneration else { throw CancellationError() }
         guard !invalidated else { throw WorkspaceError.scopeChanged }
+        if let previous = fingerprint, snapshot.fingerprint != previous {
+            retireForCookieChange(snapshot)
+            throw WorkspaceError.scopeChanged
+        }
         let headers = try snapshot.headers(for: url, previous: fingerprint)
         let current = snapshot.fingerprint
         fingerprint = current
+        acceptedCookies = snapshot
         var request = URLRequest(url: url, cachePolicy: .reloadIgnoringLocalCacheData)
         request.httpMethod = method
         request.httpBody = body
@@ -211,11 +231,14 @@ final class WorkspaceAPI: NSObject, WKHTTPCookieStoreObserver, WorkspaceServing 
         }
         for (name, value) in headers { request.setValue(value, forHTTPHeaderField: name) }
         let (bytes, response) = try await session.bytes(for: request)
+        try Task.checkCancellation()
         guard let response = response as? HTTPURLResponse, response.url == url else { throw WorkspaceError.invalidResponse }
         guard generation == requestGeneration, !invalidated else { throw CancellationError() }
-        // Preserve server-issued cookie attributes/expiry, including revocations.
-        // Rotations or scope changes fail closed and require a newly validated screen.
-        await installResponseCookies(response, url: url)
+        // Data transport never writes WebKit credentials, including on PATCH/errors.
+        // WKHTTPCookieStore has no compare-and-set: a stale response could overwrite
+        // a newer login even with a fingerprint check before an asynchronous write.
+        // Auth/login owns cookie installation; server revocation remains authoritative
+        // through 401/403 and save's explicit reauthenticationRequired response.
         if response.statusCode == 401 { throw WorkspaceError.expired }
         if response.statusCode == 403 { throw WorkspaceError.forbidden }
         guard !(300..<400).contains(response.statusCode) else { throw WorkspaceError.unsafeURL }
@@ -226,9 +249,14 @@ final class WorkspaceAPI: NSObject, WKHTTPCookieStoreObserver, WorkspaceServing 
             data.append(byte)
         }
         try Task.checkCancellation()
-        let finalFingerprint = await cookieFingerprint()
+        let finalSnapshot = WorkspaceCookieSnapshot(cookies: await allCookies(), origin: origin)
+        try Task.checkCancellation()
         guard generation == requestGeneration else { throw CancellationError() }
-        guard !invalidated, finalFingerprint == current else { throw WorkspaceError.scopeChanged }
+        guard !invalidated else { throw WorkspaceError.scopeChanged }
+        if finalSnapshot.fingerprint != current {
+            retireForCookieChange(finalSnapshot)
+            throw WorkspaceError.scopeChanged
+        }
         guard (200..<300).contains(response.statusCode) else {
             // Validation messages only; never surface server traces, response HTML, or credential details.
             if response.statusCode == 400, let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any],

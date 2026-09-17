@@ -36,7 +36,28 @@ final class NativeBottomNavigation {
     private BottomSheetDialog sheet;
     private Listener listener;
     private boolean keyboardVisible;
+    private boolean nativeDashboardVisible;
     private String pendingId;
+
+    // Presentation only: keep the web's offered actions/revision as the authority.
+    void dashboard(boolean visible) {
+        if (nativeDashboardVisible == visible) return;
+        nativeDashboardVisible = visible;
+        updateSelection();
+    }
+    private boolean selected(NativeNavigationState.Tab tab) {
+        if (!nativeDashboardVisible) return tab.selected;
+        if (tab.items.isEmpty()) return "vendor-dashboard".equals(tab.id);
+        for (NativeNavigationState.Item item : tab.items)
+            if ("vendor-dashboard".equals(item.id)) return true;
+        return false;
+    }
+    private void updateSelection() {
+        NativeNavigationState state = store.current();
+        if (bar == null || state == null) return;
+        for (int index = 0; index < state.tabs.size(); index++)
+            bar.getMenu().getItem(index).setChecked(selected(state.tabs.get(index)));
+    }
 
     NativeBottomNavigation(androidx.appcompat.app.AppCompatActivity host, View webView, Readiness readiness) {
         this.host = host; this.readiness = readiness;
@@ -127,7 +148,7 @@ final class NativeBottomNavigation {
         // Web state owns selection, including no selection. Disable exclusive setters
         // before applying flags: MenuItemImpl otherwise treats setChecked(false) as selection.
         bar.getMenu().setGroupCheckable(0, true, false);
-        for (int index = 0; index < state.tabs.size(); index++) bar.getMenu().getItem(index).setChecked(state.tabs.get(index).selected);
+        updateSelection();
         String context = state.context; long generation = store.generation();
         BottomNavigationView renderedBar = bar;
         bar.setOnItemSelectedListener(item -> {
@@ -162,12 +183,13 @@ final class NativeBottomNavigation {
         column.addView(scroll, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1));
         for (NativeNavigationState.Item item : tab.items) {
             Button button = row(dialog.getContext(), item.label + (item.detail == null || item.detail.isEmpty() ? "" : "\n" + item.detail), NativeSystemAppearance.dark(host), item.destructive);
-            button.setSelected(item.selected);
-            if (item.selected && !item.destructive) {
+            boolean selected = nativeDashboardVisible ? "vendor-dashboard".equals(item.id) : item.selected;
+            button.setSelected(selected);
+            if (selected && !item.destructive) {
                 button.setTextColor(NativeSystemAppearance.dark(host) ? Color.rgb(190, 159, 255) : Color.rgb(112, 51, 255));
                 button.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
             }
-            button.setContentDescription(item.label + (item.detail == null ? "" : ", " + item.detail) + (item.selected ? ", selected" : ""));
+            button.setContentDescription(item.label + (item.detail == null ? "" : ", " + item.detail) + (selected ? ", selected" : ""));
             Drawable drawable = host.getDrawable(icon(item.icon));
             if (drawable != null) {
                 drawable = DrawableCompat.wrap(drawable.mutate()); DrawableCompat.setTint(drawable, button.getCurrentTextColor());
