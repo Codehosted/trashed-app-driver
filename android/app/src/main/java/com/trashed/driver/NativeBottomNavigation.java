@@ -54,6 +54,12 @@ final class NativeBottomNavigation {
         closeSheet(false);
         render();
     }
+    NativeNavigationState currentState() { return store.current(); }
+    boolean accepts(NativeNavigationState.Selection selection) {
+        NativeNavigationState current = store.current();
+        return current != null && current.context.equals(selection.context)
+            && current.revision == selection.revision && current.offers(selection.id);
+    }
     void clear(String context) {
         NativeNavigationState state = store.current();
         if (state == null || !state.context.equals(context)) return;
@@ -78,19 +84,33 @@ final class NativeBottomNavigation {
         NativeNavigationState state = store.current();
         return state != null && state.visible && !state.tabs.isEmpty() && !keyboardVisible && readiness.allowed();
     }
+    void appearanceChanged() {
+        boolean night=NativeSystemAppearance.dark(host);
+        if(bar!=null){
+            int purple=night?0xffbe9fff:0xff7033ff;
+            bar.setBackgroundColor(surface(night));
+            ColorStateList tint=new ColorStateList(new int[][]{{android.R.attr.state_checked},{}},new int[]{purple,foreground(night)});
+            bar.setItemIconTintList(tint);bar.setItemTextColor(tint);
+            for(int i=0;i<bar.getMenu().size();i++){
+                com.google.android.material.badge.BadgeDrawable badge=bar.getBadge(bar.getMenu().getItem(i).getItemId());
+                if(badge!=null){badge.setBackgroundColor(purple);badge.setBadgeTextColor(night?Color.BLACK:Color.WHITE);}
+            }
+        }
+        if(sheet!=null)NativeSystemAppearance.dialog(sheet);
+    }
     private void render() {
         if (bar != null) container.removeView(bar);
         bar = null;
         NativeNavigationState state = store.current();
         if (state == null || !state.visible || state.tabs.isEmpty()) return;
-        Context themed = new ContextThemeWrapper(host, state.dark ? R.style.TrashedNavigationDark : R.style.TrashedNavigationLight);
+        Context themed = new ContextThemeWrapper(host, NativeSystemAppearance.dark(host) ? R.style.TrashedNavigationDark : R.style.TrashedNavigationLight);
         bar = new BottomNavigationView(themed);
         bar.setTag("native-bottom-navigation");
-        bar.setElevation(0); bar.setBackgroundColor(surface(state.dark));
+        bar.setElevation(0); bar.setBackgroundColor(surface(NativeSystemAppearance.dark(host)));
         bar.setLabelVisibilityMode(NavigationBarView.LABEL_VISIBILITY_LABELED);
         bar.setItemHorizontalTranslationEnabled(false); bar.setItemActiveIndicatorEnabled(false);
-        int purple = state.dark ? Color.rgb(190, 159, 255) : Color.rgb(112, 51, 255);
-        ColorStateList tint = new ColorStateList(new int[][]{{android.R.attr.state_checked}, {}}, new int[]{purple, foreground(state.dark)});
+        int purple = NativeSystemAppearance.dark(host) ? Color.rgb(190, 159, 255) : Color.rgb(112, 51, 255);
+        ColorStateList tint = new ColorStateList(new int[][]{{android.R.attr.state_checked}, {}}, new int[]{purple, foreground(NativeSystemAppearance.dark(host))});
         bar.setItemIconTintList(tint); bar.setItemTextColor(tint);
         // The Activity applies system/IME insets once to its content, not again to this bar.
         ViewCompat.setOnApplyWindowInsetsListener(bar, (view, insets) -> insets);
@@ -101,7 +121,7 @@ final class NativeBottomNavigation {
             if (tab.badge > 0) {
                 bar.getOrCreateBadge(index + 1).setNumber(tab.badge);
                 bar.getOrCreateBadge(index + 1).setBackgroundColor(purple);
-                bar.getOrCreateBadge(index + 1).setBadgeTextColor(state.dark ? Color.BLACK : Color.WHITE);
+                bar.getOrCreateBadge(index + 1).setBadgeTextColor(NativeSystemAppearance.dark(host) ? Color.BLACK : Color.WHITE);
             }
         }
         // Web state owns selection, including no selection. Disable exclusive setters
@@ -123,16 +143,16 @@ final class NativeBottomNavigation {
     }
     private void openSheet(NativeNavigationState.Tab tab, NativeNavigationState state, long generation) {
         closeSheet(true);
-        BottomSheetDialog dialog = new BottomSheetDialog(host, state.dark ? R.style.TrashedNavigationSheetDark : R.style.TrashedNavigationSheetLight);
+        BottomSheetDialog dialog = new BottomSheetDialog(host, NativeSystemAppearance.dark(host) ? R.style.TrashedNavigationSheetDark : R.style.TrashedNavigationSheetLight);
         sheet = dialog;
         LinearLayout column = new LinearLayout(dialog.getContext()); column.setOrientation(LinearLayout.VERTICAL);
-        column.setBackgroundColor(surface(state.dark)); column.setPadding(dp(16), dp(8), dp(16), dp(8));
+        column.setBackgroundColor(surface(NativeSystemAppearance.dark(host))); column.setPadding(dp(16), dp(8), dp(16), dp(8));
         LinearLayout header = new LinearLayout(dialog.getContext()); header.setGravity(Gravity.CENTER_VERTICAL);
         TextView title = new TextView(dialog.getContext()); title.setText(tab.label); title.setTextSize(20);
-        title.setTypeface(Typeface.DEFAULT, Typeface.BOLD); title.setTextColor(foreground(state.dark));
+        title.setTypeface(Typeface.DEFAULT, Typeface.BOLD); title.setTextColor(foreground(NativeSystemAppearance.dark(host)));
         ViewCompat.setAccessibilityHeading(title, true);
         header.addView(title, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1));
-        Button close = row(dialog.getContext(), "Close", state.dark, false);
+        Button close = row(dialog.getContext(), "Close", NativeSystemAppearance.dark(host), false);
         close.setContentDescription("Close " + tab.label); close.setOnClickListener(view -> closeSheet(true));
         header.addView(close, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, dp(48)));
         column.addView(header);
@@ -141,10 +161,10 @@ final class NativeBottomNavigation {
         scroll.addView(rows);
         column.addView(scroll, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1));
         for (NativeNavigationState.Item item : tab.items) {
-            Button button = row(dialog.getContext(), item.label + (item.detail == null || item.detail.isEmpty() ? "" : "\n" + item.detail), state.dark, item.destructive);
+            Button button = row(dialog.getContext(), item.label + (item.detail == null || item.detail.isEmpty() ? "" : "\n" + item.detail), NativeSystemAppearance.dark(host), item.destructive);
             button.setSelected(item.selected);
             if (item.selected && !item.destructive) {
-                button.setTextColor(state.dark ? Color.rgb(190, 159, 255) : Color.rgb(112, 51, 255));
+                button.setTextColor(NativeSystemAppearance.dark(host) ? Color.rgb(190, 159, 255) : Color.rgb(112, 51, 255));
                 button.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
             }
             button.setContentDescription(item.label + (item.detail == null ? "" : ", " + item.detail) + (item.selected ? ", selected" : ""));

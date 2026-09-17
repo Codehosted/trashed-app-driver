@@ -26,7 +26,7 @@ test('both native platforms bundle the same three-page offline copy', () => {
 });
 
 test('native initialization blocks the actual Capacitor bootstrap entry points', () => {
-  assert.match(ios, /override func webView\(with frame: CGRect, configuration: WKWebViewConfiguration\) -> WKWebView \{\s*OnboardingWebView/);
+  assert.match(ios, /override func webView\(with frame: CGRect, configuration: WKWebViewConfiguration\) -> WKWebView \{[^]*?return OnboardingWebView\(frame: frame, configuration: configuration\)/);
   assert.match(ios, /override func load\(_ request: URLRequest\) -> WKNavigation\? \{\s*guard appNavigationEnabled else \{ return nil \}\s*return super.load\(request\)/);
   assert.match(android, /protected void load\(\)[^]*?parent.addView\(gated, index, params\);[^]*?super.load\(\)/);
   assert.match(android, /public void loadUrl\(String url\) \{\s*if \(appNavigationEnabled\) super.loadUrl\(url\)/);

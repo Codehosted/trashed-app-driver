@@ -15,9 +15,10 @@ import com.google.android.material.button.MaterialButton;
 final class NativeWorkspaceTokens {
     static final int PRIMARY = Color.rgb(112, 51, 255);
     final Context context;
-    final int background, surface, foreground, secondary, divider, accent;
+    int background, surface, foreground, secondary, divider, accent;
     final Typeface regular, semibold;
     NativeWorkspaceTokens(Context base, boolean dark) {
+        dark = NativeSystemAppearance.dark(base);
         context = new ContextThemeWrapper(base, dark ? R.style.TrashedNavigationDark : R.style.TrashedNavigationLight);
         background = dark ? Color.rgb(19, 19, 21) : Color.rgb(250, 250, 251);
         surface = dark ? Color.rgb(29, 29, 32) : Color.WHITE;
@@ -27,6 +28,13 @@ final class NativeWorkspaceTokens {
         accent = dark ? Color.rgb(190, 159, 255) : PRIMARY;
         regular = Typeface.createFromAsset(base.getAssets(), "native-chat-fonts/TrashedJakarta-Regular.ttf");
         semibold = Typeface.createFromAsset(base.getAssets(), "native-chat-fonts/TrashedJakarta-SemiBold.ttf");
+    }
+    void updateAppearance() {
+        boolean dark=NativeSystemAppearance.dark(context);
+        ((ContextThemeWrapper)context).setTheme(dark?R.style.TrashedNavigationDark:R.style.TrashedNavigationLight);
+        background=dark?0xff131315:0xfffafafb;surface=dark?0xff1d1d20:Color.WHITE;
+        foreground=dark?0xfff6f6f8:0xff1c1c20;secondary=dark?0xffb6b6be:0xff62626e;
+        divider=dark?0xff35353b:0xffe3e3e8;accent=dark?0xffbe9fff:PRIMARY;
     }
     int dp(int value) { return Math.round(value * context.getResources().getDisplayMetrics().density); }
     LinearLayout column() { LinearLayout view = new LinearLayout(context); view.setOrientation(LinearLayout.VERTICAL); return view; }

@@ -9,6 +9,14 @@ test('measured renderer preserves API 23 without newer collection or TextView AP
  assert.match(source,/TextViewCompat\.setLineHeight\(textView,/);
  assert.match(read('android/variables.gradle'),/minSdkVersion\s*=\s*23\b/);
 });
+test('appearance gradient reads keep Android API23 compatibility',()=>{
+ const source=read('android/app/src/main/java/com/trashed/driver/NativeSystemAppearance.java');
+ const method=source.slice(source.indexOf('static int gradientColor'),source.indexOf('static boolean accent'));
+ assert.match(method,/SDK_INT>=24/);assert.match(method,/gradient\.getColor\(\)/);
+ assert.match(method,/finally \{gradient\.setBounds\(bounds\);pixel\.recycle\(\);\}/);
+ assert.equal((source.match(/gradient\.getColor\(\)/g)||[]).length,1);
+ assert.doesNotMatch(source,/\bg\.getColor\(\)|\(\(GradientDrawable\)d\)\.getColor\(\)/);
+});
 test('instrumentation-only activity exceptions are narrow and absent from release',()=>{
  const debug=read('android/app/src/debug/AndroidManifest.xml');
  assert.doesNotMatch(debug,/<application[^>]*tools:ignore/);

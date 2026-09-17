@@ -12,12 +12,14 @@ final class NativeWorkspacePolicy {
         try {
             URI uri = new URI(url);
             String path = uri.getRawPath();
+            if ("/vendor/dashboard".equals(path)) return "dashboard";
             if ("/vendor/profile".equals(path) && Arrays.asList("", "about").contains(query(url, "view", ""))) return "profile";
             if ("/calls/history".equals(path) || "/vendor/trisha/calls".equals(path)) return "calls";
         } catch (Exception ignored) { }
         return "";
     }
     static String selection(String id) {
+        if ("vendor-dashboard".equals(id)) return "dashboard";
         if ("vendor-profile".equals(id)) return "profile";
         return "vendor-call-history".equals(id) ? "calls" : "";
     }

@@ -146,7 +146,7 @@ public class TrashedNavigationPlugin: CAPPlugin, CAPBridgedPlugin, UITabBarDeleg
     private var sheetTabID: String?
     private var sheetContext: String?
     private var selectionPending = false
-    private let primary = UIColor(red: 112 / 255, green: 51 / 255, blue: 1, alpha: 1)
+    private let primary = NativeAdaptivePalette.accent
     private var host: MainViewController? { bridge?.viewController as? MainViewController }
 
     func attach(to container: UIView) {
@@ -195,6 +195,7 @@ public class TrashedNavigationPlugin: CAPPlugin, CAPBridgedPlugin, UITabBarDeleg
                 call.reject("Invalid navigation state.", "INVALID_STATE"); return
             }
             guard self.store.set(next) else { call.reject("Navigation state is stale.", "STALE_STATE"); return }
+            self.host?.nativeWorkspaceNavigationChanged(context: next.context, visible: next.visible)
             self.refresh()
             call.resolve(["context": next.context, "revision": next.revision])
         }
@@ -207,6 +208,7 @@ public class TrashedNavigationPlugin: CAPPlugin, CAPBridgedPlugin, UITabBarDeleg
                 call.reject("Invalid navigation context.", "INVALID_STATE"); return
             }
             self.store.clear(context: context)
+            self.host?.nativeWorkspaceNavigationChanged(context: self.store.state?.context, visible: self.store.state?.visible == true)
             self.refresh()
             call.resolve()
         }
@@ -214,6 +216,7 @@ public class TrashedNavigationPlugin: CAPPlugin, CAPBridgedPlugin, UITabBarDeleg
 
     func reset() {
         let context = store.clear()
+        host?.nativeWorkspaceNavigationChanged(context: nil, visible: false)
         refresh()
         if let context = context { notifyListeners("reset", data: ["context": context], retainUntilConsumed: false) }
     }
@@ -233,7 +236,7 @@ public class TrashedNavigationPlugin: CAPPlugin, CAPBridgedPlugin, UITabBarDeleg
             dismissSheet()
             return
         }
-        bar.overrideUserInterfaceStyle = state.appearance == "dark" ? .dark : .light
+        bar.overrideUserInterfaceStyle = .unspecified // Device, never the web projection.
         let appearance = UITabBarAppearance()
         appearance.configureWithOpaqueBackground()
         appearance.backgroundColor = .systemBackground
@@ -243,8 +246,10 @@ public class TrashedNavigationPlugin: CAPPlugin, CAPBridgedPlugin, UITabBarDeleg
             layout.normal.titleTextAttributes = [.foregroundColor: UIColor.secondaryLabel]
             layout.selected.iconColor = primary
             layout.selected.titleTextAttributes = [.foregroundColor: primary]
-            layout.normal.badgeBackgroundColor = primary
-            layout.selected.badgeBackgroundColor = primary
+            layout.normal.badgeBackgroundColor = NativeAdaptivePalette.fill
+            layout.selected.badgeBackgroundColor = NativeAdaptivePalette.fill
+            layout.normal.badgeTextAttributes = [.foregroundColor: UIColor.white]
+            layout.selected.badgeTextAttributes = [.foregroundColor: UIColor.white]
         }
         bar.standardAppearance = appearance
         if #available(iOS 15.0, *) { bar.scrollEdgeAppearance = appearance }
@@ -261,10 +266,10 @@ public class TrashedNavigationPlugin: CAPPlugin, CAPBridgedPlugin, UITabBarDeleg
         let height = max(49, bar.sizeThatFits(CGSize(width: host?.view.bounds.width ?? 0, height: 49)).height)
         barHeight?.constant = height
         host?.setNativeNavigationHeight(height)
-        barBackground.backgroundColor = UIColor.systemBackground.resolvedColor(with: bar.traitCollection)
+        barBackground.backgroundColor = .systemBackground
         if let sheet = sheet, let table = sheet.viewControllers.first as? NativeNavigationTable {
             guard sheetContext == state.context, let tab = state.tabs.first(where: { $0.id == sheetTabID }), !tab.items.isEmpty else { dismissSheet(); return }
-            sheet.overrideUserInterfaceStyle = bar.overrideUserInterfaceStyle
+            sheet.overrideUserInterfaceStyle = .unspecified
             table.update(tab)
         }
     }
@@ -280,7 +285,7 @@ public class TrashedNavigationPlugin: CAPPlugin, CAPBridgedPlugin, UITabBarDeleg
         table.onSelect = { [weak self] id in self?.selectItem(context: state.context, tabID: tab.id, itemID: id) }
         table.onClose = { [weak self] in self?.dismissSheet() }
         let controller = UINavigationController(rootViewController: table)
-        controller.overrideUserInterfaceStyle = bar.overrideUserInterfaceStyle
+        controller.overrideUserInterfaceStyle = .unspecified
         controller.modalPresentationStyle = .pageSheet
         if #available(iOS 15.0, *) {
             controller.sheetPresentationController?.detents = [.medium(), .large()]
@@ -293,20 +298,25 @@ public class TrashedNavigationPlugin: CAPPlugin, CAPBridgedPlugin, UITabBarDeleg
 
     private func selectItem(context: String, tabID: String, itemID: String) {
         guard !selectionPending, let sheet = sheet, !sheet.isBeingDismissed,
-              store.state?.selection(context: context, tabID: tabID, itemID: itemID) != nil else { return }
+              let state = store.state, state.selection(context: context, tabID: tabID, itemID: itemID) != nil else { return }
         selectionPending = true
+        let sourceURL = webView?.url
         sheet.dismiss(animated: true) { [weak self] in
             guard let self = self else { return }
             self.sheet = nil; self.sheetContext = nil; self.sheetTabID = nil; self.selectionPending = false
-            self.emit(context: context, tabID: tabID, itemID: itemID)
+            if self.store.state?.revision == state.revision, self.webView?.url == sourceURL {
+                self.emit(context: context, tabID: tabID, itemID: itemID)
+            }
             self.refresh()
         }
     }
 
     private func emit(context: String, tabID: String, itemID: String) {
         guard host?.nativeNavigationAvailable == true, !keyboardVisible,
+              host?.presentedViewController == nil,
               NativeNavigationPolicy.isWorkspace(webView?.url, configured: bridge?.config.serverURL),
               let event = store.state?.selection(context: context, tabID: tabID, itemID: itemID) else { return }
+        if host?.consumeNativeWorkspaceAction(itemID, context: context) == true { return }
         notifyListeners("select", data: event, retainUntilConsumed: false)
     }
 
@@ -374,7 +384,7 @@ private final class NativeNavigationTable: UITableViewController {
         cell.textLabel?.textColor = foreground
         cell.detailTextLabel?.textColor = item.selected ? .white : .secondaryLabel
         cell.imageView?.tintColor = foreground
-        cell.backgroundColor = item.selected ? primary : .systemBackground
+        cell.backgroundColor = item.selected ? NativeAdaptivePalette.fill : .systemBackground
         cell.accessoryType = item.selected ? .checkmark : .none
         cell.tintColor = foreground
         cell.accessibilityIdentifier = "trashed-native-item-" + item.id

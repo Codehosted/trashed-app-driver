@@ -8,13 +8,16 @@ struct NativeMeasuredComponent: UIViewRepresentable {
     let state: NativeChatState
     let configured: URL
     let onAction: (String, String?) -> Void
+    var inheritedSurface: String? = nil
     func makeUIView(context: Context) -> NativeMeasuredRoot { NativeMeasuredRoot() }
     func updateUIView(_ view: NativeMeasuredRoot, context: Context) {
         view.isUserInteractionEnabled = context.environment.isEnabled
+        view.inheritedSurface = inheritedSurface
         view.update(node, state: state, configured: configured, onAction: onAction)
     }
 }
 final class NativeMeasuredRoot: UIView {
+    var inheritedSurface: String?
     private var root: NativeMeasuredNode?
     private var reference = CGSize.zero
     func update(_ node: NativeComponentNode, state: NativeChatState, configured: URL, onAction: @escaping (String, String?) -> Void) {
@@ -90,9 +93,19 @@ final class NativeMeasuredNode: UIView, UITextViewDelegate {
         }
     }
     required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
-    private func color(_ hex: String?) -> UIColor? {
-        guard let value = hex.flatMap({ UInt32($0.dropFirst(), radix: 16) }) else { return nil }
-        return UIColor(red: CGFloat((value >> 16) & 255)/255, green: CGFloat((value >> 8) & 255)/255, blue: CGFloat(value & 255)/255, alpha: 1)
+    private var brandedSurface: String? {
+        node.style?.background ?? (superview as? NativeMeasuredNode)?.brandedSurface ?? (superview as? NativeMeasuredRoot)?.inheritedSurface
+    }
+    private func color(_ hex: String?, role: NativeAdaptivePalette.Role = .foreground) -> UIColor? {
+        NativeAdaptivePalette.color(hex, role: role, surface: brandedSurface)
+    }
+    override func traitCollectionDidChange(_ previousTraitCollection: UITraitCollection?) {
+        super.traitCollectionDidChange(previousTraitCollection)
+        guard previousTraitCollection?.userInterfaceStyle != traitCollection.userInterfaceStyle else { return }
+        // CGColor is not dynamic; repaint only. Do not rebuild editors/maps or
+        // replace attributed input text (which would lose marked text/selection).
+        layer.borderColor = color(node.style?.borderColor, role: .border)?.resolvedColor(with: traitCollection).cgColor
+        label?.setNeedsDisplay(); editor?.setNeedsDisplay(); placeholder?.setNeedsDisplay()
     }
     private var font: UIFont {
         let size = CGFloat(node.style?.fontSize ?? 15)
@@ -123,11 +136,11 @@ final class NativeMeasuredNode: UIView, UITextViewDelegate {
     func update(_ value: NativeComponentNode, state: NativeChatState, configured: URL, onAction: @escaping (String, String?) -> Void) {
         node = value; perform = onAction
         enabled = node.disabled != true && node.actionId.map(state.offers) == true
-        backgroundColor = color(node.style?.background) ?? .clear
+        backgroundColor = color(node.style?.background, role: .background) ?? .clear
         alpha = CGFloat(node.style?.opacity ?? 1)
         layer.cornerRadius = CGFloat(node.style?.radius ?? 0)
         layer.borderWidth = CGFloat(node.style?.borderWidth ?? 0)
-        layer.borderColor = color(node.style?.borderColor)?.cgColor
+        layer.borderColor = color(node.style?.borderColor, role: .border)?.resolvedColor(with: traitCollection).cgColor
         clipsToBounds = layer.cornerRadius > 0
         let spoken = node.accessibilityLabel ?? node.text ?? node.props?.placeholder ?? ""
         isAccessibilityElement = button == nil && editor == nil && (node.children ?? []).isEmpty && !spoken.isEmpty

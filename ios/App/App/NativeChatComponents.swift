@@ -2,10 +2,18 @@ import SwiftUI
 import MapKit
 
 struct NativeChatPalette {
-    static let primary = Color(red: 112 / 255, green: 51 / 255, blue: 1)
-    static func color(_ hex: String?) -> Color? {
-        guard let hex = hex, let value = UInt32(hex.dropFirst(), radix: 16) else { return nil }
-        return Color(red: Double((value >> 16) & 255) / 255, green: Double((value >> 8) & 255) / 255, blue: Double(value & 255) / 255)
+    static let primary = Color(NativeAdaptivePalette.accent)
+    static let fill = Color(NativeAdaptivePalette.fill)
+    static func color(_ hex: String?, role: NativeAdaptivePalette.Role = .foreground, surface: String? = nil) -> Color? {
+        NativeAdaptivePalette.color(hex, role: role, surface: surface).map { Color($0) }
+    }
+}
+
+struct NativeBrandedSurfaceKey: EnvironmentKey { static let defaultValue: String? = nil }
+extension EnvironmentValues {
+    var nativeBrandedSurface: String? {
+        get { self[NativeBrandedSurfaceKey.self] }
+        set { self[NativeBrandedSurfaceKey.self] = newValue }
     }
 }
 
@@ -16,28 +24,25 @@ struct NativeComponentView: View {
     let state: NativeChatState
     let configured: URL
     let onAction: (String, String?) -> Void
-    @Environment(\.colorScheme) private var inheritedScheme
-    private var surfaceScheme: ColorScheme {
-        guard let hex = node.style?.background, let rgb = UInt32(hex.dropFirst(), radix: 16) else { return inheritedScheme }
-        let luminance = 0.2126 * Double((rgb >> 16) & 255) + 0.7152 * Double((rgb >> 8) & 255) + 0.0722 * Double(rgb & 255)
-        return luminance > 140 ? .light : .dark
+    @Environment(\.nativeBrandedSurface) private var inheritedBrand
+    private var brandedSurface: String? {
+        node.style?.background ?? inheritedBrand
     }
     private var enabled: Bool { node.disabled != true && node.actionId.map { state.offers($0) } == true }
     var body: some View {
         Group {
         if let box = node.box {
-            NativeMeasuredComponent(node: node, state: state, configured: configured, onAction: onAction)
+            NativeMeasuredComponent(node: node, state: state, configured: configured, onAction: onAction, inheritedSurface: brandedSurface)
                 .frame(height: CGFloat(box.height)).frame(maxWidth: .infinity, alignment: .leading)
         } else {
         content
             .font(.system(size: CGFloat(node.style?.fontSize ?? 15), weight: weight))
-            .foregroundColor(NativeChatPalette.color(node.style?.foreground))
+            .foregroundColor(NativeChatPalette.color(node.style?.foreground, surface: brandedSurface))
             .padding(CGFloat(node.style?.padding ?? (node.type == "card" ? 12 : 0)))
-            .background(NativeChatPalette.color(node.style?.background) ?? (node.type == "card" ? Color(.tertiarySystemBackground) : .clear))
+            .background(NativeChatPalette.color(node.style?.background, role: .background) ?? (node.type == "card" ? Color(.tertiarySystemBackground) : .clear))
             .clipShape(RoundedRectangle(cornerRadius: CGFloat(node.style?.radius ?? (node.type == "card" ? 12 : 0))))
             .accessibilityIdentifier("trashed-native-node-" + node.id)
-            // Explicit schema surfaces retain legible adaptive text and controls in dark mode.
-            .environment(\.colorScheme, surfaceScheme)
+            .environment(\.nativeBrandedSurface, brandedSurface)
         }
         }
     }
@@ -64,7 +69,7 @@ struct NativeComponentView: View {
                     if let text = node.text, !text.isEmpty { Text(text) }
                     children
                 }.frame(minHeight: 44)
-            }.buttonStyle(.plain).foregroundColor(NativeChatPalette.color(node.style?.foreground) ?? NativeChatPalette.primary).disabled(!enabled)
+            }.buttonStyle(.plain).foregroundColor(NativeChatPalette.color(node.style?.foreground, surface: brandedSurface) ?? NativeChatPalette.primary).disabled(!enabled)
         case "input":
             NativeComponentInput(node: node, enabled: enabled, onAction: onAction)
         case "image":
@@ -94,7 +99,7 @@ struct NativeComponentView: View {
         for child in value.children ?? [] { result = result + inlineText(child) }
         let weight: Font.Weight = value.style?.fontWeight == "bold" ? .bold : value.style?.fontWeight == "semibold" ? .semibold : value.style?.fontWeight == "medium" ? .medium : .regular
         return result.font(.system(size: CGFloat(value.style?.fontSize ?? node.style?.fontSize ?? 15), weight: weight))
-            .foregroundColor(NativeChatPalette.color(value.style?.foreground) ?? NativeChatPalette.color(node.style?.foreground))
+            .foregroundColor(NativeChatPalette.color(value.style?.foreground, surface: brandedSurface) ?? NativeChatPalette.color(node.style?.foreground, surface: brandedSurface))
     }
     private func perform() { if enabled, let id = node.actionId { onAction(id, node.value) } }
 }
