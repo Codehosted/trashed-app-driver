@@ -61,6 +61,8 @@ test('missing Firebase config stops an otherwise-ready release before downstream
   const sentinel = join(directory, 'keep-artifact');
   try {
     writeFileSync(sentinel, 'existing artifact');
+    const keystore = join(directory, 'fixture-keystore');
+    writeFileSync(keystore, 'synthetic readable file; signing must never execute');
     writeFileSync(join(directory, 'node'), '#!/bin/sh\ncase "$1" in\n scripts/check-mobile-backend.mjs) exit 0 ;;\n scripts/check-mobile-push-config.mjs) exec "$REAL_NODE" "$PUSH_CONFIG_CLI" "$MISSING_PUSH_CONFIG" ;;\n *) exit 91 ;;\nesac\n', { mode: 0o755 });
     for (const name of ['npm', 'npx', 'security', 'gradle']) {
       writeFileSync(join(directory, name), '#!/bin/sh\nprintf "unexpected\\n" >> "$GATE_TRACE"\nexit 92\n', { mode: 0o755 });
@@ -70,6 +72,8 @@ test('missing Firebase config stops an otherwise-ready release before downstream
       env: { ...process.env, PATH: `${directory}:${process.env.PATH}`, REAL_NODE: process.execPath,
         PUSH_CONFIG_CLI: new URL('../scripts/check-mobile-push-config.mjs', import.meta.url).pathname,
         MISSING_PUSH_CONFIG: join(directory, 'missing.json'), GATE_TRACE: trace,
+        TRASHED_ANDROID_KEYSTORE: keystore, TRASHED_ANDROID_KEY_ALIAS: 'fixture',
+        TRASHED_ANDROID_KEYSTORE_PASSWORD: 'fixture-only', TRASHED_ANDROID_KEY_PASSWORD: 'fixture-only',
         ARTIFACT_DIR: directory, TRASHED_ANDROID_VERSION_CODE: '999', TRASHED_ANDROID_VERSION_NAME: 'test-only' },
     });
     assert.equal(result.status, 3, result.stderr);
