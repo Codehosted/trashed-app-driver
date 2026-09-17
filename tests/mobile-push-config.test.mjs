@@ -87,6 +87,6 @@ test('Android release checks push config before dependencies, artifact deletion 
   const script = readFileSync(new URL('../scripts/ci-build-android.sh', import.meta.url), 'utf8');
   const gate = script.indexOf('node scripts/check-mobile-push-config.mjs');
   assert.ok(gate > 0, 'release requires a push configuration gate');
-  assert.ok(gate < script.indexOf('rm -rf "$ARTIFACT_DIR"'));
+  assert.ok(gate < script.indexOf('rm -f "$ARTIFACT_DIR/trashed-driver-debug.apk"'));
   assert.match(script, /if \[\[ "\$MODE" == release \]\]; then\s+node scripts\/check-mobile-backend\.mjs\s+node scripts\/check-mobile-push-config\.mjs\s+fi/);
 });
