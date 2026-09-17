@@ -22,7 +22,7 @@ jobs:
       build_number: ${{ steps.version.outputs.build_number }}
     env:
       TRASHED_WEB_URL: https://trashed.app
-      TRASHED_ANDROID_VERSION_NAME: 1.0.4-checkpoint
+      TRASHED_ANDROID_VERSION_NAME: 1.0.5-checkpoint
       CI: true
     steps:
       - uses: actions/checkout@v4
