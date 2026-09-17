@@ -20,7 +20,14 @@ struct WorkspaceDashboardView: View {
             VStack(alignment: .leading, spacing: 20) {
                 if model.invalidated {
                     notice("Dashboard unavailable", model.error ?? "Reopen the dashboard to check your workspace.", symbol: "lock")
+                    if let reopen = model.onReopen {
+                        Button("Reopen dashboard", action: reopen)
+                            .frame(minHeight: 44).accessibilityIdentifier("dashboard-reopen")
+                    }
                 } else {
+                    if let notificationError = model.notificationError {
+                        notice("Notifications", notificationError, symbol: "bell.badge")
+                    }
                     if let error = model.error {
                         notice("Could not refresh dashboard", error, symbol: "exclamationmark.triangle")
                         Button("Retry") { Task { await model.loadDashboard() } }
@@ -34,6 +41,8 @@ struct WorkspaceDashboardView: View {
                         inventory(snapshot)
                         Text("Revenue in \(snapshot.currency). Pull down to refresh.")
                             .font(.footnote).foregroundStyle(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                            .accessibilityIdentifier("dashboard-scroll-end")
                     } else if model.loading || model.error == nil {
                         ProgressView("Loading dashboard…")
                             .frame(maxWidth: .infinity, minHeight: 160)

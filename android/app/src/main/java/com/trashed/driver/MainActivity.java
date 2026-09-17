@@ -364,6 +364,7 @@ public class MainActivity extends BridgeActivity {
         return identity.isEmpty() ? "" : NativeChatCache.digest(chatOrigin() + ":" + identity);
     }
     private void closeNativeWorkspace() {
+        if (nativeNavigation != null) nativeNavigation.dashboard(false);
         nativeRoute = null;
         nativeWorkspaceSelection = null;
         if (nativeWorkspace == null) return;
@@ -447,6 +448,7 @@ public class MainActivity extends BridgeActivity {
             public void invalidated() { dismissDirectWorkspace(); }
         }, chatOrigin(), url, destination, dark);
         chatContainer.addView(nativeWorkspace, fullFrameParams());
+        nativeNavigation.dashboard("dashboard".equals(destination));
         getBridge().getWebView().setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_NO_HIDE_DESCENDANTS);
     }
     void clearNativeNavigation(String context) {

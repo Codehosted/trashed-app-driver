@@ -15,7 +15,8 @@ private final class NativeChatBridgeSourceGuard: NSObject, WKScriptMessageHandle
         self.forward = forward; self.configured = configured
     }
     func userContentController(_ userContentController: WKUserContentController, didReceive message: WKScriptMessage) {
-        if let body = message.body as? [String: Any], body["pluginId"] as? String == "TrashedChat" {
+        if let body = message.body as? [String: Any],
+           ["TrashedChat", "TrashedWorkspacePush"].contains(body["pluginId"] as? String ?? "") {
             let frame = message.frameInfo
             let origin = frame.securityOrigin
             var source = URLComponents()
@@ -209,6 +210,11 @@ class MainViewController: CAPBridgeViewController, UIGestureRecognizerDelegate {
     })()
     """
     private var pendingAppleCredential: NativeAppleCredential?
+    private var nativeWorkspaceRoot = false
+    private var workspaceBootstrap: Task<Void, Never>?
+    private var workspaceBootstrapGeneration = UUID()
+    private var workspacePushTask: Task<Void, Never>?
+    private var workspacePushGeneration = UUID()
     private var nativeWorkspaceController: UIViewController?
     private var nativeWorkspaceFinish: (() -> Void)?
     private var nativeWorkspaceURL: URL?
@@ -222,6 +228,9 @@ class MainViewController: CAPBridgeViewController, UIGestureRecognizerDelegate {
     #endif
 
     override func webView(with frame: CGRect, configuration: WKWebViewConfiguration) -> WKWebView {
+        #if DEBUG && targetEnvironment(simulator)
+        if workspaceBootstrapFixtureOrigin != nil { configuration.websiteDataStore = .nonPersistent() }
+        #endif
         // Runs before web providers mount, including login and fresh documents.
         if let raw = bundledServerURLString(), let origin = URL(string: raw),
            let script = NativeSystemAppearance.script(origin: origin) {
@@ -235,6 +244,10 @@ class MainViewController: CAPBridgeViewController, UIGestureRecognizerDelegate {
         bridge?.registerPluginInstance(TrashedFileExportPlugin())
         bridge?.registerPluginInstance(nativeNavigation)
         bridge?.registerPluginInstance(nativeChat)
+        if #available(iOS 16.0, *) {
+            bridge?.registerPluginInstance(TrashedWorkspacePushPlugin())
+            NativeWorkspacePush.shared.prepareLaunchRouting()
+        }
         guard let webView = webView else { return }
 
         if let configured = bridge?.config.serverURL,
@@ -296,6 +309,7 @@ class MainViewController: CAPBridgeViewController, UIGestureRecognizerDelegate {
         if workspaceFixtureStore != nil { return }
         #endif
         let origin = makeDriverAuthConfig().origin
+        if nativeWorkspaceRoot { return } // Blank WebView KVO is not native session authority.
         if let entry = directWorkspace {
             if !entry.remainsValid(currentURL: url, loading: webView?.isLoading != false,
                                    context: entry.context, visible: nativeWorkspaceSessionAvailable) {
@@ -332,12 +346,13 @@ class MainViewController: CAPBridgeViewController, UIGestureRecognizerDelegate {
     }
 
     @available(iOS 16.0, *)
-    private func presentNativeWorkspace(route: WorkspaceRoute, url: URL, origin: URL, store: WKHTTPCookieStore) {
+    private func presentNativeWorkspace(route: WorkspaceRoute, url: URL, origin: URL, store: WKHTTPCookieStore, isRoot: Bool = false, profile: WorkspaceProfile? = nil) {
         guard nativeWorkspaceController == nil, presentedViewController == nil else { return }
+        let isRoot = isRoot || route == .dashboard
         let api = WorkspaceAPI(origin: origin, cookieStore: store)
-        let controller = WorkspaceHostingController(api: api, route: route,
+        let controller = WorkspaceHostingController(api: api, route: route, isRoot: isRoot, profile: profile,
             openWeb: { [weak self] path in self?.openWorkspaceWeb(path, origin: origin) },
-            close: { [weak self] in self?.closeNativeWorkspace() })
+            close: { [weak self] in if !isRoot { self?.closeNativeWorkspace() } })
         controller.model.onExpired = { [weak self] in
             guard let self = self else { return }
             #if DEBUG && targetEnvironment(simulator)
@@ -349,11 +364,44 @@ class MainViewController: CAPBridgeViewController, UIGestureRecognizerDelegate {
                 self.presentNativeLogin(self.makeDriverAuthConfig())
             }
         }
+        if isRoot {
+            controller.model.onReopen = { [weak self] in
+                self?.dismissNativeWorkspace { [weak self] in
+                    guard let self = self else { return }
+                    self.bootstrapWorkspace(self.makeDriverAuthConfig())
+                }
+            }
+            controller.model.onSessionRetired = { [weak self] in self?.stopWorkspacePush() }
+            controller.model.onSessionValidated = { [weak self, weak controller] in
+                guard let controller = controller else { return }
+                self?.startWorkspacePush(controller, origin: origin, store: store, prompt: false)
+            }
+            controller.model.onEnableNotifications = { [weak self, weak controller] in
+                guard let controller = controller else { return }
+                self?.startWorkspacePush(controller, origin: origin, store: store, prompt: true)
+            }
+        }
         nativeWorkspaceController = controller
         nativeWorkspaceFinish = { [weak controller] in controller?.finish() }
         nativeWorkspaceURL = url
         historyEdgeGesture?.isEnabled = false
-        present(controller, animated: false)
+        nativeWorkspaceRoot = isRoot
+        if isRoot {
+            directWorkspace = nil
+            nativeNavigation.reset(); nativeChat.reset()
+            webView?.stopLoading(); webView?.isHidden = true
+            addChild(controller)
+            controller.view.translatesAutoresizingMaskIntoConstraints = false
+            view.addSubview(controller.view)
+            NSLayoutConstraint.activate([
+                controller.view.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+                controller.view.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+                controller.view.topAnchor.constraint(equalTo: view.topAnchor),
+                controller.view.bottomAnchor.constraint(equalTo: view.bottomAnchor),
+            ])
+            controller.didMove(toParent: self)
+            startWorkspacePush(controller, origin: origin, store: store, prompt: false)
+        } else { present(controller, animated: false) }
     }
 
     private func dismissNativeWorkspace(completion: (() -> Void)? = nil) {
@@ -361,14 +409,22 @@ class MainViewController: CAPBridgeViewController, UIGestureRecognizerDelegate {
         guard let controller = nativeWorkspaceController else { completion?(); return }
         nativeWorkspaceDismissing = true
         nativeWorkspaceFinish?(); nativeWorkspaceFinish = nil
-        controller.dismiss(animated: false) { [weak self] in
+        let finish: () -> Void = { [weak self] in
             guard let self = self else { return }
+            self.nativeWorkspaceRoot = false
+            self.webView?.isHidden = false
             self.nativeWorkspaceController = nil; self.nativeWorkspaceURL = nil
             self.directWorkspace = nil
             self.nativeWorkspaceDismissing = false
             completion?()
             self.updateHistoryGestures()
         }
+        if nativeWorkspaceRoot {
+            controller.willMove(toParent: nil)
+            controller.view.removeFromSuperview()
+            controller.removeFromParent()
+            finish()
+        } else { controller.dismiss(animated: false, completion: finish) }
     }
 
     private func closeNativeWorkspace() {
@@ -401,7 +457,8 @@ class MainViewController: CAPBridgeViewController, UIGestureRecognizerDelegate {
            !entry.remainsValid(currentURL: webView?.url, loading: webView?.isLoading != false,
                                context: entry.context, visible: nativeWorkspaceSessionAvailable) { return }
         guard let url = URL(string: path, relativeTo: origin)?.absoluteURL,
-              NativeWorkspaceHistory.isWorkspaceURL(url, origin: origin) else { return }
+              NativeWorkspaceHistory.isWorkspaceURL(url, origin: origin),
+              !WorkspaceHomeRouting.isHomeTarget(url, origin: origin) else { return }
         // A deliberate web fallback must not immediately reopen the native overview.
         nativeWorkspaceBypass = WorkspaceRoute.parse(url, origin: origin)
         #if DEBUG && targetEnvironment(simulator)
@@ -421,7 +478,123 @@ class MainViewController: CAPBridgeViewController, UIGestureRecognizerDelegate {
         }
     }
 
+    @available(iOS 16.0, *)
+    func prepareNativePushLogout() async throws {
+        guard let store = webView?.configuration.websiteDataStore.httpCookieStore else { throw WorkspaceError.expired }
+        stopWorkspacePush()
+        let origin = makeDriverAuthConfig().origin
+        let api = WorkspaceAPI(origin: origin, cookieStore: store)
+        defer { api.close() }
+        let profile = try await api.profile()
+        try await NativeWorkspacePush.shared.prepareLogout(profile: profile, origin: origin, cookieStore: store)
+    }
+
+    @available(iOS 16.0, *)
+    private func stopWorkspacePush() {
+        workspacePushGeneration = UUID()
+        workspacePushTask?.cancel(); workspacePushTask = nil
+        NativeWorkspacePush.shared.stop()
+    }
+
+    @available(iOS 16.0, *)
+    private func startWorkspacePush(_ controller: WorkspaceHostingController, origin: URL, store: WKHTTPCookieStore, prompt: Bool) {
+        workspacePushGeneration = UUID()
+        workspacePushTask?.cancel(); workspacePushTask = nil
+        let generation = workspacePushGeneration
+        NativeWorkspacePush.shared.onError = { [weak controller] message in controller?.model.notificationError = message }
+        workspacePushTask = Task { [weak self, weak controller] in
+            guard let self = self, let controller = controller else { return }
+            if controller.model.profile == nil { await controller.model.loadProfile() }
+            guard !Task.isCancelled, self.workspacePushGeneration == generation,
+                  self.nativeWorkspaceController === controller, !controller.model.invalidated,
+                  let profile = controller.model.profile else { return }
+            do {
+                try await NativeWorkspacePush.shared.start(profile: profile, origin: origin, cookieStore: store,
+                    allowPermissionPrompt: prompt, onOpen: { [weak self, weak controller] url in
+                        guard let self = self, let controller = controller,
+                              self.nativeWorkspaceController === controller else { return }
+                        if let route = WorkspaceRoute.parse(url, origin: origin) { controller.openNativeRoute(route) }
+                        else { self.openWorkspaceWeb(url.path, origin: origin) }
+                    })
+                guard !Task.isCancelled, self.workspacePushGeneration == generation else { return }
+                controller.model.notificationError = nil
+            } catch {
+                guard !Task.isCancelled, self.workspacePushGeneration == generation else { return }
+                controller.model.notificationError = (error as? WorkspaceError)?.errorDescription ?? "Could not connect notifications. Use Enable notifications to retry."
+            }
+        }
+    }
+
+    // Cancel the navigation before WebKit requests dashboard HTML, including target=_blank.
+    func interceptWorkspaceHome(_ url: URL) -> Bool {
+        guard #available(iOS 16.0, *),
+              WorkspaceHomeRouting.isHomeTarget(url, origin: makeDriverAuthConfig().origin) else { return false }
+        guard onboardingReady, nativeLoginController == nil, nativeOnboardingController == nil else { return true }
+        if nativeWorkspaceRoot { return true }
+        dismissNativeWorkspace { [weak self] in
+            guard let self = self else { return }
+            self.bootstrapWorkspace(self.makeDriverAuthConfig())
+        }
+        return true
+    }
+
+    @available(iOS 16.0, *)
+    private func bootstrapWorkspace(_ config: DriverAuthConfig) {
+        guard let store = webView?.configuration.websiteDataStore.httpCookieStore else { return }
+        workspaceBootstrap?.cancel()
+        let generation = UUID(); workspaceBootstrapGeneration = generation
+        webView?.stopLoading()
+        workspaceBootstrap = Task { [weak self] in
+            guard let self = self else { return }
+            let api = WorkspaceAPI(origin: config.origin, cookieStore: store)
+            defer { api.close() }
+            do {
+                let profile = try await api.profile()
+                try Task.checkCancellation()
+                guard self.workspaceBootstrapGeneration == generation, self.onboardingReady,
+                      self.nativeLoginController == nil, self.nativeOnboardingController == nil else { return }
+                if WorkspaceHomeRouting.dashboardEligible(profile) {
+                    let url = URL(string: "/vendor/dashboard", relativeTo: config.origin)!.absoluteURL
+                    self.presentNativeWorkspace(route: .dashboard, url: url, origin: config.origin, store: store, isRoot: true, profile: profile)
+                } else {
+                    let path = WorkspaceHomeRouting.fallbackPath(profile)
+                    self.stopWorkspacePush()
+                    let url = URL(string: path, relativeTo: config.origin)!.absoluteURL
+                    self.webView?.isHidden = false
+                    self.webView?.load(URLRequest(url: url))
+                }
+            } catch {
+                guard !Task.isCancelled, self.workspaceBootstrapGeneration == generation else { return }
+                if case WorkspaceError.expired = error { self.presentNativeLogin(config); return }
+                let alert = UIAlertController(title: "Unable to open workspace", message: error.localizedDescription, preferredStyle: .alert)
+                alert.addAction(UIAlertAction(title: "Retry", style: .default) { [weak self] _ in self?.bootstrapWorkspace(config) })
+                alert.addAction(UIAlertAction(title: "Sign in again", style: .cancel) { [weak self] _ in self?.presentNativeLogin(config) })
+                self.present(alert, animated: false)
+            }
+        }
+    }
+
     #if DEBUG && targetEnvironment(simulator)
+    // Exercise the normal authenticated bootstrap against a local HTTP fixture.
+    private func startWorkspaceBootstrapIfRequested() -> Bool {
+        guard #available(iOS 16.0, *), let origin = workspaceBootstrapFixtureOrigin,
+              let webView = webView as? OnboardingWebView else { return false }
+        onboardingReady = true; webView.appNavigationEnabled = true
+        let cookie = HTTPCookie(properties: [.name: "next-auth.session-token", .value: "local-ui-fixture", .domain: "127.0.0.1", .path: "/"])!
+        webView.configuration.websiteDataStore.httpCookieStore.setCookie(cookie) { [weak self] in
+            DispatchQueue.main.async { self?.loadDriverApp(DriverAuthConfig(origin: origin)) }
+        }
+        return true
+    }
+
+    private var workspaceBootstrapFixtureOrigin: URL? {
+        guard let raw = ProcessInfo.processInfo.environment["TRASHED_WORKSPACE_BOOTSTRAP_ORIGIN"],
+              let url = URL(string: raw), url.scheme == "http", url.host == "127.0.0.1", url.port != nil,
+              url.user == nil, url.password == nil, url.query == nil, url.fragment == nil,
+              url.path.isEmpty || url.path == "/" else { return nil }
+        return url
+    }
+
     // Explicit, loopback-only UI test harness. No production cookies/data or release bypass.
     private func startWorkspaceFixtureIfRequested() -> Bool {
         guard #available(iOS 16.0, *),
@@ -447,12 +620,12 @@ class MainViewController: CAPBridgeViewController, UIGestureRecognizerDelegate {
     // That is not logout and must not invalidate an already-presented native screen.
     private var nativeWorkspaceSessionAvailable: Bool {
         onboardingReady && nativeOnboardingController == nil && nativeLoginController == nil
-            && webView?.isLoading == false
+            && (nativeWorkspaceRoot || webView?.isLoading == false)
     }
 
     var nativeNavigationAvailable: Bool {
         onboardingReady && nativeOnboardingController == nil && nativeLoginController == nil
-            && webView?.isLoading == false && viewIfLoaded?.window != nil
+            && !nativeWorkspaceRoot && webView?.isLoading == false && viewIfLoaded?.window != nil
     }
 
     var nativeChatAvailable: Bool {
@@ -554,6 +727,9 @@ class MainViewController: CAPBridgeViewController, UIGestureRecognizerDelegate {
             webView.stopLoading()
             self.presentNativeLogin(config)
         }
+        #if DEBUG && targetEnvironment(simulator)
+        if startWorkspaceBootstrapIfRequested() { return }
+        #endif
         // This local blank page supplies the original WebKit UA without a network request.
         webView?.loadHTMLString("<html><body></body></html>", baseURL: nil)
         if NativeOnboarding.isComplete() {
@@ -745,6 +921,9 @@ class MainViewController: CAPBridgeViewController, UIGestureRecognizerDelegate {
     }
 
     private func makeDriverAuthConfig() -> DriverAuthConfig {
+        #if DEBUG && targetEnvironment(simulator)
+        if let origin = workspaceBootstrapFixtureOrigin { return DriverAuthConfig(origin: origin) }
+        #endif
         let fallbackOrigin = URL(string: "https://trashed.app")!
         guard
             let serverURL = bridge?.config.serverURL,
@@ -763,6 +942,9 @@ class MainViewController: CAPBridgeViewController, UIGestureRecognizerDelegate {
 
     private func presentNativeLogin(_ config: DriverAuthConfig) {
         guard onboardingReady, nativeOnboardingController == nil else { return }
+        if #available(iOS 16.0, *) { stopWorkspacePush() }
+        workspaceBootstrapGeneration = UUID()
+        workspaceBootstrap?.cancel(); workspaceBootstrap = nil
         dismissNativeWorkspace()
         nativeNavigation.reset()
         nativeChat.reset()
@@ -818,8 +1000,12 @@ class MainViewController: CAPBridgeViewController, UIGestureRecognizerDelegate {
         workspaceHistory.beginSession()
         webView?.allowsBackForwardNavigationGestures = false
         historyEdgeGesture?.isEnabled = false
-        webView?.isHidden = false
-        webView?.load(URLRequest(url: config.driverURL(theme: currentDriverTheme)))
+        if #available(iOS 16.0, *) {
+            bootstrapWorkspace(config)
+        } else {
+            webView?.isHidden = false
+            webView?.load(URLRequest(url: config.driverURL(theme: currentDriverTheme)))
+        }
     }
 
     private func signIn(

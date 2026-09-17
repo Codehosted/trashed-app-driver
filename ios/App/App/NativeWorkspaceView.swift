@@ -1,16 +1,119 @@
 import SwiftUI
 
+// MARK: - Native dock navigation policy
+// Same app destinations and symbols as the web-owned navigation, without a JS owner.
+enum WorkspaceDockGroup: String, CaseIterable, Identifiable {
+    case manage = "vendor-manage", assistant = "vendor-assistant"
+    case calls = "vendor-calls", account = "vendor-account"
+    var id: String { rawValue }
+    var title: String {
+        switch self {
+        case .manage: return "Manage"
+        case .assistant: return "Assistant"
+        case .calls: return "Calls"
+        case .account: return "Account"
+        }
+    }
+    var symbol: String {
+        switch self {
+        case .manage: return "square.grid.2x2"
+        case .assistant: return "sparkles"
+        case .calls: return "phone"
+        case .account: return "person.crop.circle"
+        }
+    }
+}
+
+enum WorkspaceDockAction: Equatable {
+    case dashboard, profile, calls, enableNotifications
+    case web(String)
+}
+
+struct WorkspaceDockEntry: Identifiable {
+    let id: String
+    let title: String
+    let symbol: String
+    let action: WorkspaceDockAction
+}
+
+enum WorkspaceDockNavigation {
+    static func selectedGroup(_ route: WorkspaceRoute) -> WorkspaceDockGroup {
+        switch route {
+        case .dashboard: return .manage
+        case .profile: return .account
+        case .calls: return .calls
+        }
+    }
+
+    static func entries(in group: WorkspaceDockGroup, profile: WorkspaceProfile?) -> [WorkspaceDockEntry] {
+        guard let profile = profile, profile.user.id > 0 else { return [] }
+        let roles = profile.user.roles
+        let vendor = (profile.user.vendor?.id ?? 0) > 0
+            && roles.contains(where: { ["vendor", "manager", "admin"].contains($0) })
+        func allowed(_ feature: String) -> Bool {
+            vendor && (profile.user.vendorPermissions == nil || profile.user.vendorPermissions?[feature] == true)
+        }
+        func web(_ id: String, _ title: String, _ symbol: String, _ path: String) -> WorkspaceDockEntry {
+            WorkspaceDockEntry(id: id, title: title + " · Web", symbol: symbol, action: .web(path))
+        }
+        var entries: [WorkspaceDockEntry] = []
+        switch group {
+        case .manage:
+            if WorkspaceHomeRouting.dashboardEligible(profile) {
+                entries.append(.init(id: "vendor-dashboard", title: "Dashboard", symbol: "square.grid.2x2", action: .dashboard))
+            }
+            if allowed("inventory") {
+                entries.append(web("vendor-inventory", "Inventory", "shippingbox", "/vendor/inventory"))
+                entries.append(web("vendor-pods", "Pods", "cube.box", "/vendor/pods"))
+            }
+            if allowed("rentals") { entries.append(web("vendor-rentals", "Rentals", "truck.box", "/vendor/rentals")) }
+            if allowed("customers") { entries.append(web("vendor-customers", "Customers", "person.2", "/vendor/customers")) }
+            if allowed("driver") {
+                // Product entitlements are still rechecked by these web destinations.
+                entries.append(web("vendor-dispatch", "Dispatch", "point.topleft.down.curvedto.point.bottomright.up", "/vendor/dispatch"))
+                entries.append(web("vendor-driver", "Driver App", "car", "/driver"))
+            }
+        case .assistant:
+            if allowed("aiAssistant") && profile.capabilities.calls {
+                entries.append(web("vendor-assistant", "Assistant", "sparkles", "/vendor/assistant"))
+            }
+        case .calls:
+            if allowed("aiAssistant") && profile.capabilities.calls {
+                entries.append(.init(id: "vendor-call-history", title: "Calls", symbol: "phone", action: .calls))
+                entries.append(web("vendor-call-monitor", "Live calls", "headphones", "/calls/monitor"))
+                entries.append(web("vendor-call-settings", "Assistant settings", "slider.horizontal.3", "/vendor/trisha/settings"))
+            }
+        case .account:
+            if allowed("profile") {
+                entries.append(.init(id: "vendor-profile", title: "Profile", symbol: "person.crop.circle", action: .profile))
+                entries.append(web("vendor-security", "Account & security", "lock.shield", "/vendor/profile?view=account"))
+            }
+            if roles.contains("admin") { entries.append(web("vendor-admin", "Administration", "gearshape", "/admin")) }
+            if allowed("settings") { entries.append(web("vendor-settings", "Settings", "slider.horizontal.3", "/vendor/settings")) }
+            entries.append(web("vendor-inbox", "Inbox", "tray", "/vendor/profile?view=inbox"))
+            entries.append(web("vendor-support", "Support", "questionmark.circle", "/vendor/support"))
+            entries.append(.init(id: "vendor-enable-notifications", title: "Enable notifications", symbol: "bell.badge", action: .enableNotifications))
+        }
+        return entries
+    }
+}
+
+// MARK: - Native workspace screen
 // Native API-backed workspace. The host owns session lifetime and navigation.
 @available(iOS 16.0, *)
 @MainActor
 struct WorkspaceScreen: View {
     @ObservedObject var model: WorkspaceModel
     let route: WorkspaceRoute
+    var isRoot = false
     let openWeb: (String) -> Void
     let close: () -> Void
+    @State private var path: [WorkspaceRoute] = []
+    @State private var keyboardVisible = false
 
     var body: some View {
-        NavigationStack {
+        VStack(spacing: 0) {
+        NavigationStack(path: $path) {
             Group {
                 switch route {
                 case .dashboard:
@@ -21,14 +124,50 @@ struct WorkspaceScreen: View {
                     WorkspaceCallsView(model: model, initialQuery: query)
                 }
             }
+            .navigationDestination(for: WorkspaceRoute.self) { destination in
+                switch destination {
+                case .profile: WorkspaceProfileView(model: model, openWeb: openWeb)
+                case .calls(let query): WorkspaceCallsView(model: model, initialQuery: query)
+                case .dashboard: WorkspaceDashboardView(model: model)
+                }
+            }
             .toolbar {
                 ToolbarItem(placement: .navigationBarLeading) {
-                    Button("Close", action: close)
+                    if !isRoot { Button("Close", action: close)
                         .fixedSize(horizontal: true, vertical: false)
                         .accessibilityIdentifier("workspace-close")
+                    }
                 }
                 ToolbarItem(placement: .navigationBarTrailing) {
-                    if case .calls = route {
+                    if isRoot {
+                        Menu {
+                            if model.invalidated {
+                                Button("Reopen dashboard") { model.onReopen?() }
+                                Button("Sign in again") { model.onExpired?() }
+                            } else {
+                                if dockEntry(.manage, "vendor-dashboard") != nil {
+                                    Button("Dashboard") { guard dockEntry(.manage, "vendor-dashboard") != nil else { return }; path = [] }
+                                }
+                                if dockEntry(.account, "vendor-profile") != nil {
+                                    Button("Profile") { guard dockEntry(.account, "vendor-profile") != nil else { return }; path = [.profile] }
+                                }
+                                Button("Enable notifications") { selectDockEntry(.account, "vendor-enable-notifications") }
+                                if dockEntry(.calls, "vendor-call-history") != nil {
+                                    Button("Calls") { guard dockEntry(.calls, "vendor-call-history") != nil else { return }; path = [.calls(WorkspaceCallsQuery())] }
+                                }
+                                Menu("More destinations · Web") {
+                                    ForEach(WorkspaceDockGroup.allCases) { group in
+                                        ForEach(WorkspaceDockNavigation.entries(in: group, profile: model.profile)) { entry in
+                                            if case .web = entry.action {
+                                                Button(entry.title) { selectDockEntry(group, entry.id) }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        } label: { Label("Navigate", systemImage: "line.3.horizontal") }
+                        .accessibilityIdentifier("workspace-native-menu")
+                    } else if case .calls = route {
                         Menu {
                             Button("Full call workspace · Web") { openWeb("/calls/history") }
                             Button("Live monitoring · Web") { openWeb("/calls/monitor") }
@@ -38,9 +177,56 @@ struct WorkspaceScreen: View {
                 }
             }
         }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        // A sibling consumes real height; NavigationStack safe-area propagation
+        // alone allowed the final dashboard footer under the dock on iOS 26.
+            if isRoot && !keyboardVisible {
+                WorkspaceBottomDock(
+                    profile: model.profile,
+                    selected: WorkspaceDockNavigation.selectedGroup(path.last ?? route),
+                    enabled: !model.invalidated && !model.suspended,
+                    select: selectDockEntry
+                )
+                .fixedSize(horizontal: false, vertical: true)
+            }
+        }
         .tint(WorkspaceStyle.accent)
         .environment(\.defaultMinListRowHeight, 44)
         .disabled(model.suspended)
+        // Renewal clears the profile; a newly verified dashboard must repopulate
+        // navigation permissions without ever using the quarantined transport.
+        .task(id: model.dashboard?.generatedAt) {
+            if isRoot && model.profile == nil { await model.loadProfile() }
+        }
+        .onChange(of: model.invalidated) { if $0 { path = [] } }
+        .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillShowNotification)) { _ in
+            keyboardVisible = true
+        }
+        .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillHideNotification)) { _ in
+            keyboardVisible = false
+        }
+        .onChange(of: model.requestedRoute) { destination in
+            guard let destination = destination else { return }
+            path = destination == .dashboard ? [] : [destination]
+            model.requestedRoute = nil
+        }
+    }
+
+    private func dockEntry(_ group: WorkspaceDockGroup, _ id: String) -> WorkspaceDockEntry? {
+        guard !model.invalidated, !model.suspended else { return nil }
+        return WorkspaceDockNavigation.entries(in: group, profile: model.profile).first { $0.id == id }
+    }
+
+    private func selectDockEntry(_ group: WorkspaceDockGroup, _ id: String) {
+        // Re-resolve against current permissions: an already-open menu may be stale.
+        guard let entry = dockEntry(group, id) else { return }
+        switch entry.action {
+        case .dashboard: path = []
+        case .profile: path = [.profile]
+        case .calls: path = [.calls(WorkspaceCallsQuery())]
+        case .enableNotifications: model.onEnableNotifications?()
+        case .web(let destination): openWeb(destination)
+        }
     }
 }
 
@@ -51,6 +237,59 @@ enum WorkspaceStyle {
             ? UIColor(red: 190.0 / 255, green: 159.0 / 255, blue: 1, alpha: 1)
             : UIColor(red: 112.0 / 255, green: 51.0 / 255, blue: 1, alpha: 1)
     })
+}
+
+@available(iOS 16.0, *)
+private struct WorkspaceBottomDock: View {
+    let profile: WorkspaceProfile?
+    let selected: WorkspaceDockGroup
+    let enabled: Bool
+    let select: (WorkspaceDockGroup, String) -> Void
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+
+    var body: some View {
+        LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 4), count: dynamicTypeSize.isAccessibilitySize ? 2 : 4), spacing: 8) {
+            ForEach(WorkspaceDockGroup.allCases) { group in
+                let entries = WorkspaceDockNavigation.entries(in: group, profile: profile)
+                Menu {
+                    ForEach(entries) { entry in
+                        Button { select(group, entry.id) } label: {
+                            Label(entry.title, systemImage: entry.symbol)
+                        }
+                        .accessibilityIdentifier("workspace-dock-action-\(entry.id)")
+                    }
+                } label: {
+                    VStack(spacing: 4) {
+                        Image(systemName: group.symbol).font(.body.weight(.semibold)).accessibilityHidden(true)
+                        Text(group.title).font(.caption.weight(.medium))
+                            .fixedSize(horizontal: false, vertical: true)
+                            .multilineTextAlignment(.center)
+                    }
+                    .frame(maxWidth: .infinity, minHeight: 44)
+                    .padding(.vertical, 6)
+                    .foregroundStyle(selected == group ? WorkspaceStyle.accent : Color.secondary)
+                    .background(selected == group ? WorkspaceStyle.accent.opacity(0.12) : Color.clear)
+                    .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+                    .contentShape(Rectangle())
+                }
+                .disabled(!enabled || entries.isEmpty)
+                .accessibilityLabel(group.title)
+                .accessibilityHint("Opens \(group.title) navigation")
+                .accessibilityAddTraits(selected == group ? .isSelected : [])
+                .accessibilityIdentifier("trashed-native-tab-\(group.rawValue)")
+            }
+        }
+        .buttonStyle(.plain)
+        .padding(.horizontal, 12)
+        .padding(.top, 8)
+        .padding(.bottom, 8)
+        .background(Color(uiColor: .systemBackground), in: RoundedRectangle(cornerRadius: 22, style: .continuous))
+        .padding(.horizontal, 12)
+        .padding(.top, 8)
+        .background(Color(uiColor: .systemGroupedBackground))
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("workspace-bottom-dock")
+    }
 }
 
 @available(iOS 16.0, *)

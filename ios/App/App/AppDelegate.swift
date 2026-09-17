@@ -8,7 +8,9 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
     var window: UIWindow?
 
     func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?) -> Bool {
-        // Override point for customization after application launch.
+        if #available(iOS 16.0, *) {
+            NativeWorkspacePush.shared.captureLaunchNotification(launchOptions?[.remoteNotification] as? [AnyHashable: Any])
+        }
         return true
     }
 

@@ -111,7 +111,7 @@ final class WorkspaceAudio: ObservableObject {
 @available(iOS 16.0, *)
 @MainActor
 final class WorkspaceModel: ObservableObject {
-    let api: any WorkspaceServing
+    private(set) var api: any WorkspaceServing
     let audio = WorkspaceAudio() // A single player owned above every collapsible row.
     @Published private(set) var profile: WorkspaceProfile?
     @Published private(set) var dashboard: WorkspaceDashboard?
@@ -128,15 +128,73 @@ final class WorkspaceModel: ObservableObject {
     private var lifecycleID = UUID()
     private var profileID = UUID()
     private var saveID = UUID()
+    private var dashboardIdentity: WorkspaceDashboard.Scope?
+    private var verifiedProfileScope: String?
+    private var sessionRenewal: Task<Void, Never>?
+    private var renewalAPI: (any WorkspaceServing)?
+    private var renewingSession = false
     var onExpired: (() -> Void)?
+    var onReopen: (() -> Void)?
+    var onSessionRetired: (() -> Void)?
+    var onSessionValidated: (() -> Void)?
+    var onEnableNotifications: (() -> Void)?
+    @Published var notificationError: String?
+    @Published var requestedRoute: WorkspaceRoute?
     var scope: String? { profile?.scope(origin: api.origin) }
 
-    init(api: any WorkspaceServing) {
+    init(api: any WorkspaceServing, profile: WorkspaceProfile? = nil) {
         self.api = api
-        api.onSessionChange = { [weak self] in self?.invalidate(WorkspaceError.scopeChanged) }
+        self.profile = profile
+        verifiedProfileScope = profile?.scope(origin: api.origin)
+        observeSession()
+    }
+
+    private func observeSession() {
+        api.onSessionChange = { [weak self] in self?.sessionCookiesChanged() }
+    }
+
+    private func sessionCookiesChanged() {
+        guard !closed, !invalidated else { return }
+        onSessionRetired?()
+        guard !renewingSession, !suspended, let expected = dashboardIdentity,
+              let replacement = api.renewedSession() else {
+            invalidate(WorkspaceError.scopeChanged); return
+        }
+        beginSessionRenewal(replacement, expected: expected)
+    }
+
+    private func beginSessionRenewal(_ replacement: any WorkspaceServing, expected: WorkspaceDashboard.Scope) {
+        // Never leave old private data/actions visible while accepting new credentials.
+        dashboard = nil; profile = nil; pagination.reset(); audio.stop()
+        lifecycleID = UUID(); loadID = UUID(); let lifetime = lifecycleID
+        loading = true; paging = false; saving = false; error = nil; renewingSession = true
+        api.close()
+        renewalAPI = replacement // Quarantined: no profile, call, audio or save can use it.
+        replacement.onSessionChange = { [weak self] in self?.invalidate(WorkspaceError.scopeChanged) }
+        sessionRenewal = Task { [weak self] in
+            guard let self = self else { replacement.close(); return }
+            defer { if self.lifecycleID == lifetime { self.renewingSession = false; self.loading = false; self.sessionRenewal = nil } }
+            do {
+                let result = try await replacement.dashboard()
+                try Task.checkCancellation()
+                guard self.lifecycleID == lifetime, !self.closed, !self.invalidated, !self.suspended else { return }
+                guard result.scope.userId == expected.userId, result.scope.vendorId == expected.vendorId else { throw WorkspaceError.scopeChanged }
+                let verified = try result.validated()
+                self.api = replacement; self.renewalAPI = nil; self.observeSession()
+                self.dashboard = verified
+                self.onSessionValidated?()
+            } catch {
+                guard self.lifecycleID == lifetime, !Task.isCancelled, !self.closed, !self.invalidated, !self.suspended else { return }
+                // Even a transient validation failure cannot publish candidate credentials.
+                self.invalidate(error)
+            }
+        }
     }
 
     func close() {
+        onSessionRetired?()
+        sessionRenewal?.cancel(); sessionRenewal = nil; renewingSession = false
+        renewalAPI?.close(); renewalAPI = nil
         closed = true; lifecycleID = UUID(); loadID = UUID(); audio.stop(); api.close()
         loading = false; paging = false; saving = false
         profile = nil; dashboard = nil; pagination.reset()
@@ -144,6 +202,8 @@ final class WorkspaceModel: ObservableObject {
 
     func suspend() {
         guard !closed, !invalidated else { return }
+        sessionRenewal?.cancel(); sessionRenewal = nil; renewingSession = false
+        renewalAPI?.cancelPending()
         suspended = true; lifecycleID = UUID(); saving = false
         loadID = UUID(); audio.stop(); api.cancelPending()
         loading = false; paging = false
@@ -152,7 +212,13 @@ final class WorkspaceModel: ObservableObject {
     func resume() async {
         guard !closed, !invalidated, suspended else { return }
         let id = UUID(); lifecycleID = id
-        if dashboard != nil {
+        if let candidate = renewalAPI, let expected = dashboardIdentity {
+            suspended = false
+            beginSessionRenewal(candidate, expected: expected)
+            await sessionRenewal?.value
+            return
+        }
+        if dashboardIdentity != nil {
             // Reauthorize the dashboard with one server-owned snapshot on resume.
             suspended = false
             await loadDashboard()
@@ -161,8 +227,7 @@ final class WorkspaceModel: ObservableObject {
         do {
             let current = try await api.profile()
             guard lifecycleID == id, !Task.isCancelled, !closed, !invalidated else { return }
-            if let scope = scope, current.scope(origin: api.origin) != scope { throw WorkspaceError.scopeChanged }
-            profile = current; suspended = false
+            try acceptProfile(current); suspended = false
         } catch {
             guard lifecycleID == id, !Task.isCancelled, !closed, !invalidated else { return }
             invalidate(error)
@@ -171,6 +236,9 @@ final class WorkspaceModel: ObservableObject {
 
     func invalidate(_ failure: Error) {
         guard !closed, !invalidated else { return }
+        onSessionRetired?()
+        sessionRenewal?.cancel(); sessionRenewal = nil; renewingSession = false
+        renewalAPI?.close(); renewalAPI = nil
         lifecycleID = UUID(); invalidated = true; profile = nil; dashboard = nil; pagination.reset(); audio.stop()
         api.cancelPending()
         loadID = UUID(); loading = false; paging = false; saving = false
@@ -186,7 +254,7 @@ final class WorkspaceModel: ObservableObject {
     }
 
     func loadProfile() async {
-        guard !closed, !invalidated, !suspended else { return }
+        guard !closed, !invalidated, !suspended, !renewingSession, renewalAPI == nil else { return }
         let lifetime = lifecycleID, id = UUID(); profileID = id
         loading = true; error = nil
         defer { if lifecycleID == lifetime, profileID == id { loading = false } }
@@ -194,8 +262,7 @@ final class WorkspaceModel: ObservableObject {
             let profile = try await api.profile()
             try Task.checkCancellation()
             guard lifecycleID == lifetime, profileID == id, !closed, !invalidated, !suspended else { return }
-            if let scope = scope, profile.scope(origin: api.origin) != scope { throw WorkspaceError.scopeChanged }
-            self.profile = profile
+            try acceptProfile(profile)
         } catch {
             guard lifecycleID == lifetime, profileID == id, !Task.isCancelled, !closed, !invalidated, !suspended else { return }
             self.error = error.localizedDescription; handle(error)
@@ -203,7 +270,7 @@ final class WorkspaceModel: ObservableObject {
     }
 
     func save(_ edit: WorkspaceProfileEdit) async -> Bool {
-        guard let scope = scope, !saving, !closed, !invalidated, !suspended else { return false }
+        guard let scope = scope, !saving, !closed, !invalidated, !suspended, !renewingSession, renewalAPI == nil else { return false }
         if let validation = edit.validation { error = validation; return false }
         let lifetime = lifecycleID, id = UUID(); saveID = id
         saving = true; error = nil
@@ -211,7 +278,7 @@ final class WorkspaceModel: ObservableObject {
         do {
             let verified = try await api.save(edit, scope: scope)
             guard lifecycleID == lifetime, saveID == id, !Task.isCancelled, !closed, !invalidated, !suspended else { return false }
-            profile = verified
+            try acceptProfile(verified)
             return true
         } catch {
             guard lifecycleID == lifetime, saveID == id, !Task.isCancelled, !closed, !invalidated, !suspended else { return false }
@@ -220,7 +287,7 @@ final class WorkspaceModel: ObservableObject {
     }
 
     func loadDashboard() async {
-        guard !closed, !invalidated, !suspended else { return }
+        guard !closed, !invalidated, !suspended, !renewingSession else { return }
         let id = UUID(), lifetime = lifecycleID; loadID = id
         loading = true; error = nil // Keep the last validated snapshot during refresh.
         defer { if lifecycleID == lifetime, loadID == id { loading = false } }
@@ -228,10 +295,11 @@ final class WorkspaceModel: ObservableObject {
             let result = try await api.dashboard()
             try Task.checkCancellation()
             guard lifecycleID == lifetime, loadID == id, !closed, !invalidated, !suspended else { return }
-            if let previous = dashboard,
-               previous.scope.userId != result.scope.userId || previous.scope.vendorId != result.scope.vendorId { throw WorkspaceError.scopeChanged }
+            if let previous = dashboardIdentity,
+               previous.userId != result.scope.userId || previous.vendorId != result.scope.vendorId { throw WorkspaceError.scopeChanged }
             if let current = profile { _ = try result.validated(for: current) }
             dashboard = try result.validated()
+            dashboardIdentity = result.scope
         } catch {
             guard !Task.isCancelled, lifecycleID == lifetime, loadID == id, !closed, !invalidated, !suspended else { return }
             self.error = error.localizedDescription; handle(error)
@@ -239,7 +307,7 @@ final class WorkspaceModel: ObservableObject {
     }
 
     func loadCalls(_ query: WorkspaceCallsQuery, refresh: Bool = false, debounce: Bool = false) async {
-        guard !closed, !invalidated, !suspended else { return }
+        guard !closed, !invalidated, !suspended, !renewingSession, renewalAPI == nil else { return }
         let id = UUID(); loadID = id
         loading = true; paging = false; error = nil; pageError = nil
         if !refresh { pagination.reset() }
@@ -249,9 +317,8 @@ final class WorkspaceModel: ObservableObject {
             try Task.checkCancellation()
             let current = try await api.profile()
             guard loadID == id, !closed, !invalidated else { return }
-            if let scope = scope, current.scope(origin: api.origin) != scope { throw WorkspaceError.scopeChanged }
             guard current.capabilities.calls else { throw WorkspaceError.forbidden }
-            profile = current
+            try acceptProfile(current)
             let page = try await api.calls(query: query, page: 1, scope: current.scope(origin: api.origin))
             try Task.checkCancellation()
             guard loadID == id, !closed, !invalidated else { return }
@@ -265,7 +332,7 @@ final class WorkspaceModel: ObservableObject {
     }
 
     func loadMore(_ query: WorkspaceCallsQuery) async {
-        guard !paging, !loading, !closed, !invalidated, !suspended, pagination.hasMore, let scope = scope else { return }
+        guard !paging, !loading, !closed, !invalidated, !suspended, !renewingSession, renewalAPI == nil, pagination.hasMore, let scope = scope else { return }
         paging = true; pageError = nil
         let id = loadID, generation = pagination.generation, next = pagination.currentPage + 1
         defer { if loadID == id { paging = false } }
@@ -278,5 +345,15 @@ final class WorkspaceModel: ObservableObject {
             guard !Task.isCancelled, loadID == id, !closed else { return }
             pageError = error.localizedDescription; handle(error)
         }
+    }
+
+    private func acceptProfile(_ candidate: WorkspaceProfile) throws {
+        if let expected = dashboardIdentity {
+            guard candidate.user.id == expected.userId, candidate.user.vendor?.id == expected.vendorId else { throw WorkspaceError.scopeChanged }
+        }
+        let candidateScope = candidate.scope(origin: api.origin)
+        if let expected = verifiedProfileScope, candidateScope != expected { throw WorkspaceError.scopeChanged }
+        verifiedProfileScope = candidateScope
+        profile = candidate
     }
 }

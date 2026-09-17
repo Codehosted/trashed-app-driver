@@ -125,7 +125,7 @@ test('bridge ACK/event/reset lifecycle retains native auth, document, modal and 
   assert.match(controller,/if !NativeNavigationPolicy.isWorkspace\(url, configured: self.bridge\?\.config.serverURL\) \{ self.nativeNavigation.reset\(\); self.nativeChat.reset\(\) \}/);
   assert.match(controller,/private func presentNativeOnboarding\(\) \{\s*nativeNavigation.reset\(\)/);
   assert.match(controller,/private func presentNativeLogin[\s\S]*?nativeNavigation.reset\(\)/);
-  assert.match(controller,/nativeNavigationAvailable: Bool \{\s*onboardingReady && nativeOnboardingController == nil && nativeLoginController == nil\s*&& webView\?\.isLoading == false/);
+  assert.match(controller,/nativeNavigationAvailable: Bool \{\s*onboardingReady && nativeOnboardingController == nil && nativeLoginController == nil\s*&& !nativeWorkspaceRoot && webView\?\.isLoading == false/);
   const history = controller.slice(controller.indexOf('@objc private func handleHistoryEdge'), controller.indexOf('private func presentNativeOnboarding'));
   assert.ok(history.indexOf('nativeNavigation.dismissSheet()') < history.indexOf('webView.evaluateJavaScript'));
   assert.match(history,/webView.go\(to: target\)/);

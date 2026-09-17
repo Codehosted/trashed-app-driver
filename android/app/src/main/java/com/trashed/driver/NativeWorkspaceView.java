@@ -115,6 +115,9 @@ final class NativeWorkspaceView extends LinearLayout {
         status.setAccessibilityLiveRegion(View.ACCESSIBILITY_LIVE_REGION_POLITE); addView(status, tokens.row());
         if (!"calls".equals(destination)) {
             ScrollView scroll = new ScrollView(tokens.context); body = tokens.column();
+            // The host consumes the measured dock and system insets. This is only
+            // scrollable footer breathing room, not another dock-height inset.
+            if ("dashboard".equals(destination)) body.setPadding(0, 0, 0, tokens.dp(24));
             scroll.addView(body, tokens.row()); addView(scroll, new LinearLayout.LayoutParams(-1, 0, 1));
             if("dashboard".equals(destination)) scroll.setOnTouchListener(new View.OnTouchListener(){float start=-1;public boolean onTouch(View v,MotionEvent e){if(e.getActionMasked()==MotionEvent.ACTION_DOWN)start=scroll.canScrollVertically(-1)?-1:e.getY();if(e.getActionMasked()==MotionEvent.ACTION_UP && start>=0 && e.getY()-start>tokens.dp(100)){start=-1;refresh();}return false;}});
         } else buildCalls();

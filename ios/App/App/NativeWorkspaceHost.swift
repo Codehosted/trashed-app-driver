@@ -11,9 +11,9 @@ final class WorkspaceHostingController: UIHostingController<WorkspaceScreen> {
     private var finished = false
     private var revalidation: Task<Void, Never>?
 
-    init(api: WorkspaceAPI, route: WorkspaceRoute, openWeb: @escaping (String) -> Void, close: @escaping () -> Void) {
-        model = WorkspaceModel(api: api)
-        super.init(rootView: WorkspaceScreen(model: model, route: route, openWeb: openWeb, close: close))
+    init(api: WorkspaceAPI, route: WorkspaceRoute, isRoot: Bool = false, profile: WorkspaceProfile? = nil, openWeb: @escaping (String) -> Void, close: @escaping () -> Void) {
+        model = WorkspaceModel(api: api, profile: profile)
+        super.init(rootView: WorkspaceScreen(model: model, route: route, isRoot: isRoot, openWeb: openWeb, close: close))
         modalPresentationStyle = .fullScreen
         isModalInPresentation = true
         NotificationCenter.default.addObserver(self, selector: #selector(backgrounded), name: UIApplication.didEnterBackgroundNotification, object: nil)
@@ -43,8 +43,13 @@ final class WorkspaceHostingController: UIHostingController<WorkspaceScreen> {
         model.close()
     }
 
+    func openNativeRoute(_ route: WorkspaceRoute) {
+        guard !finished, !model.invalidated else { return }
+        model.requestedRoute = route
+    }
+
     override func viewDidDisappear(_ animated: Bool) {
         super.viewDidDisappear(animated)
-        if isBeingDismissed || presentingViewController == nil { finish() }
+        if isBeingDismissed || (presentingViewController == nil && parent == nil) { finish() }
     }
 }
