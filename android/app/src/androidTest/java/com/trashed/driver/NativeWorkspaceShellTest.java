@@ -104,6 +104,7 @@ public class NativeWorkspaceShellTest {
                         "tabs", Arrays.asList(
                             Map.of("id", "vendor-profile", "label", "Profile", "icon", "profile", "badge", 0, "selected", false, "items", Collections.emptyList()),
                             Map.of("id", "vendor-call-history", "label", "Calls", "icon", "calls", "badge", 0, "selected", false, "items", Collections.emptyList()),
+                            Map.of("id", "vendor-dashboard", "label", "Dashboard", "icon", "dashboard", "badge", 0, "selected", false, "items", Collections.emptyList()),
                             Map.of("id", "vendor-orders", "label", "Orders", "icon", "manage", "badge", 0, "selected", false, "items", Collections.emptyList()))));
                     scenario.onActivity(a -> a.setNativeNavigation(directState, new NativeBottomNavigation.Listener() {
                         public void select(NativeNavigationState.Selection selection) { forwarded.incrementAndGet(); }
@@ -111,10 +112,40 @@ public class NativeWorkspaceShellTest {
                     }));
                     long[] sourceDocument = {0}; int[] sourceHistory = {0};
                     scenario.onActivity(a -> { sourceDocument[0] = a.navigationDocument(); sourceHistory[0] = originalWeb.get().copyBackForwardList().getSize(); });
-                    for (String id : new String[]{"vendor-profile", "vendor-call-history"}) {
+                    for (String id : new String[]{"vendor-profile", "vendor-call-history", "vendor-dashboard"}) {
                         scenario.onActivity(a -> ((NativeBottomNavigation.Listener)field(field(a,"nativeNavigation"),"listener")).select(new NativeNavigationState.Selection(directState,id)));
                         await(scenario,"direct native " + id,a -> workspace(a)!=null);
                         scenario.moveToState(Lifecycle.State.CREATED); scenario.moveToState(Lifecycle.State.RESUMED);
+                        if (id.equals("vendor-dashboard")) {
+                            await(scenario,"dashboard data and visible dock",a -> workspace(a).findViewWithTag("native-dashboard") != null
+                                && ((NativeDashboardView)workspace(a).findViewWithTag("native-dashboard")).snapshot != null
+                                && ((View)field(field(a,"nativeNavigation"),"bar")).isShown());
+                            scenario.onActivity(a -> {
+                                NativeDashboardView dashboard=(NativeDashboardView)workspace(a).findViewWithTag("native-dashboard");
+                                View parent=dashboard;
+                                while (!(parent instanceof android.widget.ScrollView)) parent=(View)parent.getParent();
+                                ((android.widget.ScrollView)parent).fullScroll(View.FOCUS_DOWN);
+                            });
+                            InstrumentationRegistry.getInstrumentation().waitForIdleSync();
+                            await(scenario,"dashboard final footer fits above measured dock",a -> {
+                                NativeDashboardView dashboard=(NativeDashboardView)workspace(a).findViewWithTag("native-dashboard");
+                                View footer=dashboard.getChildAt(dashboard.getChildCount()-1);
+                                com.google.android.material.bottomnavigation.BottomNavigationView bar=(com.google.android.material.bottomnavigation.BottomNavigationView)field(field(a,"nativeNavigation"),"bar");
+                                android.graphics.Rect shown=new android.graphics.Rect(),dock=new android.graphics.Rect();
+                                boolean visible=footer.getGlobalVisibleRect(shown)&&bar.getGlobalVisibleRect(dock);
+                                return visible && shown.height()==footer.getHeight() && shown.bottom<dock.top;
+                            });
+                            scenario.onActivity(a -> {
+                                NativeDashboardView dashboard=(NativeDashboardView)workspace(a).findViewWithTag("native-dashboard");
+                                View footer=dashboard.getChildAt(dashboard.getChildCount()-1);
+                                com.google.android.material.bottomnavigation.BottomNavigationView bar=(com.google.android.material.bottomnavigation.BottomNavigationView)field(field(a,"nativeNavigation"),"bar");
+                                assertTrue("Native dashboard dock selection",bar.getMenu().getItem(2).isChecked());
+                                android.graphics.Rect rect=new android.graphics.Rect(),dock=new android.graphics.Rect();
+                                assertTrue(footer.getGlobalVisibleRect(rect));assertTrue(bar.getGlobalVisibleRect(dock));
+                                android.util.Log.i("NativeDashboardDockTest","PASS footer="+rect+" dock="+dock+" gap="+(dock.top-rect.bottom));
+                            });
+                            NativeWorkspaceRegressionTest.screenshot("shell-dashboard-dock-footer.png");
+                        }
                         scenario.onActivity(a -> {
                             assertNotNull(workspace(a)); assertEquals(server.origin()+"/vendor", originalWeb.get().getUrl());
                             assertEquals(sourceDocument[0],a.navigationDocument()); assertEquals(sourceHistory[0],originalWeb.get().copyBackForwardList().getSize());
@@ -223,6 +254,7 @@ public class NativeWorkspaceShellTest {
                 assertTrue("Only synthetic loopback session authorized",cookie.contains(COOKIE+"=local-shell-fixture"));String body;
                 if(request.startsWith("GET /api/user/profile ")){profiles.incrementAndGet();body="{\"user\":{\"id\":1,\"name\":\"Shell Fixture\",\"email\":\"shell@example.invalid\",\"roles\":[\"vendor\"],\"vendorPermissions\":{},\"vendor\":{\"id\":2,\"businessName\":\"Loopback only\"}},\"capabilities\":{\"calls\":true}}";}
                 else if(request.startsWith("GET /api/ai-features/calls?")){calls.incrementAndGet();body="{\"currentPage\":1,\"totalPages\":0,\"totalCalls\":0,\"calls\":[]}";}
+                else if(request.startsWith("GET /api/mobile/dashboard ")){body="{\"version\":1,\"generatedAt\":\"2026-09-17T12:00:00Z\",\"scope\":{\"userId\":1,\"vendorId\":2},\"businessName\":\"Synthetic dock fixture\",\"currency\":\"USD\",\"revenue\":{\"today\":150,\"thisWeek\":550,\"thisMonth\":1800,\"thisQuarter\":4100,\"thisYear\":14650,\"monthlyGrowthPercent\":50},\"monthlyRevenue\":[{\"month\":\"Aug\",\"revenue\":1200},{\"month\":\"Sep\",\"revenue\":1800}],\"rentals\":{\"total\":18,\"active\":6,\"pending\":2,\"completed\":10},\"inventory\":{\"total\":12,\"available\":5,\"rented\":6,\"maintenance\":1},\"customers\":{\"total\":9},\"inventoryByType\":[{\"name\":\"roll_off\",\"count\":8},{\"name\":\"storage_pod\",\"count\":4}]}";}
                 else throw new AssertionError("Unexpected fixture request "+request);
                 NativeWorkspaceRegressionTest.Fixture.respond(s,200,"application/json",body.getBytes(StandardCharsets.UTF_8));
             }catch(Throwable e){if(!closed)failure=e;}},"shell-loopback");thread.start();
