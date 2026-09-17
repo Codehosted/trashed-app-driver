@@ -11,4 +11,5 @@ test('local and automatic iOS release builds use the same new store version', ()
   assert.match(workflow, /marketing_version:[\s\S]*?default: "1\.0\.5"/);
   assert.match(workflow, /github\.event\.inputs\.marketing_version \|\| '1\.0\.5'/);
   assert.ok(read('scripts/ci-upload-testflight.sh').includes('MARKETING_VERSION="${MARKETING_VERSION:-1.0.5}"'));
+  assert.match(read('.github/workflows/android-checkpoint.yml'), /TRASHED_ANDROID_VERSION_NAME: 1\.0\.5-checkpoint/);
 });
