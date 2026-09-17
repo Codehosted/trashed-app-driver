@@ -1,6 +1,8 @@
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { readFileSync } from 'node:fs';
+import { readFileSync, mkdtempSync, writeFileSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { test } from 'node:test';
 
 const root = new URL('../', import.meta.url);
@@ -30,6 +32,24 @@ test('release script rejects missing version metadata before installing or build
     assert.match(result.stderr, new RegExp(missing));
     assert.equal(result.stdout, '');
   }
+});
+
+test('release rejects missing signing material before network, cleanup, dependency install or build', () => {
+  const bin = mkdtempSync(join(tmpdir(), 'android-release-preflight-'));
+  writeFileSync(join(bin, 'node'), '#!/bin/sh\nexit 91\n', { mode: 0o700 });
+  try {
+    for (const missing of ['TRASHED_ANDROID_KEYSTORE', 'TRASHED_ANDROID_KEY_ALIAS', 'TRASHED_ANDROID_KEYSTORE_PASSWORD', 'TRASHED_ANDROID_KEY_PASSWORD', 'unreadable-file']) {
+      const env = { ...process.env, TRASHED_ANDROID_VERSION_CODE: '6', TRASHED_ANDROID_VERSION_NAME: '1.0.6',
+        TRASHED_ANDROID_KEYSTORE: join(bin, 'absent-keystore'), TRASHED_ANDROID_KEY_ALIAS: 'fixture',
+        TRASHED_ANDROID_KEYSTORE_PASSWORD: 'fixture-only', TRASHED_ANDROID_KEY_PASSWORD: 'fixture-only' };
+      env.PATH = bin + ':' + process.env.PATH;
+      if (missing !== 'unreadable-file') delete env[missing];
+      const result = spawnSync('bash', ['scripts/ci-build-android.sh', 'release'], { cwd: root, env, encoding: 'utf8', timeout: 2000 });
+      assert.equal(result.status, 1, result.stderr);
+      assert.match(result.stderr, new RegExp(missing === 'unreadable-file' ? 'readable keystore file' : missing));
+      assert.equal(result.stdout, '', 'preflight must run before any network checks or destructive work');
+    }
+  } finally { rmSync(bin, { recursive: true, force: true }); }
 });
 
 const optionalHardware = [

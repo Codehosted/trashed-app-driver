@@ -58,6 +58,8 @@ test('release scripts stop before artifact deletion, dependency installation, or
   const trace = join(directory, 'trace');
   const artifacts = join(directory, 'artifacts');
   try {
+    const keystore = join(directory, 'fixture-keystore');
+    writeFileSync(keystore, 'synthetic readable file; signing must never execute');
     // Mock the shared CLI boundary and Apple discovery; never contact a provider.
     writeFileSync(join(directory, 'node'), '#!/bin/sh\n[ "$1" = scripts/check-mobile-backend.mjs ] || exit 91\nprintf "preflight\\n" >> "$PREFLIGHT_TRACE"\necho "production /app is not ready" >&2\nexit 3\n', { mode: 0o755 });
     writeFileSync(join(directory, 'curl'), '#!/bin/sh\nprintf \'{"provider":"apple","audience":"com.trashed.driver","protocolVersion":1,"configured":true}\'\n', { mode: 0o755 });
@@ -69,6 +71,8 @@ test('release scripts stop before artifact deletion, dependency installation, or
       ARTIFACT_DIR: artifacts, RUNNER_TEMP: directory,
       TRASHED_WEB_URL: 'http://localhost:3000',
       TRASHED_ANDROID_VERSION_CODE: '99', TRASHED_ANDROID_VERSION_NAME: 'test-only',
+      TRASHED_ANDROID_KEYSTORE: keystore, TRASHED_ANDROID_KEY_ALIAS: 'fixture',
+      TRASHED_ANDROID_KEYSTORE_PASSWORD: 'fixture-only', TRASHED_ANDROID_KEY_PASSWORD: 'fixture-only',
       APP_STORE_CONNECT_KEY_ID: 'test', APP_STORE_CONNECT_ISSUER_ID: 'test',
       APP_STORE_CONNECT_API_KEY_P8: 'test', GOOGLE_IOS_CLIENT_ID: 'test.apps.googleusercontent.com',
       IOS_DISTRIBUTION_CERTIFICATE_BASE64: 'test', IOS_DISTRIBUTION_CERTIFICATE_PASSWORD: 'test',

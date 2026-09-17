@@ -10,6 +10,14 @@ esac
 if [[ "$MODE" == release ]]; then
   : "${TRASHED_ANDROID_VERSION_CODE:?set an unused Google Play version code}"
   : "${TRASHED_ANDROID_VERSION_NAME:?set the Android release version name}"
+  # Fail before network checks, artifact cleanup or dependency/build work.
+  : "${TRASHED_ANDROID_KEYSTORE:?missing TRASHED_ANDROID_KEYSTORE}"
+  : "${TRASHED_ANDROID_KEY_ALIAS:?missing TRASHED_ANDROID_KEY_ALIAS}"
+  : "${TRASHED_ANDROID_KEYSTORE_PASSWORD:?missing TRASHED_ANDROID_KEYSTORE_PASSWORD}"
+  : "${TRASHED_ANDROID_KEY_PASSWORD:?missing TRASHED_ANDROID_KEY_PASSWORD}"
+  [[ -r "$TRASHED_ANDROID_KEYSTORE" && -f "$TRASHED_ANDROID_KEYSTORE" ]] || {
+    echo 'TRASHED_ANDROID_KEYSTORE must point to a readable keystore file' >&2; exit 1;
+  }
 fi
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -33,10 +41,6 @@ npx cap sync android
 
 cd android
 if [[ "$MODE" == release ]]; then
-  : "${TRASHED_ANDROID_KEYSTORE:?missing TRASHED_ANDROID_KEYSTORE}"
-  : "${TRASHED_ANDROID_KEY_ALIAS:?missing TRASHED_ANDROID_KEY_ALIAS}"
-  : "${TRASHED_ANDROID_KEYSTORE_PASSWORD:?missing TRASHED_ANDROID_KEYSTORE_PASSWORD}"
-  : "${TRASHED_ANDROID_KEY_PASSWORD:?missing TRASHED_ANDROID_KEY_PASSWORD}"
   export TRASHED_REQUIRE_SIGNING=true
   ./gradlew --no-daemon --stacktrace testReleaseUnitTest lintRelease assembleRelease bundleRelease
 else

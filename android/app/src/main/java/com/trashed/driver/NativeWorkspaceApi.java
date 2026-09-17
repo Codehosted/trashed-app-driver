@@ -93,6 +93,15 @@ final class NativeWorkspaceApi {
         if (identity.isEmpty() || !identity.equals(NativeWorkspacePolicy.identityFingerprint(cookies.get(origin))))
             throw new Failure(401,"Your session or workspace changed. Reopen this screen.");
     }
+    private void checkCancelled() throws IOException {
+        if (cancelled || Thread.currentThread().isInterrupted()) throw new IOException("Cancelled");
+    }
+    private void checkCurrent() throws IOException {
+        checkCancelled();
+        checkIdentity();
+        // A cookie-source callback can cancel while the live identity is read.
+        checkCancelled();
+    }
     void cancel() { cancelled = true; synchronized (active) { for (HttpURLConnection c : active) c.disconnect(); active.clear(); } }
     NativeDashboard dashboard() throws Exception { return new NativeDashboard(json("GET", "/api/mobile/dashboard", null)); }
     Profile profile() throws Exception { return new Profile(json("GET", "/api/user/profile", null)); }
@@ -134,10 +143,11 @@ final class NativeWorkspaceApi {
             }
             check(connection);
             if (!"application/json".equals(mime(connection))) throw new IOException("The server did not return JSON.");
+            JSONObject result;
             try (InputStream input = connection.getInputStream()) {
-                JSONObject result = new JSONObject(new String(bytes(input, 2 * 1024 * 1024), StandardCharsets.UTF_8));
-                checkIdentity(); return result;
+                result = new JSONObject(new String(bytes(input, 2 * 1024 * 1024), StandardCharsets.UTF_8));
             }
+            checkCurrent(); return result;
         } finally { active.remove(connection); connection.disconnect(); }
     }
     File recording(File cache, String value) throws Exception {
@@ -153,20 +163,19 @@ final class NativeWorkspaceApi {
             try (InputStream input = connection.getInputStream(); OutputStream output = new FileOutputStream(file)) {
                 byte[] buffer = new byte[8192]; int size, total = 0;
                 while ((size = input.read(buffer)) != -1) {
-                    total += size; if (cancelled || Thread.currentThread().isInterrupted()) throw new IOException("Cancelled");
+                    total += size; checkCancelled();
                     if (total > 32 * 1024 * 1024) throw new IOException("Recording exceeds the 32 MB playback limit.");
                     output.write(buffer, 0, size);
                 }
             }
-            checkIdentity();
+            checkCurrent();
             if (file.length() == 0) throw new IOException("The recording is empty.");
             return file;
         } catch (Exception error) { if (file != null) file.delete(); throw error; }
         finally { active.remove(connection); connection.disconnect(); }
     }
     private HttpURLConnection connection(URL url, String method, boolean authenticated) throws Exception {
-        if (cancelled || Thread.currentThread().isInterrupted()) throw new IOException("Cancelled");
-        checkIdentity();
+        checkCurrent();
         String requestCookies = authenticated ? Objects.toString(cookies.get(url.toString()), "") : "";
         if (authenticated && !identity.equals(NativeWorkspacePolicy.identityFingerprint(requestCookies)))
             throw new Failure(401,"Your session changed before this request. Reopen the screen.");
@@ -177,25 +186,29 @@ final class NativeWorkspaceApi {
         // Explicit headers; never install CookieHandler globally and never pass a URL to MediaPlayer.
         connection.setRequestProperty("Cookie", requestCookies);
         if (authenticated) connection.setRequestProperty("Origin", origin);
-        active.add(connection); if (cancelled) { connection.disconnect(); throw new IOException("Cancelled"); }
+        active.add(connection);
+        try { checkCancelled(); }
+        catch (IOException error) { active.remove(connection); connection.disconnect(); throw error; }
         return connection;
     }
     private void check(HttpURLConnection connection) throws Exception {
         int code = connection.getResponseCode();
-        List<String> issued = new ArrayList<>();
-        for (Map.Entry<String,List<String>> entry : connection.getHeaderFields().entrySet())
-            if (entry.getKey() != null && entry.getKey().equalsIgnoreCase("Set-Cookie")) issued.addAll(entry.getValue());
-        if (!issued.isEmpty()) cookies.receive(connection.getURL().toString(), issued);
+        checkCancelled();
+        // Data transport is a read-only cookie consumer, including PATCH, audio,
+        // and error responses. Only login/session owners may update the OS jar:
+        // a delayed old-account Set-Cookie must never replace the current login.
         if (code >= 300 && code < 400) throw new Failure(code, "The server redirected this request. Sign in again or retry.");
         if (code == 401) throw new Failure(code, "Your session expired. Sign in again.");
         if (code == 403) throw new Failure(code, "Your role or plan does not allow this feature.");
         if (code == 404 && connection.getURL().getPath().endsWith("/recording")) throw new Failure(code,"This recording is not ready or is no longer available. Try again shortly.");
         if (code == 410) throw new Failure(code,"This legacy recording is no longer available.");
         if (code < 200 || code >= 300) throw new Failure(code, code == 409 ? "That email is already in use." : "Request failed (" + code + "). Please retry.");
+        checkCurrent();
     }
     private byte[] bytes(InputStream input, int limit) throws IOException {
         ByteArrayOutputStream out = new ByteArrayOutputStream(); byte[] buffer = new byte[8192]; int read;
-        while ((read = input.read(buffer)) != -1) { if (cancelled || out.size() + read > limit) throw new IOException("Response unavailable or too large"); out.write(buffer, 0, read); }
+        while ((read = input.read(buffer)) != -1) { checkCancelled(); if (out.size() + read > limit) throw new IOException("Response unavailable or too large"); out.write(buffer, 0, read); }
+        checkCancelled(); // Also covers zero-byte bodies and cancellation at EOF.
         return out.toByteArray();
     }
     private static String mime(HttpURLConnection connection) { return Objects.toString(connection.getContentType(),"").split(";",2)[0].trim().toLowerCase(Locale.ROOT); }

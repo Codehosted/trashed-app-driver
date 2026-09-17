@@ -25,6 +25,7 @@ public class NativeWorkspaceApiTest {
     }
     static class Reply {
         final int code; final String type, headers; final byte[] body;
+        Runnable beforeResponse = () -> {};
         Reply(int code,String type,String body){this(code,type,body,"");}
         Reply(int code,String type,String body,String headers){this.code=code;this.type=type;this.body=body.getBytes(StandardCharsets.UTF_8);this.headers=headers;}
     }
@@ -43,6 +44,7 @@ public class NativeWorkspaceApiTest {
                     int length=0;for(String line:value.split("\r\n"))if(line.toLowerCase(Locale.ROOT).startsWith("content-length:"))length=Integer.parseInt(line.split(":",2)[1].trim());
                     byte[] payload=new byte[length];int offset=0;while(offset<length){int count=input.read(payload,offset,length-offset);if(count<0)break;offset+=count;}
                     requests.add(value+new String(payload,StandardCharsets.UTF_8));
+                    reply.beforeResponse.run();
                     OutputStream out=client.getOutputStream();out.write(("HTTP/1.1 "+reply.code+" Fixture\r\nContent-Type: "+reply.type+"\r\nContent-Length: "+reply.body.length+"\r\nConnection: close\r\n"+reply.headers+"\r\n").getBytes(StandardCharsets.UTF_8));out.write(reply.body);out.flush();
                 }}catch(IOException error){if(!socket.isClosed())throw new RuntimeException(error);}
             });
@@ -53,7 +55,7 @@ public class NativeWorkspaceApiTest {
     static Reply json(JSONObject value){return new Reply(200,"application/json",value.toString());}
     // JDK HttpURLConnection rejects PATCH; Android has its own implementation.
     // Save semantics use an explicit unit double; emulator tests must prove PATCH on Android.
-    static final class SaveConnection extends HttpURLConnection {
+    static class SaveConnection extends HttpURLConnection {
         final Reply reply; final ByteArrayOutputStream body=new ByteArrayOutputStream();
         SaveConnection(URL url,Reply reply){super(url);this.reply=reply;}
         @Override public void setRequestMethod(String value){method=value;}
@@ -63,7 +65,13 @@ public class NativeWorkspaceApiTest {
         @Override public OutputStream getOutputStream(){return body;}
         @Override public int getResponseCode(){return reply.code;}
         @Override public String getContentType(){return reply.type;}
-        @Override public Map<String,List<String>> getHeaderFields(){return Collections.emptyMap();}
+        @Override public Map<String,List<String>> getHeaderFields(){
+            Map<String,List<String>> headers=new HashMap<>();
+            for(String line:reply.headers.split("\r\n")) if(line.contains(":")) {
+                String[] pair=line.split(":",2);headers.computeIfAbsent(pair[0],key->new ArrayList<>()).add(pair[1].trim());
+            }
+            return headers;
+        }
         @Override public InputStream getInputStream(){return new ByteArrayInputStream(reply.body);}
     }
     @Test public void strictNumericIdentityIsNotCoerced() throws Exception {
@@ -114,17 +122,77 @@ public class NativeWorkspaceApiTest {
         cancelled.cancel();try{cancelled.profile();fail();}catch(IOException expected){}
         assertEquals(0,opened[0]);
     }
-    @Test public void trustedSetCookieIsDeliveredBeforeRotationInvalidatesResponse() throws Exception {
-        final String[] cookies={"next-auth.session-token=fixture-session"};final List<String> received=new ArrayList<>();
-        JSONObject value=profile(12,"Fixture","fixture@example.test",null);
-        try(Fixture f=new Fixture(new Reply(200,"application/json",value.toString(),"Set-Cookie: next-auth.session-token=rotated; Path=/; HttpOnly\r\n"))){
-            NativeWorkspaceApi.CookieSource source=new NativeWorkspaceApi.CookieSource(){
-                public String get(String url){return cookies[0];}
-                public void receive(String url,List<String> values){assertTrue(url.startsWith(f.origin+"/api/"));received.addAll(values);cookies[0]="next-auth.session-token=rotated";}
-            };
-            try{new NativeWorkspaceApi(f.origin,source).profile();fail();}catch(NativeWorkspaceApi.Failure expected){assertEquals(401,expected.status);}
-            assertEquals(1,received.size());assertTrue(received.get(0).contains("HttpOnly"));
+    static final class MutableCookies implements NativeWorkspaceApi.CookieSource {
+        volatile String value="next-auth.session-token=fixture-A";
+        final List<String> received=Collections.synchronizedList(new ArrayList<>());
+        public String get(String url){return value;}
+        public void receive(String url,List<String> values){received.addAll(values);value=values.get(0).split(";",2)[0];}
+    }
+    static final String ROTATION="Set-Cookie: next-auth.session-token=stale-A; Path=/; HttpOnly\r\n";
+    static final String DELETION="Set-Cookie: next-auth.session-token=; Path=/; Max-Age=0\r\n";
+    @Test public void sameIdentityGetIgnoresResponseCookieRotation() throws Exception {
+        MutableCookies cookies=new MutableCookies();
+        try(Fixture f=new Fixture(new Reply(200,"application/json",profile(12,"Fixture","fixture@example.test",null).toString(),ROTATION))){
+            assertEquals(12,new NativeWorkspaceApi(f.origin,cookies).profile().id);
+            assertEquals("next-auth.session-token=fixture-A",cookies.value);assertTrue(cookies.received.isEmpty());
         }
+    }
+    @Test public void delayedAccountAResponseCannotOverwriteNewAccountB() throws Exception {
+        for(String headers:new String[]{ROTATION,DELETION}) {
+            MutableCookies cookies=new MutableCookies();CountDownLatch requested=new CountDownLatch(1),release=new CountDownLatch(1);
+            Reply reply=new Reply(200,"application/json",profile(12,"Fixture","fixture@example.test",null).toString(),headers);
+            reply.beforeResponse=()->{requested.countDown();try{assertTrue(release.await(5,TimeUnit.SECONDS));}catch(InterruptedException e){Thread.currentThread().interrupt();throw new AssertionError(e);}};
+            ExecutorService worker=Executors.newSingleThreadExecutor();
+            try(Fixture f=new Fixture(reply)) {
+                NativeWorkspaceApi api=new NativeWorkspaceApi(f.origin,cookies);
+                Future<NativeWorkspaceApi.Profile> response=worker.submit(api::profile);
+                try {
+                    assertTrue(requested.await(5,TimeUnit.SECONDS));cookies.value="next-auth.session-token=fixture-B";release.countDown();
+                    try{response.get(5,TimeUnit.SECONDS);fail("stale result published");}
+                    catch(ExecutionException expected){assertTrue(expected.getCause() instanceof NativeWorkspaceApi.Failure);assertEquals(401,((NativeWorkspaceApi.Failure)expected.getCause()).status);}
+                    assertEquals("next-auth.session-token=fixture-B",cookies.value);assertTrue(cookies.received.isEmpty());
+                    f.task.get(5,TimeUnit.SECONDS);
+                } finally {release.countDown();api.cancel();}
+            } finally {worker.shutdownNow();assertTrue(worker.awaitTermination(5,TimeUnit.SECONDS));}
+        }
+    }
+    @Test public void errorsAndRedirectsNeverInstallOrDeleteCookies() throws Exception {
+        for(int code:new int[]{401,403,302,500}) for(String header:new String[]{ROTATION,DELETION}) {
+            MutableCookies cookies=new MutableCookies();
+            try(Fixture f=new Fixture(new Reply(code,"application/json","{}",header+"Location: https://example.invalid/\r\n"))) {
+                try{new NativeWorkspaceApi(f.origin,cookies).profile();fail();}catch(NativeWorkspaceApi.Failure expected){assertEquals(code,expected.status);}
+                assertEquals("next-auth.session-token=fixture-A",cookies.value);assertTrue(cookies.received.isEmpty());
+            }
+        }
+    }
+    @Test public void cancellationAndInterruptionAtHeadersEofCloseAndIdentityNeverPublish() throws Exception {
+        for(boolean recording:new boolean[]{false,true}) for(boolean interrupt:new boolean[]{false,true})
+            for(String stage:new String[]{"headers","empty-eof","eof","close","identity"}) {
+                File cache=new File(System.getProperty("java.io.tmpdir"),"workspace-cancel-"+UUID.randomUUID());assertTrue(cache.mkdir());
+                NativeWorkspaceApi[] api={null};boolean[] completed={false};
+                Runnable stop=()->{if(interrupt)Thread.currentThread().interrupt();else api[0].cancel();};
+                NativeWorkspaceApi.CookieSource cookies=url->{if(completed[0] && stage.equals("identity"))stop.run();return "next-auth.session-token=fixture-A";};
+                Reply reply=new Reply(200,recording?"audio/wav":"application/json",stage.equals("empty-eof")?"":recording?"RIFF-fixture":profile(12,"Fixture","fixture@example.test",null).toString());
+                api[0]=new NativeWorkspaceApi("https://trashed.app",cookies,url->new SaveConnection(url,reply){
+                    @Override public int getResponseCode(){if(stage.equals("headers"))stop.run();return super.getResponseCode();}
+                    @Override public InputStream getInputStream(){return new ByteArrayInputStream(reply.body){
+                        @Override public synchronized int read(byte[] b,int off,int len){int n=super.read(b,off,len);if(n==-1){completed[0]=true;if(stage.endsWith("eof"))stop.run();}return n;}
+                        @Override public void close(){if(stage.equals("close"))stop.run();}
+                    };}
+                });
+                try {
+                    try{if(recording)api[0].recording(cache,"/api/calls/fixture/recording");else api[0].profile();fail("published after "+stage);}
+                    catch(IOException expected){assertEquals("Cancelled",expected.getMessage());}
+                    assertEquals(0,Objects.requireNonNull(cache.list()).length);
+                } finally {Thread.interrupted();for(File file:Objects.requireNonNull(cache.listFiles()))assertTrue(file.delete());assertTrue(cache.delete());}
+            }
+    }
+    @Test public void recordingTransportIsReadOnly() throws Exception {
+        MutableCookies cookies=new MutableCookies();File cache=new File(System.getProperty("java.io.tmpdir"),"workspace-audio-"+UUID.randomUUID());assertTrue(cache.mkdir());
+        try(Fixture f=new Fixture(new Reply(200,"audio/wav","RIFF-fixture",ROTATION))) {
+            File audio=new NativeWorkspaceApi(f.origin,cookies).recording(cache,"/api/calls/fixture/recording");assertTrue(audio.delete());
+            assertEquals("next-auth.session-token=fixture-A",cookies.value);assertTrue(cookies.received.isEmpty());
+        } finally {for(File file:Objects.requireNonNull(cache.listFiles()))file.delete();assertTrue(cache.delete());}
     }
     @Test public void callsUseRealPagingQueryAndRejectChangedWorkspace() throws Exception {
         JSONObject value=profile(12,"Fixture","fixture@example.test",null);
@@ -142,11 +210,13 @@ public class NativeWorkspaceApiTest {
     @Test public void emailChangeReturnsConfirmedReauthenticationInsteadOfFailingReadback() throws Exception {
         JSONObject before=profile(12,"Fixture","fixture@example.test",null);
         JSONObject saved=profile(12,"Fixture","changed@example.test",null);
-        Queue<Reply> replies=new ArrayDeque<>(Arrays.asList(json(before),json(new JSONObject().put("success",true).put("reauthenticationRequired",true).put("user",saved.getJSONObject("user")))));
-        NativeWorkspaceApi api=new NativeWorkspaceApi("https://trashed.app",url->"next-auth.session-token=fixture-session",url->new SaveConnection(url,replies.remove()));
+        MutableCookies cookies=new MutableCookies();
+        Queue<Reply> replies=new ArrayDeque<>(Arrays.asList(json(before),new Reply(200,"application/json",new JSONObject().put("success",true).put("reauthenticationRequired",true).put("user",saved.getJSONObject("user")).toString(),DELETION)));
+        NativeWorkspaceApi api=new NativeWorkspaceApi("https://trashed.app",cookies,url->new SaveConnection(url,replies.remove()));
         try { api.save(new NativeWorkspaceApi.Profile(before),"Fixture","changed@example.test",""); fail(); }
         catch(NativeWorkspaceApi.EmailChanged expected){assertEquals("Email saved. Sign in again with your new address.",expected.getMessage());}
         assertTrue(replies.isEmpty());
+        assertEquals("next-auth.session-token=fixture-A",cookies.value);assertTrue(cookies.received.isEmpty());
     }
     @Test public void changedRequestCookieCannotMutateTheNewAccount() throws Exception {
         final int[] opened={0};
