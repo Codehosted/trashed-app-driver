@@ -5,12 +5,21 @@ No database/provider credentials or production data. Start with --port 3421.
 import argparse, base64, hashlib, io, json, math, struct, threading, wave
 from pathlib import Path
 from http.server import ThreadingHTTPServer, BaseHTTPRequestHandler
+from socketserver import TCPServer
 from urllib.parse import urlparse, parse_qs
 
 state={'name':'Morgan Ellis (Fixture)','email':'morgan@example.test','phone':'+15555550123','userId':12,'failSave':False,'expired':False,'dashboardError':0,'dashboardZero':False,'pushError':0,'receiptMatched':True,'requests':[]}
 state.update({'bridgeCommand':0,'bridgeResults':[], 'rentalsError':0, 'rentalsEmpty':False, 'rentalsPermission':True, 'rentalsWrongScope':False})
 state['rentalsLargeCount'] = 0
 lock=threading.Lock()
+class LoopbackHTTPServer(ThreadingHTTPServer):
+    """Numeric loopback needs no reverse-DNS lookup (unreliable on hosted CI)."""
+    def server_bind(self):
+        if self.server_address[0] != '127.0.0.1':
+            raise ValueError('Fixture must bind to numeric loopback')
+        TCPServer.server_bind(self)
+        self.server_name = '127.0.0.1'
+        self.server_port = self.server_address[1]
 def profile():
     return {'user':{'id':state['userId'],'name':state['name'],'email':state['email'],'phone':state['phone'],'image':None,'emailVerified':True,'roles':['vendor'],'vendor':{'id':29,'businessName':'Local fixture workspace'},'vendorPermissions':{'dashboard':True,'callCenter':True,'aiAssistant':True,'profile':True,'settings':True,'rentals':state['rentalsPermission']}},'capabilities':{'calls':True}}
 def rentals_map():
@@ -197,4 +206,4 @@ if __name__=='__main__':
     dashboard_fixture=args.dashboard_fixture
     if dashboard_fixture is not None:assert dashboard_fixture.is_file(), 'Missing synthetic dashboard fixture'
     print(f'Local synthetic native workspace fixture on 127.0.0.1:{args.port}',flush=True)
-    ThreadingHTTPServer(('127.0.0.1',args.port),Handler).serve_forever()
+    LoopbackHTTPServer(('127.0.0.1',args.port),Handler).serve_forever()

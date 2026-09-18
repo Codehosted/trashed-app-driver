@@ -7,12 +7,11 @@ import { once } from 'node:events';
 test('rentals fixture exposes mapped, empty, denied, failed and scope-changed responses', async () => {
   const server = spawn('python3', ['-u', '-c', `
 import importlib.util
-from http.server import ThreadingHTTPServer
 spec = importlib.util.spec_from_file_location('workspace_fixture', 'scripts/native-workspace-fixture.py')
 m = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(m)
 m.dashboard_fixture = None
-server = ThreadingHTTPServer(('127.0.0.1', 0), m.Handler)
+server = m.LoopbackHTTPServer(('127.0.0.1', 0), m.Handler)
 print(server.server_port, flush=True)
 server.serve_forever()
 `], { cwd: new URL('../', import.meta.url), stdio: ['ignore', 'pipe', 'pipe'] });
