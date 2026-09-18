@@ -22,7 +22,7 @@ jobs:
       build_number: ${{ steps.version.outputs.build_number }}
     env:
       TRASHED_WEB_URL: https://trashed.app
-      TRASHED_ANDROID_VERSION_NAME: 1.0.6-checkpoint
+      TRASHED_ANDROID_VERSION_NAME: 1.0.7-checkpoint
       CI: true
     steps:
       - uses: actions/checkout@v4
@@ -97,7 +97,7 @@ jobs:
           SLACK_MOBILE_APP_ANDROID_CHANNEL_ID: ${{ vars.SLACK_MOBILE_APP_ANDROID_CHANNEL_ID }}
           MOBILE_PLATFORM: android
           MOBILE_BUILD_STATUS: ${{ needs.build.result }}
-          MOBILE_VERSION: 1.0.6-checkpoint
+          MOBILE_VERSION: 1.0.7-checkpoint
           MOBILE_BUILD_NUMBER: ${{ needs.build.outputs.build_number }}
           SLACK_RECEIPT_PATH: slack-android-receipt.json
       - uses: actions/upload-artifact@v4

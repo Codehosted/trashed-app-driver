@@ -14,5 +14,5 @@ test('Trashed branding keeps installed app identity stable on both platforms', (
   const upload = read('scripts/ci-upload-testflight.sh');
   assert.match(upload, /Archived display name must be Trashed/);
   assert.match(upload, /Verified archive: Trashed/);
-  assert.match(read('.github/workflows/android-checkpoint.yml'), /MOBILE_VERSION: 1\.0\.6-checkpoint/);
+  assert.match(read('.github/workflows/android-checkpoint.yml'), /MOBILE_VERSION: 1\.0\.7-checkpoint/);
 });

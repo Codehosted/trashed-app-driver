@@ -172,7 +172,14 @@ test('compiled Java history policy supports push/pop but never crosses a previou
 });
 
 test('history integration preserves single bridges, native overlays and Capacitor intent/delegate policy', () => {
-  assert.doesNotMatch(ios, /navigationDelegate\s*=|UINavigationController\(|pushViewController\(|reloadFromOrigin\(/);
+  assert.doesNotMatch(ios, /UINavigationController\(|pushViewController\(|reloadFromOrigin\(/);
+  // One outcome observer forwards Capacitor's existing navigation delegate; it
+  // must not replace its URL/permission policy or add a second script bridge.
+  assert.equal([...ios.matchAll(/navigationDelegate\s*=/g)].length, 1);
+  assert.match(ios, /WorkspaceLoadDelegate\(forward: delegate, host: self\)/);
+  assert.match(ios, /forwardingTarget\(for aSelector: Selector!\)/);
+  assert.match(ios, /forward\.webView\?\(webView, didFinish: navigation\)/);
+  assert.match(ios, /forward\.webView\?\(webView, didFail: navigation, withError: error\)/);
   for (const property of ['canGoBack', 'isLoading', 'url']) assert.ok(ios.includes(`observe(\\.${property}`));
   assert.match(ios, /let edge = UIPanGestureRecognizer/);
   assert.doesNotMatch(ios, /UIScreenEdgePanGestureRecognizer/);

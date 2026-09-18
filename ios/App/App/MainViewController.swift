@@ -30,6 +30,32 @@ private final class NativeChatBridgeSourceGuard: NSObject, WKScriptMessageHandle
     }
 }
 
+// Observe load outcomes while forwarding every Capacitor navigation policy and
+// bridge lifecycle callback. The existing script-message source guard is unchanged.
+private final class WorkspaceLoadDelegate: NSObject, WKNavigationDelegate {
+    let forward: WKNavigationDelegate
+    weak var host: MainViewController?
+    init(forward: WKNavigationDelegate, host: MainViewController) { self.forward = forward; self.host = host }
+    override func responds(to aSelector: Selector!) -> Bool { super.responds(to: aSelector) || forward.responds(to: aSelector) }
+    override func forwardingTarget(for aSelector: Selector!) -> Any? { forward.responds(to: aSelector) ? forward : super.forwardingTarget(for: aSelector) }
+    func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
+        forward.webView?(webView, didFinish: navigation)
+        host?.workspaceLoadFinished(navigation)
+    }
+    func webView(_ webView: WKWebView, didFail navigation: WKNavigation!, withError error: Error) {
+        forward.webView?(webView, didFail: navigation, withError: error)
+        host?.workspaceLoadFailed(navigation)
+    }
+    func webView(_ webView: WKWebView, didFailProvisionalNavigation navigation: WKNavigation!, withError error: Error) {
+        forward.webView?(webView, didFailProvisionalNavigation: navigation, withError: error)
+        host?.workspaceLoadFailed(navigation)
+    }
+    func webViewWebContentProcessDidTerminate(_ webView: WKWebView) {
+        forward.webViewWebContentProcessDidTerminate?(webView)
+        host?.workspaceLoadFailed(nil)
+    }
+}
+
 private let driverSessionCookieNames = [
     "next-auth.session-token",
     "__Secure-next-auth.session-token",
@@ -223,6 +249,15 @@ class MainViewController: CAPBridgeViewController, UIGestureRecognizerDelegate {
     private var directWorkspace: WorkspaceDirectNavigation?
     private var workspaceNavigationGeneration = UUID()
     private var lastWebWorkspaceURL: URL?
+    private var workspaceLoadDelegate: WorkspaceLoadDelegate?
+    private var workspaceLoadNavigation: WKNavigation?
+    private var workspaceLoadGeneration = UUID()
+    private var workspaceLoadTimeout: DispatchWorkItem?
+    private var workspaceLoadCover: UIView?
+    private var workspaceLoadLabel: UILabel?
+    private var workspaceLoadSpinner: UIActivityIndicatorView?
+    private var workspaceLoadRetry: UIButton?
+    private var workspaceLoadTarget: URL?
     #if DEBUG && targetEnvironment(simulator)
     private var workspaceFixtureStore: WKWebsiteDataStore?
     #endif
@@ -256,6 +291,12 @@ class MainViewController: CAPBridgeViewController, UIGestureRecognizerDelegate {
             webView.configuration.userContentController.removeScriptMessageHandler(forName: "bridge")
             webView.configuration.userContentController.add(sourceGuard, name: "bridge")
             nativeChatSourceGuard = sourceGuard
+        }
+
+        if let delegate = webView.navigationDelegate {
+            let observer = WorkspaceLoadDelegate(forward: delegate, host: self)
+            workspaceLoadDelegate = observer
+            webView.navigationDelegate = observer
         }
 
         // A native boundary protects every website screen and modal, not just
@@ -348,6 +389,7 @@ class MainViewController: CAPBridgeViewController, UIGestureRecognizerDelegate {
     @available(iOS 16.0, *)
     private func presentNativeWorkspace(route: WorkspaceRoute, url: URL, origin: URL, store: WKHTTPCookieStore, isRoot: Bool = false, profile: WorkspaceProfile? = nil) {
         guard nativeWorkspaceController == nil, presentedViewController == nil else { return }
+        clearWorkspaceLoadCover()
         let isRoot = isRoot || route == .dashboard
         let api = WorkspaceAPI(origin: origin, cookieStore: store)
         let controller = WorkspaceHostingController(api: api, route: route, isRoot: isRoot, profile: profile,
@@ -469,13 +511,106 @@ class MainViewController: CAPBridgeViewController, UIGestureRecognizerDelegate {
             return
         }
         #endif
+        // The native root deliberately covers a stopped/blank WebView. Check
+        // handoff readiness BEFORE destroying the only visible screen; the
+        // post-dismiss guard alone can otherwise reject and expose that blank.
+        if nativeWorkspaceRoot {
+            guard webView?.isLoading == false, viewIfLoaded?.window != nil else { return }
+        }
         let sourceURL = webView?.url
         let generation = workspaceNavigationGeneration
+        showWorkspaceLoadCover(target: url)
         dismissNativeWorkspace { [weak self] in
-            guard let self = self, self.webView?.url == sourceURL, self.nativeNavigationAvailable,
-                  self.workspaceNavigationGeneration == generation else { return }
-            self.webView?.load(URLRequest(url: url))
+            guard let self = self else { return }
+            guard self.webView?.url == sourceURL, self.nativeNavigationAvailable,
+                  self.workspaceNavigationGeneration == generation else {
+                self.workspaceLoadFailed(nil); return
+            }
+            self.startWorkspaceWebLoad(url)
         }
+    }
+
+    private func showWorkspaceLoadCover(target: URL) {
+        clearWorkspaceLoadCover()
+        workspaceLoadTarget = target
+        let cover = UIView(); cover.backgroundColor = .systemBackground
+        cover.accessibilityIdentifier = "workspace-load-recovery"
+        cover.translatesAutoresizingMaskIntoConstraints = false
+        let stack = UIStackView(); stack.axis = .vertical; stack.spacing = 20; stack.alignment = .center
+        stack.translatesAutoresizingMaskIntoConstraints = false
+        let spinner = UIActivityIndicatorView(style: .large); spinner.startAnimating()
+        let label = UILabel(); label.text = "Opening screen…"; label.font = .preferredFont(forTextStyle: .headline)
+        label.numberOfLines = 0; label.textAlignment = .center; label.adjustsFontForContentSizeCategory = true
+        let retry = UIButton(type: .system); retry.setTitle("Retry", for: .normal); retry.isHidden = true
+        retry.accessibilityIdentifier = "workspace-load-retry"
+        retry.addTarget(self, action: #selector(retryWorkspaceLoad), for: .touchUpInside)
+        let home = UIButton(type: .system); home.setTitle("Return to dashboard", for: .normal)
+        home.accessibilityIdentifier = "workspace-load-home"
+        home.addTarget(self, action: #selector(returnFromWorkspaceLoad), for: .touchUpInside)
+        for child in [spinner, label, retry, home] { stack.addArrangedSubview(child) }
+        cover.addSubview(stack); view.addSubview(cover)
+        NSLayoutConstraint.activate([
+            cover.leadingAnchor.constraint(equalTo: view.leadingAnchor), cover.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+            cover.topAnchor.constraint(equalTo: view.topAnchor), cover.bottomAnchor.constraint(equalTo: view.bottomAnchor),
+            stack.centerYAnchor.constraint(equalTo: cover.safeAreaLayoutGuide.centerYAnchor),
+            stack.leadingAnchor.constraint(equalTo: cover.safeAreaLayoutGuide.leadingAnchor, constant: 24),
+            stack.trailingAnchor.constraint(equalTo: cover.safeAreaLayoutGuide.trailingAnchor, constant: -24),
+            retry.heightAnchor.constraint(greaterThanOrEqualToConstant: 44), home.heightAnchor.constraint(greaterThanOrEqualToConstant: 44)
+        ])
+        workspaceLoadCover = cover; workspaceLoadLabel = label; workspaceLoadSpinner = spinner; workspaceLoadRetry = retry
+    }
+
+    private func startWorkspaceWebLoad(_ url: URL) {
+        let generation = workspaceLoadGeneration
+        workspaceLoadNavigation = webView?.load(URLRequest(url: url))
+        guard workspaceLoadNavigation != nil else { workspaceLoadFailed(nil); return }
+        let timeout = DispatchWorkItem { [weak self] in
+            guard let self = self, self.workspaceLoadGeneration == generation else { return }
+            self.workspaceLoadFailed(nil)
+            self.webView?.stopLoading()
+        }
+        workspaceLoadTimeout = timeout
+        DispatchQueue.main.asyncAfter(deadline: .now() + 20, execute: timeout)
+    }
+
+    fileprivate func workspaceLoadFinished(_ navigation: WKNavigation?) {
+        guard workspaceLoadCover != nil, let navigation = navigation,
+              navigation === workspaceLoadNavigation else { return }
+        clearWorkspaceLoadCover()
+    }
+
+    fileprivate func workspaceLoadFailed(_ navigation: WKNavigation?) {
+        guard workspaceLoadCover != nil,
+              navigation == nil || navigation === workspaceLoadNavigation else { return }
+        workspaceLoadTimeout?.cancel(); workspaceLoadTimeout = nil
+        workspaceLoadNavigation = nil
+        workspaceLoadSpinner?.stopAnimating()
+        workspaceLoadLabel?.text = "Unable to open this screen. Check your connection and try again."
+        workspaceLoadRetry?.isHidden = false
+    }
+
+    private func clearWorkspaceLoadCover() {
+        workspaceLoadGeneration = UUID()
+        workspaceLoadTimeout?.cancel(); workspaceLoadTimeout = nil
+        workspaceLoadNavigation = nil; workspaceLoadTarget = nil
+        workspaceLoadCover?.removeFromSuperview(); workspaceLoadCover = nil
+        workspaceLoadLabel = nil; workspaceLoadSpinner = nil; workspaceLoadRetry = nil
+    }
+
+    @objc private func retryWorkspaceLoad() {
+        guard let url = workspaceLoadTarget, onboardingReady,
+              nativeLoginController == nil, nativeOnboardingController == nil,
+              NativeWorkspaceHistory.isWorkspaceURL(url, origin: makeDriverAuthConfig().origin) else { return }
+        webView?.stopLoading()
+        showWorkspaceLoadCover(target: url)
+        startWorkspaceWebLoad(url)
+    }
+
+    @objc private func returnFromWorkspaceLoad() {
+        webView?.stopLoading()
+        clearWorkspaceLoadCover()
+        nativeNavigation.reset(); nativeChat.reset()
+        loadDriverApp(makeDriverAuthConfig())
     }
 
     @available(iOS 16.0, *)
@@ -942,6 +1077,7 @@ class MainViewController: CAPBridgeViewController, UIGestureRecognizerDelegate {
 
     private func presentNativeLogin(_ config: DriverAuthConfig) {
         guard onboardingReady, nativeOnboardingController == nil else { return }
+        clearWorkspaceLoadCover()
         if #available(iOS 16.0, *) { stopWorkspacePush() }
         workspaceBootstrapGeneration = UUID()
         workspaceBootstrap?.cancel(); workspaceBootstrap = nil
