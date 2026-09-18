@@ -16,7 +16,6 @@ test('real WorkspaceAPI loads >4 MiB rentals via bounded pages without relaxing 
   // bytes and adding an oversized-response fault; no shared fixture edits.
   const server = spawn('python3', ['-u', '-c', `
 import importlib.util, json
-from http.server import ThreadingHTTPServer
 spec = importlib.util.spec_from_file_location('fixture', 'scripts/native-workspace-fixture.py')
 m = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(m)
@@ -42,7 +41,7 @@ class Handler(m.Handler):
             else:
                 m.state['transportPages'].append({'bytes':len(json.dumps(body).encode()), 'count':body['count']})
         return super().send(status, body, content_type)
-server = ThreadingHTTPServer(('127.0.0.1', 0), Handler)
+server = m.LoopbackHTTPServer(('127.0.0.1', 0), Handler)
 print(server.server_port, flush=True)
 server.serve_forever()
 `], {cwd: root, stdio: ['ignore', 'pipe', 'pipe']});
