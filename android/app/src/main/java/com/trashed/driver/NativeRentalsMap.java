@@ -10,8 +10,8 @@ import java.util.*;
 final class NativeRentalsMap {
     static final String LIST_PATH = "/vendor/rentals?view=list";
     final long userId, vendorId;
-    final int count, totalRentalCount, unmappedCount;
-    final String generatedAt;
+    final int count, mappedCount, totalRentalCount, unmappedCount;
+    final String generatedAt, snapshot, nextCursor;
     final List<Order> orders;
     static final class Order {
         final String id, label, status, source, address, customerName, confirmationCode, totalPrice,
@@ -41,14 +41,22 @@ final class NativeRentalsMap {
         }
     }
     NativeRentalsMap(JSONObject value) throws Exception {
-        if (integer(value,"version",1) != 1) throw invalid();
+        this(value, false);
+    }
+    NativeRentalsMap(JSONObject value, boolean paginated) throws Exception {
+        if (integer(value,"version",1) != (paginated ? 2 : 1)) throw invalid();
         generatedAt = text(value,"generatedAt",true,80);
         try { Instant.parse(generatedAt); } catch (Exception error) { throw invalid(); }
         JSONObject scope = value.getJSONObject("scope");
         userId = integer(scope,"userId",1); vendorId = integer(scope,"vendorId",1);
         count = integer(value,"count",0); totalRentalCount = integer(value,"totalRentalCount",0); unmappedCount = integer(value,"unmappedCount",0);
+        mappedCount = paginated ? integer(value,"mappedCount",0) : count;
+        snapshot = paginated ? text(value,"snapshot",true,64) : "";
+        nextCursor = paginated && value.get("nextCursor") != JSONObject.NULL ? text(value,"nextCursor",true,256) : null;
+        if (paginated && (!snapshot.matches("[0-9a-f]{64}") || (nextCursor != null && !validCursor(nextCursor)))) throw invalid();
         JSONArray rows = value.getJSONArray("orders");
-        if (count != rows.length() || (long)count + unmappedCount != totalRentalCount) throw invalid();
+        if (count != rows.length() || (long)mappedCount + unmappedCount != totalRentalCount
+            || count > mappedCount || (paginated && count > 200)) throw invalid();
         List<Order> parsed = new ArrayList<>(); Set<String> ids = new HashSet<>();
         for (int i = 0; i < rows.length(); i++) {
             Order order = new Order(rows.getJSONObject(i));
@@ -56,6 +64,20 @@ final class NativeRentalsMap {
             parsed.add(order);
         }
         orders = Collections.unmodifiableList(parsed);
+    }
+    NativeRentalsMap(NativeRentalsMap first, List<Order> complete) {
+        userId=first.userId; vendorId=first.vendorId; generatedAt=first.generatedAt;
+        count=complete.size(); mappedCount=first.mappedCount; totalRentalCount=first.totalRentalCount;
+        unmappedCount=first.unmappedCount; snapshot=first.snapshot; nextCursor=null;
+        orders=Collections.unmodifiableList(new ArrayList<>(complete));
+    }
+    static boolean validCursor(String cursor) {
+        if (!cursor.matches("[A-Za-z0-9_-]{1,256}")) return false;
+        // Canonical unpadded base64url has zero unused tail bits. Avoid the
+        // API-26 java.util.Base64 dependency: this app also supports API 23.
+        int remainder = cursor.length() % 4;
+        int tail = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_".indexOf(cursor.charAt(cursor.length()-1));
+        return remainder == 0 || (remainder == 2 && (tail & 15) == 0) || (remainder == 3 && (tail & 3) == 0);
     }
     List<Order> filtered(String search, String status) {
         List<Order> result = new ArrayList<>();

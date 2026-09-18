@@ -104,7 +104,51 @@ final class NativeWorkspaceApi {
     }
     void cancel() { cancelled = true; synchronized (active) { for (HttpURLConnection c : active) c.disconnect(); active.clear(); } }
     NativeDashboard dashboard() throws Exception { return new NativeDashboard(json("GET", "/api/mobile/dashboard", null)); }
-    NativeRentalsMap rentalsMap() throws Exception { return new NativeRentalsMap(json("GET", "/api/vendor/rentals/map", null)); }
+    NativeRentalsMap rentalsMap() throws Exception {
+        String path = "/api/vendor/rentals/map?pageSize=200";
+        NativeRentalsMap first = null;
+        List<NativeRentalsMap.Order> orders = new ArrayList<>();
+        Set<String> ids = new HashSet<>(), cursors = new HashSet<>();
+        // Same explicit aggregate envelope as iOS. Fail with the web escape,
+        // never truncate or let bounded pages accumulate without a memory budget.
+        long[] remainingBytes = {32L * 1024 * 1024};
+        while (true) {
+            checkCurrent();
+            JSONObject value = json("GET", path, null, remainingBytes);
+            // Legacy fixtures/servers may return v1, but never in a v2 chain.
+            if (first == null && value.optInt("version") == 1) {
+                NativeRentalsMap legacy = new NativeRentalsMap(value);
+                checkCurrent(); return legacy;
+            }
+            NativeRentalsMap page = new NativeRentalsMap(value, true);
+            if (first == null) first = page;
+            else {
+                page.requireSameScope(first);
+                if (!first.snapshot.equals(page.snapshot) || first.mappedCount != page.mappedCount
+                    || first.totalRentalCount != page.totalRentalCount || first.unmappedCount != page.unmappedCount)
+                    throw new IOException("Rentals map changed. Please retry.");
+            }
+            for (NativeRentalsMap.Order order : page.orders) {
+                if (!ids.add(order.id)) throw new IOException("Duplicate rental across map pages");
+                orders.add(order);
+            }
+            if (orders.size() > first.mappedCount) throw new IOException("Invalid rentals map totals");
+            checkCurrent();
+            if (page.nextCursor == null) {
+                if (orders.size() != first.mappedCount) throw new IOException("Incomplete rentals map response");
+                NativeRentalsMap result = new NativeRentalsMap(first, orders);
+                checkCurrent(); return result;
+            }
+            if (page.count == 0 || orders.size() >= first.mappedCount || !cursors.add(page.nextCursor))
+                throw new IOException("Rentals map pagination made no progress");
+            path = "/api/vendor/rentals/map?pageSize=200&cursor=" + URLEncoder.encode(page.nextCursor, "UTF-8");
+        }
+    }
+    static boolean rentalsMapPath(String path) {
+        if (path.equals("/api/vendor/rentals/map?pageSize=200")) return true;
+        String prefix = "/api/vendor/rentals/map?pageSize=200&cursor=";
+        return path.startsWith(prefix) && NativeRentalsMap.validCursor(path.substring(prefix.length()));
+    }
     Profile profile() throws Exception { return new Profile(json("GET", "/api/user/profile", null)); }
     Profile save(Profile previous, String name, String email, String phone) throws Exception {
         Profile verified = profile();
@@ -132,7 +176,10 @@ final class NativeWorkspaceApi {
         if (!expected.scope().equals(current.scope())) throw new Failure(401, "Your account or workspace changed. Reopen this screen.");
     }
     private JSONObject json(String method, String path, JSONObject body) throws Exception {
-        if (!(path.equals("/api/user/profile") || (method.equals("GET") && (path.equals("/api/mobile/dashboard") || path.equals("/api/vendor/rentals/map") || path.startsWith("/api/ai-features/calls?"))))) throw new IOException("Unsupported API route");
+        return json(method, path, body, null);
+    }
+    private JSONObject json(String method, String path, JSONObject body, long[] remainingBytes) throws Exception {
+        if (!(path.equals("/api/user/profile") || (method.equals("GET") && (path.equals("/api/mobile/dashboard") || rentalsMapPath(path) || path.startsWith("/api/ai-features/calls?"))))) throw new IOException("Unsupported API route");
         URL url = new URL(origin + path);
         if (!NativeWorkspaceHistory.isSameOriginURL(url.toString(), origin)) throw new IOException("Untrusted API origin");
         HttpURLConnection connection = connection(url, method, true);
@@ -146,7 +193,14 @@ final class NativeWorkspaceApi {
             if (!"application/json".equals(mime(connection))) throw new IOException("The server did not return JSON.");
             JSONObject result;
             try (InputStream input = connection.getInputStream()) {
-                result = new JSONObject(new String(bytes(input, 2 * 1024 * 1024), StandardCharsets.UTF_8));
+                byte[] payload = bytes(input, 2 * 1024 * 1024);
+                if (remainingBytes != null) {
+                    if (payload.length > remainingBytes[0]) throw new IOException("Rental map exceeds the app memory limit. Open Rental list · Web.");
+                    remainingBytes[0] -= payload.length;
+                }
+                result = new JSONObject(new String(payload, StandardCharsets.UTF_8));
+                if (rentalsMapPath(path) && result.optInt("version") == 2 && payload.length > 256 * 1024)
+                    throw new IOException("Rentals map page exceeds the 256 KiB limit");
             }
             checkCurrent(); return result;
         } finally { active.remove(connection); connection.disconnect(); }
@@ -203,6 +257,8 @@ final class NativeWorkspaceApi {
         if (code == 403) throw new Failure(code, "Your role or plan does not allow this feature.");
         if (code == 404 && connection.getURL().getPath().endsWith("/recording")) throw new Failure(code,"This recording is not ready or is no longer available. Try again shortly.");
         if (code == 410) throw new Failure(code,"This legacy recording is no longer available.");
+        if (code == 409 && connection.getURL().getPath().equals("/api/vendor/rentals/map"))
+            throw new Failure(code,"Rentals map changed. Please retry.");
         if (code < 200 || code >= 300) throw new Failure(code, code == 409 ? "That email is already in use." : "Request failed (" + code + "). Please retry.");
         checkCurrent();
     }

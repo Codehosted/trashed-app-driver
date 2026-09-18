@@ -4,7 +4,9 @@
 
 `vendor-rentals` is consumed by `MainActivity.openDirectWorkspace` before the web navigation listener. The existing navigation context/revision/offered-action gate remains authoritative. A native route lease is bound to the source document, session fingerprint and navigation-document generation; native selection does not navigate the underlying WebView. `NativeBottomNavigation` projects Rentals selection without modifying offered actions. Dismissal restores the source selection.
 
-`NativeWorkspaceView` creates `NativeRentalsMapView` and calls `GET /api/vendor/rentals/map` through the existing cookie-scoped, no-store, redirect-rejecting transport. Version, scope, counts, coordinates and app-relative rental-detail hrefs are validated before presentation. Optional confirmation codes may be absent. No endpoint response or private markers are persisted.
+`NativeWorkspaceView` creates `NativeRentalsMapView` and calls `GET /api/vendor/rentals/map?pageSize=200` through the existing cookie-scoped, no-store, redirect-rejecting transport. Version 2 pages are fetched sequentially using their opaque canonical base64url cursor (maximum 256 characters), with an exact query allowlist. Each page is at most 200 rows/256 KiB; the transport's independent 2 MiB per-request streaming cap remains unchanged. Version 1 is accepted only as the first complete response for older servers/fixtures.
+
+Pages must agree on snapshot (64 lowercase hexadecimal characters), user/vendor scope, mapped count and total/unmapped counts. Duplicate IDs, empty continuations, repeated cursors, excess rows, and premature terminal pages fail without publishing a partial result. Only the fully validated aggregate is presented; request/page/publication boundaries recheck cancellation and session identity. Scope changes invalidate the screen, while HTTP 409 explains that the map changed and can be retried. Coordinates and app-relative rental-detail hrefs remain strictly validated. Optional confirmation codes may be absent. No endpoint response or private markers are persisted.
 
 ## Screen
 
@@ -13,6 +15,7 @@
 - Marker tap or the accessible Choose rental control opens a scrollable bottom detail panel.
 - Explicit `Rental details · Web` and `Rental list · Web` actions; the latter uses `/vendor/rentals?view=list`, which deliberately bypasses native map interception.
 - Loading, successful-empty, no matches, transport/malformed-data retry, and authorization invalidation are separate paths.
+- Recoverable errors clear private markers/details and keep `Rental list · Web` enabled, without inventing a mapped count. HTTP 401/403, changed scope, suspension and session invalidation keep that action disabled. The existing host callback still checks the current session before opening the web route.
 - Refresh drops old markers before fetching. Suspension, session invalidation, close and disposal clear private map/detail/dialog state. Scope IDs survive only ordinary suspension/refresh to detect a changed response scope. Closing disposes the tile loader.
 - Public OpenStreetMap raster tiles retain the existing bounded seven-day cache and attribution; tile requests carry no application cookies. No location permission, new SDK, WebView map or paid key is introduced.
 
@@ -27,6 +30,12 @@ python3 tests/android-native-rentals-map.py --compile-native
 The runner executes real loopback transport and pure-Java DTO/policy/viewport JUnit tests, source-contract guards for native-before-web routing and screen wiring, and compiles all app Java sources with JDK 21 against Android 36 plus existing cached AAR/JARs. It uses the already generated resource `R.jar` and Capacitor libraries from sibling `trashed-app-mobile` (override with `ANDROID_CACHED_BUILD`; override SDK with `ANDROID_JAR`). It creates temporary output only and never downloads dependencies or runs Gradle.
 
 This is Java/type and contract verification, not a resource rebuild, APK build, emulator install or device UI test. The initial source-only check was followed by the emulator pass below. Small-screen/keyboard geometry, raw pan/pinch/marker gestures, accessibility traversal, shell routing and live permission revocation remain separate coverage gaps.
+
+### Pagination regression verification
+
+`python3 tests/android-native-rentals-map.py --compile-native` passed **47 JVM tests** and compiled **29 app Java sources** against existing cached Android dependencies. The production `NativeWorkspaceApi` fetched **10,000 mapped rentals across 100 real loopback HTTP responses**, each description 1,500 characters: **17,655,561 aggregate bytes**, largest page **176,578 bytes**. This exercises an aggregate larger than the unchanged 2 MiB request cap without raising that cap. Tests also reject actual oversized page/request bodies, mixed scopes/snapshots/totals, duplicate IDs, repeated/noncanonical cursors, no-progress chains, premature termination, and v1 mid-chain responses; cancellation/account-change tests cover both intermediate and terminal response boundaries. Legacy first-page v1 compatibility remains covered. A32MiB aggregate serialized-data budget is enforced before parsing each response; its boundary test verifies explicit failure before terminal completion, preserving the web-list fallback without returning partial data.
+
+The runner checks fallback/session wiring, and instrumentation assertions now cover the web-list button being enabled on 503 and disabled after session invalidation. Those updated instrumentation assertions have not been rerun on an emulator in this pagination pass; the emulator results below describe the earlier screen verification, not this change.
 
 ### Emulator QA (2026-09-17)
 

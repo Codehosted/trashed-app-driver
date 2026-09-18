@@ -69,7 +69,7 @@ public class NativeRentalsMapTest {
             NativeRentalsMap result=new NativeWorkspaceApi(fixture.origin,cookies).rentalsMap();
             assertEquals(2,result.orders.size()); assertEquals(1,fixture.requests.size());
             String request=fixture.requests.get(0);
-            assertTrue(request.startsWith("GET /api/vendor/rentals/map HTTP/"));
+            assertTrue(request.startsWith("GET /api/vendor/rentals/map?pageSize=200 HTTP/"));
             assertFalse(request.toLowerCase().contains("x-vendor"));
             assertTrue(request.toLowerCase().contains("cache-control: no-store"));
             assertEquals("next-auth.session-token=fixture-A",cookies.value);assertTrue(cookies.received.isEmpty());

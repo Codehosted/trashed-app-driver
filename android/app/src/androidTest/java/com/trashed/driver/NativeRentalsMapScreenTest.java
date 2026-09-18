@@ -49,7 +49,7 @@ public class NativeRentalsMapScreenTest {
             capture("rentals-"+mode+"-status.png");
             control("{\"rentalsError\":503}");scenario.onActivity(a->a.workspace.refresh());
             await(scenario,a->text(a.workspace,"Retry")!=null&&text(a.workspace,"Retry").getVisibility()==View.VISIBLE);
-            scenario.onActivity(a->{assertNull(field(map(a),"snapshot"));assertEquals(View.GONE,((View)field(map(a),"detailScroll")).getVisibility());});
+            scenario.onActivity(a->{assertNull(field(map(a),"snapshot"));assertEquals(View.GONE,((View)field(map(a),"detailScroll")).getVisibility());assertTrue(text(a.workspace,"Rental list · Web").isEnabled());});
             capture("rentals-"+mode+"-error.png");
             control("{\"rentalsError\":0}");scenario.onActivity(a->text(a.workspace,"Retry").performClick());
             await(scenario,a->text(a.workspace,"5 of 5 mapped · 1 without coordinates")!=null);
@@ -59,7 +59,7 @@ public class NativeRentalsMapScreenTest {
             await(scenario,a->text(a.workspace,"5 of 5 mapped · 1 without coordinates")!=null);
             scenario.onActivity(a->{chooseFirst(a);a.identity="next-auth.session-token=changed-fixture";});
             await(scenario,a->text(a.workspace,"Your session changed. Reopen this screen after signing in.")!=null);
-            scenario.onActivity(a->{assertNull(field(map(a),"snapshot"));assertEquals("",field(map(a),"selected"));assertEquals(View.GONE,((View)field(map(a),"detailScroll")).getVisibility());});
+            scenario.onActivity(a->{assertNull(field(map(a),"snapshot"));assertEquals("",field(map(a),"selected"));assertEquals(View.GONE,((View)field(map(a),"detailScroll")).getVisibility());assertFalse(text(a.workspace,"Rental list · Web").isEnabled());});
             capture("rentals-"+mode+"-session-cleared.png");
         }
     }

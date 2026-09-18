@@ -258,6 +258,97 @@ struct WorkspaceRentalsMap: Decodable {
     var statuses: [String] { Set(orders.map(\.status)).sorted() }
 }
 
+// Wire pages are never published: only a fully verified v1-shaped aggregate is.
+struct WorkspaceRentalsPage: Decodable {
+    let version: Int
+    let generatedAt: String
+    let scope: WorkspaceDashboard.Scope
+    let orders: [WorkspaceRental]
+    let count: Int
+    let mappedCount: Int
+    let totalRentalCount: Int
+    let unmappedCount: Int
+    let snapshot: String
+    let nextCursor: String?
+}
+
+struct WorkspaceRentalsAccumulator {
+    // A safety envelope, not a result cap: exceeding it fails the entire load
+    // with an explicit web fallback. The per-request 4 MiB limit is unchanged.
+    static let maxSerializedBytes = 32 * 1024 * 1024
+    private var serializedBytes = 0
+    private var first: WorkspaceRentalsPage?
+    private var orders: [WorkspaceRental] = []
+    private var ids = Set<String>()
+    private var cursors = Set<String>()
+    private var finished = false
+    private(set) var nextCursor: String?
+
+    var path: String {
+        var parts = URLComponents()
+        parts.path = "/api/vendor/rentals/map"
+        parts.queryItems = [URLQueryItem(name: "pageSize", value: "200")]
+        if let nextCursor = nextCursor { parts.queryItems?.append(URLQueryItem(name: "cursor", value: nextCursor)) }
+        return parts.string!
+    }
+
+    mutating func append(_ data: Data, profile: WorkspaceProfile, origin: URL) throws -> WorkspaceRentalsMap? {
+        guard !finished else { throw WorkspaceError.invalidResponse }
+        guard data.count <= Self.maxSerializedBytes - serializedBytes else {
+            throw WorkspaceError.server("This rental map exceeds the app's memory limit. Open Rental list · Web to view all rentals.")
+        }
+        struct Version: Decodable { let version: Int }
+        let decoder = JSONDecoder()
+        guard let version = try? decoder.decode(Version.self, from: data).version else { throw WorkspaceError.invalidResponse }
+        if version == 1, first == nil {
+            guard let legacy = try? decoder.decode(WorkspaceRentalsMap.self, from: data) else { throw WorkspaceError.invalidResponse }
+            let result = try legacy.validated(for: profile, origin: origin)
+            finished = true
+            return result
+        }
+        guard version == 2, data.count <= 256 * 1024,
+              let page = try? decoder.decode(WorkspaceRentalsPage.self, from: data) else { throw WorkspaceError.invalidResponse }
+        guard page.scope.userId == profile.user.id, page.scope.vendorId == profile.user.vendor?.id else { throw WorkspaceError.scopeChanged }
+        guard WorkspaceRentalsPolicy.allowed(profile) else { throw WorkspaceError.forbidden }
+        guard WorkspaceRentalsPolicy.date(page.generatedAt) != nil,
+              page.count == page.orders.count, page.count <= 200,
+              page.mappedCount >= 0, page.totalRentalCount >= page.mappedCount, page.unmappedCount >= 0,
+              page.totalRentalCount - page.mappedCount == page.unmappedCount,
+              page.snapshot.utf8.count == 64,
+              page.snapshot.utf8.allSatisfy({ (48...57).contains($0) || (97...102).contains($0) }),
+              page.orders.allSatisfy({ $0.isValid(origin: origin) }) else { throw WorkspaceError.invalidResponse }
+        if let first = first {
+            guard page.scope.userId == first.scope.userId, page.scope.vendorId == first.scope.vendorId else { throw WorkspaceError.scopeChanged }
+            guard page.snapshot == first.snapshot, page.mappedCount == first.mappedCount,
+                  page.totalRentalCount == first.totalRentalCount, page.unmappedCount == first.unmappedCount else { throw WorkspaceError.invalidResponse }
+        }
+        guard orders.count <= page.mappedCount, page.count <= page.mappedCount - orders.count else { throw WorkspaceError.invalidResponse }
+        let newCount = orders.count + page.count
+        if let cursor = page.nextCursor {
+            // Opaque URL-safe token: never interpret its offset or snapshot.
+            guard !cursor.isEmpty, cursor.utf8.count <= 256,
+                  cursor.utf8.allSatisfy({ (65...90).contains($0) || (97...122).contains($0) || (48...57).contains($0) || $0 == 45 || $0 == 95 }),
+                  !cursors.contains(cursor), page.count > 0, newCount < page.mappedCount else { throw WorkspaceError.invalidResponse }
+        } else {
+            guard newCount == page.mappedCount else { throw WorkspaceError.invalidResponse }
+        }
+        var pageIDs = Set<String>()
+        guard page.orders.allSatisfy({ !ids.contains($0.id) && pageIDs.insert($0.id).inserted }) else { throw WorkspaceError.invalidResponse }
+        // Commit this page only after every invariant passes. Positive progress,
+        // declared mappedCount and the byte envelope together bound the loop.
+        serializedBytes += data.count
+        ids.formUnion(pageIDs)
+        orders.append(contentsOf: page.orders)
+        if first == nil { first = page }
+        nextCursor = page.nextCursor
+        if let cursor = nextCursor { cursors.insert(cursor); return nil }
+        let result = WorkspaceRentalsMap(version: 1, generatedAt: first!.generatedAt, scope: page.scope,
+                                        orders: orders, count: orders.count, totalRentalCount: page.totalRentalCount, unmappedCount: page.unmappedCount)
+        finished = true
+        return try result.validated(for: profile, origin: origin)
+    }
+}
+
 struct WorkspaceRental: Decodable, Identifiable, Equatable {
     let id: String
     let label: String

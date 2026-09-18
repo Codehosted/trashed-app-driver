@@ -40,14 +40,22 @@ test('native rentals DTO, routes, authorization and lifecycle regressions', {
         var response = snapshot()
         var failure: Error?
         var cancelOnRead = false
+        var cancelOnReadNumber = 0
+        var taskCancelOnReadNumber = 0
+        var cancelOnProfileRead = 0
+        var pageResponses: [Data] = []
         func profile() async throws -> WorkspaceProfile {
-          let value = actors[min(reads, actors.count - 1)]; reads += 1; return value
+          let value = actors[min(reads, actors.count - 1)]; reads += 1
+          if reads == cancelOnProfileRead { requestGeneration = UUID() }
+          return value
         }
-        func json<T: Decodable>(_ path: String) async throws -> T {
+        func rentalsPageData(_ path: String) async throws -> Data {
           paths.append(path)
-          if cancelOnRead { requestGeneration = UUID() }
+          if cancelOnRead || paths.count == cancelOnReadNumber { requestGeneration = UUID() }
+          if paths.count == taskCancelOnReadNumber { withUnsafeCurrentTask { $0?.cancel() } }
           if let failure = failure { throw failure }
-          return response as! T
+          if !pageResponses.isEmpty { return pageResponses.removeFirst() }
+          return try legacyData(response)
         }
         ${method('validateScope(_ scope: String, calls: Bool = false)')}
         ${method('rentals(scope: String) async throws -> WorkspaceRentalsMap {')}
@@ -60,6 +68,7 @@ test('native rentals DTO, routes, authorization and lifecycle regressions', {
       '@MainActor final class WorkspaceAudio { func stop() {} }',
       model.slice(modelStart),
       readFileSync(join(root, 'tests/ios-native-rentals.swift'), 'utf8'),
+      readFileSync(join(root, 'tests/ios-native-rentals-pagination.swift'), 'utf8'),
     ].join('\n');
     const source = join(directory, 'Harness.swift');
     const executable = join(directory, 'rentals-regressions');

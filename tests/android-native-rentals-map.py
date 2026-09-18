@@ -27,7 +27,13 @@ assert 'new NativeRentalsMapView(tokens' in workspace
 assert 'run(NativeWorkspaceApi::rentalsMap' in workspace
 assert '"rentals".equals(destination) ? "vendor-rentals"' in activity
 assert 'rentalsView.dispose()' in workspace and 'rentalsView.clear()' in workspace
-names = ['NativeRentalsMapTest', 'NativeWorkspacePolicyTest', 'NativeWorkspaceRouteTest', 'NativeWorkspaceApiTest', 'NativeDashboardTest']
+map_view = (source / 'NativeRentalsMapView.java').read_text()
+recoverable = map_view[map_view.index('void error(boolean canRetry)'):map_view.index('void clear()')]
+assert 'listButton.setEnabled(canRetry)' in recoverable
+assert 'listButton.setEnabled(false)' in map_view[map_view.index('void clear()'):map_view.index('private void render()')]
+assert 'if (code == 401 || code == 403) { invalidate(error.getMessage()); return; }' in workspace
+assert 'if (!disposed && !suspended && session.equals(host.session())) host.web(path);' in workspace
+names = ['NativeRentalsMapTest', 'NativeRentalsPaginationTest', 'NativeWorkspacePolicyTest', 'NativeWorkspaceRouteTest', 'NativeWorkspaceApiTest', 'NativeDashboardTest']
 files = [source / (name + '.java') for name in ['NativeWorkspaceHistory', 'NativeWorkspacePolicy', 'NativeWorkspaceRoute', 'NativeWorkspaceApi', 'NativeDashboard', 'NativeMapViewport']]
 if (source / 'NativeRentalsMap.java').exists():
     files.append(source / 'NativeRentalsMap.java')

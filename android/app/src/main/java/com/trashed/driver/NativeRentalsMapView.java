@@ -56,7 +56,12 @@ final class NativeRentalsMapView extends LinearLayout {
         clear();
     }
     void show(NativeRentalsMap value) { snapshot=value;retry.setVisibility(GONE);listButton.setEnabled(true);render(); }
-    void error(boolean canRetry) { clear();retry.setVisibility(canRetry?VISIBLE:GONE); }
+    void error(boolean canRetry) {
+        clear();retry.setVisibility(canRetry?VISIBLE:GONE);
+        // Only recoverable failures reach this path; auth/session invalidation clears.
+        listButton.setEnabled(canRetry);
+        if (canRetry) summary.setText("Map unavailable. Open the rental list on the web.");
+    }
     void clear() {
         if(dialog!=null){dialog.dismiss();dialog=null;}
         snapshot=null;visible=Collections.emptyList();selected="";filter="all";

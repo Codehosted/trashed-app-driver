@@ -16,7 +16,15 @@ Rentals opens a native SwiftUI/MapKit screen from the native Manage dock or the 
 
 ## Data and lifecycle
 
-`GET /api/vendor/rentals/map` uses the existing same-origin OS-cookie transport. The client validates permissions and account/vendor scope around the request, rejects malformed/count-inconsistent coordinates, and keeps private map data in memory only. Session changes, suspension, close and leaving Rentals clear pins and details; resumed screens reload after reauthorization. Stale/cancelled requests cannot publish their data.
+`GET /api/vendor/rentals/map?pageSize=200` uses the existing same-origin OS-cookie transport. The client fetches version2 pages sequentially, validates unchanged scope/snapshot/counts, rejects duplicate IDs, repeated cursors, nonprogress and premature termination, and publishes only a complete aggregate. Each page is limited to256KiB/200rows; the original4MiB HTTP response limit remains in force. A32MiB aggregate serialized-data envelope fails explicitly with the web-list option instead of truncating rentals. Legacy version1 is accepted only as the first complete response.
+
+The client validates permissions and account/vendor scope around every page, rejects malformed/count-inconsistent coordinates, and keeps private map data in memory only. Session changes, suspension, close and leaving Rentals clear pins and details; resumed screens reload after reauthorization. Stale/cancelled requests cannot publish their data.
+
+### Pagination transport verification
+
+The real `WorkspaceAPI` and WebKit cookie store loaded2400unique rentals over18loopback HTTP pages totaling4637313bytes, larger than the old4MiB single-response cap. Both declared-length and streaming oversized responses still fail at the original cap. Cancellation, account/scope changes, mixed snapshots/counts, duplicates, incomplete sequences and memory-envelope failures are covered by the Foundation/model tests. Byte draining now runs on a non-MainActor executor; the same streaming bounds and final cookie/generation rechecks remain intact.
+
+Run `node --test tests/ios-native-rentals*.test.mjs tests/ios-dashboard-cookie-integration.test.mjs tests/ios-dashboard-cookie-race.test.mjs`. Full iOS regression and iOS14-target SDK warnings-as-errors typecheck also pass. These are real host native-transport tests with synthetic HTTP data, not a new Simulator UI run. The screen verification below predates pagination; do not label it as updated-device proof.
 
 The companion backend branch `feat/native-rentals-map-api` is required. Deploy the reviewed backend before distributing the native app; no deployment is implied by this implementation.
 

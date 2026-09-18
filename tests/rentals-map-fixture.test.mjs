@@ -60,7 +60,37 @@ server.serve_forever()
     await control({ rentalsError: 0, rentalsPermission: false });
     assert.equal((await get()).status, 403);
     assert.equal((await (await fetch(origin + '/api/user/profile', { headers })).json()).user.vendorPermissions.rentals, false);
-    await control({ rentalsPermission: true, rentalsWrongScope: true });
+    await control({ rentalsPermission: true, rentalsLargeCount: 2400 });
+    let cursor = null, snapshot = null, bytes = 0, pages = 0;
+    const seen = new Set();
+    do {
+      const params = new URLSearchParams({ pageSize: '200' });
+      if (cursor) params.set('cursor', cursor);
+      const pageResponse = await fetch(origin + '/api/vendor/rentals/map?' + params, { headers });
+      assert.equal(pageResponse.status, 200);
+      const body = await pageResponse.text();
+      const length = Buffer.byteLength(body);
+      assert.ok(length <= 256 * 1024, 'Every fixture page fits the agreed transport envelope');
+      bytes += length; pages++;
+      const page = JSON.parse(body);
+      assert.equal(page.version, 2);
+      assert.equal(page.count, page.orders.length);
+      assert.ok(page.count > 0 && page.count <= 200);
+      assert.equal(page.mappedCount, 2400);
+      assert.equal(page.totalRentalCount, page.mappedCount + page.unmappedCount);
+      if (snapshot) assert.equal(page.snapshot, snapshot);
+      snapshot = page.snapshot;
+      for (const order of page.orders) { assert.ok(!seen.has(order.id)); seen.add(order.id); }
+      cursor = page.nextCursor;
+    } while (cursor);
+    assert.equal(seen.size, 2400);
+    assert.ok(pages > 1 && bytes > 4 * 1024 * 1024, 'Aggregate exceeds both old per-response caps');
+    console.log(`Verified ${pages} pages, ${seen.size} unique mapped rentals, ${bytes} aggregate wire bytes`);
+    const first = await (await fetch(origin + '/api/vendor/rentals/map?pageSize=1', { headers })).json();
+    await control({ rentalsLargeCount: 5 });
+    const stale = await fetch(origin + '/api/vendor/rentals/map?pageSize=1&cursor=' + encodeURIComponent(first.nextCursor), { headers });
+    assert.equal(stale.status, 409);
+    await control({ rentalsLargeCount: 0, rentalsPermission: true, rentalsWrongScope: true });
     assert.equal((await (await get()).json()).scope.vendorId, 30);
     await control({ expired: true });
     assert.equal((await get()).status, 401);

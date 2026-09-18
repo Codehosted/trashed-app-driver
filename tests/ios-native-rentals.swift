@@ -95,7 +95,8 @@ func makeDashboard() -> WorkspaceDashboard { dashboard() }
         // substituted. Existing WebKit cookie tests cover the underlying transport.
         let endpoint = Endpoint(), scope = fixtureProfile().scope(origin: origin)
         let transportValue = try await endpoint.rentals(scope: scope)
-        check(transportValue.count == 1 && endpoint.reads == 2 && endpoint.paths == ["/api/vendor/rentals/map"], "one map endpoint with before/after authorization")
+        check(transportValue.count == 1 && endpoint.reads == 2 && endpoint.paths == ["/api/vendor/rentals/map?pageSize=200"], "one map endpoint with before/after authorization")
+        try await paginationChecks()
         for scenario in ["denied-before", "denied-after", "foreign-profile", "foreign-map", "cancel", "closed", "server"] {
             let endpoint = Endpoint()
             switch scenario {
