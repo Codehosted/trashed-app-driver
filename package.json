@@ -11,6 +11,11 @@
     "cap:sync": "npm run build && npx cap sync android",
     "cap:sync:ios": "npm run build && TRASHED_WEB_URL=${TRASHED_WEB_URL:-https://trashed.app} npx cap sync ios",
     "cap:sync:ios:dev": "npm run build && TRASHED_WEB_URL=${TRASHED_WEB_URL:-https://preview.trashed.app} npx cap sync ios",
+    "android:verify": "bash scripts/ci-build-android.sh verify",
+    "android:release": "bash scripts/ci-build-android.sh release",
+    "ios:verify": "bash scripts/verify-ios.sh",
+    "ios:testflight": "bash scripts/ci-upload-testflight.sh",
+    "mobile:preflight": "node scripts/check-mobile-backend.mjs",
     "android:install:device": "bash scripts/install-android-device.sh",
     "android:open": "npx cap open android",
     "ios:open": "npx cap open ios"

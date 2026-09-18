@@ -48,6 +48,8 @@ final class NativeWorkspaceView extends LinearLayout {
     private NativeWorkspaceApi.Profile profile;
     private NativeDashboard dashboard;
     private NativeDashboardView dashboardView;
+    private NativeRentalsMapView rentalsView;
+    private long rentalsUserId, rentalsVendorId;
     private TextView status;
     private LinearLayout body, playerStrip;
     private RecyclerView list;
@@ -93,13 +95,13 @@ final class NativeWorkspaceView extends LinearLayout {
         setOrientation(VERTICAL); setBackgroundColor(tokens.background); setPadding(tokens.dp(20), tokens.dp(8), tokens.dp(20), tokens.dp(8));
         setTag("native-workspace-" + destination);
         audio = new NativeWorkspaceAudio(context, this::updateAudio);
-        ViewCompat.setAccessibilityPaneTitle(this, "dashboard".equals(destination) ? "Dashboard" : "profile".equals(destination) ? "Profile" : "Call history");
+        ViewCompat.setAccessibilityPaneTitle(this, "rentals".equals(destination) ? "Rentals" : "dashboard".equals(destination) ? "Dashboard" : "profile".equals(destination) ? "Profile" : "Call history");
         build(); refresh(); main.post(sessionWatch);
     }
     private void build() {
         removeAllViews();
         com.google.android.material.appbar.MaterialToolbar header = new com.google.android.material.appbar.MaterialToolbar(tokens.context);
-        header.setTitle("dashboard".equals(destination) ? "Dashboard" : "profile".equals(destination) ? "Your account" : "Call history");
+        header.setTitle("rentals".equals(destination) ? "Rentals" : "dashboard".equals(destination) ? "Dashboard" : "profile".equals(destination) ? "Your account" : "Call history");
         header.setTitleTextColor(tokens.foreground);header.setBackgroundColor(tokens.background);header.setElevation(0);
         header.setNavigationIcon(R.drawable.native_workspace_back);header.setNavigationIconTint(tokens.accent);
         header.setNavigationContentDescription("Back");header.setNavigationOnClickListener(view -> confirmLeave(host::back));
@@ -113,7 +115,12 @@ final class NativeWorkspaceView extends LinearLayout {
         addView(header, tokens.row());
         status = tokens.text("Loading…", 13, false); status.setTextColor(tokens.secondary);
         status.setAccessibilityLiveRegion(View.ACCESSIBILITY_LIVE_REGION_POLITE); addView(status, tokens.row());
-        if (!"calls".equals(destination)) {
+        if ("rentals".equals(destination)) {
+            rentalsView = new NativeRentalsMapView(tokens, this::refresh, path -> {
+                if (!disposed && !suspended && session.equals(host.session())) host.web(path);
+            });
+            addView(rentalsView, new LinearLayout.LayoutParams(-1, 0, 1));
+        } else if (!"calls".equals(destination)) {
             ScrollView scroll = new ScrollView(tokens.context); body = tokens.column();
             // The host consumes the measured dock and system insets. This is only
             // scrollable footer breathing room, not another dock-height inset.
@@ -209,6 +216,7 @@ final class NativeWorkspaceView extends LinearLayout {
     void refresh() {
         dismissTranscript();
         if (disposed || suspended) return;
+        if ("rentals".equals(destination)) { refreshRentals(); return; }
         if ("dashboard".equals(destination)) { refreshDashboard(); return; }
         if (debounce != null) main.removeCallbacks(debounce);
         invalidateRequests(); audioGeneration++; audio.release(); updateAudio(); profile = null;
@@ -221,6 +229,16 @@ final class NativeWorkspaceView extends LinearLayout {
             if ("profile".equals(destination)) renderProfile("Up to date");
             else if (!profile.calls) { status.setText("Call history is not available for your role."); more.setEnabled(false); }
             else loadPage(1);
+        }, this::failure);
+    }
+    private void refreshRentals() {
+        invalidateRequests(); rentalsView.clear(); loading = true; status.setText("Loading rentals…");
+        run(NativeWorkspaceApi::rentalsMap, result -> {
+            if (rentalsUserId != 0 && (rentalsUserId != result.userId || rentalsVendorId != result.vendorId)) {
+                invalidate("Your account or workspace changed. Reopen Rentals."); return;
+            }
+            rentalsUserId = result.userId; rentalsVendorId = result.vendorId;
+            loading = false; rentalsView.show(result); status.setText("Up to date");
         }, this::failure);
     }
     private void refreshDashboard() {
@@ -242,6 +260,7 @@ final class NativeWorkspaceView extends LinearLayout {
         if(editor!=null) NativeSystemAppearance.dialog(editor);
         for(AlertDialog dialog : transientDialogs) NativeSystemAppearance.dialog(dialog);
         if(dashboardView!=null)dashboardView.invalidate();
+        if(rentalsView!=null)rentalsView.appearanceChanged();
     }
     private void renderProfile(String message) {
         body.removeAllViews(); status.setText(message);
@@ -286,7 +305,8 @@ final class NativeWorkspaceView extends LinearLayout {
         loading = false; int code = error instanceof NativeWorkspaceApi.Failure ? ((NativeWorkspaceApi.Failure) error).status : 0;
         if (code == 401 || code == 403) { invalidate(error.getMessage()); return; }
         status.setText(error instanceof NativeWorkspaceApi.Failure ? error.getMessage() : "Unable to connect. Check your connection and retry.");
-        if (more != null) { more.setText("Retry"); more.setEnabled(true); }
+        if (rentalsView != null) { rentalsView.error(true); }
+        else if (more != null) { more.setText("Retry"); more.setEnabled(true); }
         else { body.removeAllViews(); body.addView(tokens.button("Retry", true, this::refresh)); }
     }
     private void invalidate(String message) {
@@ -295,7 +315,8 @@ final class NativeWorkspaceView extends LinearLayout {
         invalidateRequests(); audioGeneration++; audio.release(); updateAudio(); profile = null; rows.clear(); expanded.clear();
         if (editor != null) { editor.dismiss(); editor = null; }
         saving = false; loading = false;
-        if (adapter != null) { adapter.submitList(new ArrayList<>()); more.setEnabled(false); } else body.removeAllViews();
+        if (rentalsView != null) { rentalsView.clear(); rentalsUserId = rentalsVendorId = 0; }
+        else if (adapter != null) { adapter.submitList(new ArrayList<>()); more.setEnabled(false); } else body.removeAllViews();
         status.setText(message); main.removeCallbacks(sessionWatch);
         host.invalidated();
     }
@@ -384,6 +405,7 @@ final class NativeWorkspaceView extends LinearLayout {
     }
     void suspend() {
         dismissTranscript();
+        if (rentalsView != null) rentalsView.clear();
         suspended = true; invalidateRequests(); audioGeneration++; audio.release(); updateAudio(); main.removeCallbacks(sessionWatch);
         if (debounce != null) main.removeCallbacks(debounce);
         loading = false;
@@ -402,6 +424,7 @@ final class NativeWorkspaceView extends LinearLayout {
     void dispose() {
         dismissTransient();
         dismissTranscript();
+        if (rentalsView != null) { rentalsView.dispose(); rentalsUserId = rentalsVendorId = 0; }
         if (disposed) return; disposed = true; invalidateRequests(); audioGeneration++; audio.release(); executor.shutdownNow(); main.removeCallbacksAndMessages(null);
         if (editor != null) { editor.dismiss(); editor = null; }
         rows.clear(); profile = null; if (adapter != null) adapter.submitList(new ArrayList<>());

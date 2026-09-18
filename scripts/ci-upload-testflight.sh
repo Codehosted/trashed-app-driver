@@ -46,7 +46,7 @@ fi
 node scripts/check-mobile-backend.mjs
 
 BUILD_NUMBER="${BUILD_NUMBER:-$(date +%Y%m%d%H%M)}"
-MARKETING_VERSION="${MARKETING_VERSION:-1.0.5}"
+MARKETING_VERSION="${MARKETING_VERSION:-1.0.6}"
 TEAM_ID="${DEVELOPMENT_TEAM_ID:-3BYF8CNWS2}"
 BUNDLE_ID="${BUNDLE_ID:-com.trashed.driver}"
 PROFILE_NAME="${PROVISIONING_PROFILE_SPECIFIER:-*[expo] com.trashed.driver AppStore 2025-12-07T19:19:09.367Z}"
@@ -194,6 +194,11 @@ xcodebuild archive \
 
 APP_PATH="$ARCHIVE_PATH/Products/Applications/App.app"
 python3 scripts/validate-ios-privacy.py "$APP_PATH/Info.plist"
+[[ "$(/usr/libexec/PlistBuddy -c 'Print CFBundleDisplayName' "$APP_PATH/Info.plist")" == "Trashed" ]] || { echo 'Archived display name must be Trashed.' >&2; exit 3; }
+[[ "$(/usr/libexec/PlistBuddy -c 'Print CFBundleIdentifier' "$APP_PATH/Info.plist")" == "$BUNDLE_ID" ]] || { echo 'Archived bundle identity changed.' >&2; exit 3; }
+[[ "$(/usr/libexec/PlistBuddy -c 'Print CFBundleShortVersionString' "$APP_PATH/Info.plist")" == "$MARKETING_VERSION" ]] || exit 3
+[[ "$(/usr/libexec/PlistBuddy -c 'Print CFBundleVersion' "$APP_PATH/Info.plist")" == "$BUILD_NUMBER" ]] || exit 3
+printf 'Verified archive: Trashed %s (%s), %s\n' "$MARKETING_VERSION" "$BUILD_NUMBER" "$BUNDLE_ID"
 /usr/libexec/PlistBuddy -c 'Print CFBundleShortVersionString' "$APP_PATH/Info.plist"
 /usr/libexec/PlistBuddy -c 'Print CFBundleVersion' "$APP_PATH/Info.plist"
 /usr/libexec/PlistBuddy -c 'Print GIDClientID' "$APP_PATH/Info.plist"

@@ -42,7 +42,15 @@ struct NativeChatView: View {
     let onAction: (String, String?) -> Void
     let onDraft: (String) -> Void
     @State private var followingLatest = true
+    @Environment(\.colorScheme) private var colorScheme
     private var measured: Bool { state.messages.contains { $0.presentation == "measured" } || (state.screen?.nodes.contains { $0.box != nil } ?? false) }
+    private var measuredBackground: Color {
+        let source = state.screen?.toolbar.first?.style?.background ?? state.screen?.composer.first?.style?.background
+        if state.appearance == (colorScheme == .dark ? "dark" : "light"), let (r, g, b) = NativeAdaptivePalette.rgb(source) {
+            return Color(red: r, green: g, blue: b)
+        }
+        return NativeChatPalette.color(source, role: .background) ?? Color(.systemBackground)
+    }
     private func boxed(_ nodes: [NativeComponentNode]) -> Bool { nodes.allSatisfy { $0.box != nil } }
     var body: some View {
         VStack(spacing: 0) {
@@ -88,12 +96,24 @@ struct NativeChatView: View {
         .overlay(Group {
             if let screen = state.screen, !screen.overlay.isEmpty {
                 ScrollView { region(screen.overlay).padding(boxed(screen.overlay) ? 0 : 20) }
-                    .background(Color(.systemBackground))
+                    .background(measuredBackground)
                     .accessibilityAddTraits(.isModal)
                     .accessibilityIdentifier("trashed-native-chat-overlay")
+                    .overlay(Group {
+                        // Web popovers dismiss on an outside click/Escape. The
+                        // native projection has no DOM backdrop: expose that same
+                        // offered action to touch and VoiceOver rather than trap it.
+                        if state.offers("screen-dismiss") {
+                            Button { onAction("screen-dismiss", nil) } label: {
+                                Image(systemName: "xmark.circle.fill").font(.system(size: 24)).frame(width: 44, height: 44)
+                            }.padding(8).accessibilityLabel("Dismiss dialog")
+                                .accessibilityIdentifier("trashed-native-overlay-dismiss")
+                        }
+                    }, alignment: .topTrailing)
+                    .accessibilityAction(.escape) { if state.offers("screen-dismiss") { onAction("screen-dismiss", nil) } }
             }
         })
-        .background(Color(.systemBackground))
+        .background(measuredBackground)
         .accentColor(NativeChatPalette.primary)
         .accessibilityIdentifier("trashed-native-chat")
     }

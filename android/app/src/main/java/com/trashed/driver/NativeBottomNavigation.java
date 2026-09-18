@@ -36,20 +36,65 @@ final class NativeBottomNavigation {
     private BottomSheetDialog sheet;
     private Listener listener;
     private boolean keyboardVisible;
-    private boolean nativeDashboardVisible;
+    private String nativeDestinationId = "";
     private String pendingId;
+    private final android.os.Handler avatarHandler = new android.os.Handler(android.os.Looper.getMainLooper());
+    private final NativeDockAvatar trisha;
+    private final NativeDockAvatar account;
+    private NativeDockAvatarLoader avatars;
+    private boolean resumed = true;
+    private final Runnable avatarPoll = new Runnable() {
+        @Override public void run() {
+            if (!resumed || !showBar() || bar == null || !bar.isShown()) { stopAvatars(); return; }
+            if (avatars != null) avatars.sync(store.current().context);
+            avatarHandler.postDelayed(this, 1000);
+        }
+    };
+    void avatarHost(NativeDockAvatarLoader.Host source) {
+        if (avatars != null) avatars.dispose();
+        avatars = new NativeDockAvatarLoader(source, (bitmap, name) -> account.image(bitmap, name));
+        updateAvatars();
+    }
+    private void stopAvatars() {
+        avatarHandler.removeCallbacks(avatarPoll); trisha.active(false);
+        if (avatars != null) avatars.clear();
+    }
+    private void updateAvatars() {
+        avatarHandler.removeCallbacks(avatarPoll);
+        if (!resumed || !showBar()) { stopAvatars(); return; }
+        boolean hasTrisha = false;
+        for (NativeNavigationState.Tab tab : store.current().tabs) if ("assistant".equals(tab.icon)) hasTrisha = true;
+        if (!hasTrisha) trisha.active(false);
+        else if (!trisha.running()) trisha.active(true);
+        if (avatars != null) avatars.sync(store.current().context);
+        avatarHandler.postDelayed(avatarPoll, 1000);
+    }
+    void resume() { resumed = true; updateAvatars(); }
+    void pause() { resumed = false; closeSheet(true); stopAvatars(); }
+    void dispose() { pause(); if (avatars != null) avatars.dispose(); reset(); }
+    void refreshAvatar() { if (avatars != null) avatars.clear(); updateAvatars(); }
+    private boolean isAccount(NativeNavigationState.Tab tab) { return "account".equals(tab.icon) || "account".equals(tab.id); }
+    private Drawable tabIcon(NativeNavigationState.Tab tab, ColorStateList tint) {
+        if ("assistant".equals(tab.icon)) return trisha;
+        if (isAccount(tab)) return account;
+        Drawable symbol = DrawableCompat.wrap(host.getDrawable(icon(tab.icon)).mutate());
+        DrawableCompat.setTintList(symbol, tint); return symbol;
+    }
 
     // Presentation only: keep the web's offered actions/revision as the authority.
     void dashboard(boolean visible) {
-        if (nativeDashboardVisible == visible) return;
-        nativeDashboardVisible = visible;
+        destination(visible ? "vendor-dashboard" : "");
+    }
+    void destination(String id) {
+        if (nativeDestinationId.equals(id)) return;
+        nativeDestinationId = id;
         updateSelection();
     }
     private boolean selected(NativeNavigationState.Tab tab) {
-        if (!nativeDashboardVisible) return tab.selected;
-        if (tab.items.isEmpty()) return "vendor-dashboard".equals(tab.id);
+        if (nativeDestinationId.isEmpty()) return tab.selected;
+        if (tab.items.isEmpty()) return nativeDestinationId.equals(tab.id);
         for (NativeNavigationState.Item item : tab.items)
-            if ("vendor-dashboard".equals(item.id)) return true;
+            if (nativeDestinationId.equals(item.id)) return true;
         return false;
     }
     private void updateSelection() {
@@ -61,6 +106,7 @@ final class NativeBottomNavigation {
 
     NativeBottomNavigation(androidx.appcompat.app.AppCompatActivity host, View webView, Readiness readiness) {
         this.host = host; this.readiness = readiness;
+        trisha = NativeDockAvatar.trisha(host); account = new NativeDockAvatar(host);
         ViewGroup parent = (ViewGroup) webView.getParent();
         int index = parent.indexOfChild(webView);
         ViewGroup.LayoutParams original = webView.getLayoutParams();
@@ -96,6 +142,7 @@ final class NativeBottomNavigation {
         keyboardVisible = visible;
         if (visible) closeSheet(true);
         if (bar != null) bar.setVisibility(showBar() ? View.VISIBLE : View.GONE);
+        updateAvatars();
     }
     boolean dismissSheet() {
         if (sheet == null || !sheet.isShowing()) return false;
@@ -111,7 +158,10 @@ final class NativeBottomNavigation {
             int purple=night?0xffbe9fff:0xff7033ff;
             bar.setBackgroundColor(surface(night));
             ColorStateList tint=new ColorStateList(new int[][]{{android.R.attr.state_checked},{}},new int[]{purple,foreground(night)});
-            bar.setItemIconTintList(tint);bar.setItemTextColor(tint);
+            bar.setItemIconTintList(null);bar.setItemTextColor(tint);
+            NativeNavigationState state = store.current();
+            if (state != null) for (int index = 0; index < state.tabs.size(); index++)
+                bar.getMenu().getItem(index).setIcon(tabIcon(state.tabs.get(index), tint));
             for(int i=0;i<bar.getMenu().size();i++){
                 com.google.android.material.badge.BadgeDrawable badge=bar.getBadge(bar.getMenu().getItem(i).getItemId());
                 if(badge!=null){badge.setBackgroundColor(purple);badge.setBadgeTextColor(night?Color.BLACK:Color.WHITE);}
@@ -123,7 +173,7 @@ final class NativeBottomNavigation {
         if (bar != null) container.removeView(bar);
         bar = null;
         NativeNavigationState state = store.current();
-        if (state == null || !state.visible || state.tabs.isEmpty()) return;
+        if (state == null || !state.visible || state.tabs.isEmpty()) { stopAvatars(); return; }
         Context themed = new ContextThemeWrapper(host, NativeSystemAppearance.dark(host) ? R.style.TrashedNavigationDark : R.style.TrashedNavigationLight);
         bar = new BottomNavigationView(themed);
         bar.setTag("native-bottom-navigation");
@@ -132,12 +182,14 @@ final class NativeBottomNavigation {
         bar.setItemHorizontalTranslationEnabled(false); bar.setItemActiveIndicatorEnabled(false);
         int purple = NativeSystemAppearance.dark(host) ? Color.rgb(190, 159, 255) : Color.rgb(112, 51, 255);
         ColorStateList tint = new ColorStateList(new int[][]{{android.R.attr.state_checked}, {}}, new int[]{purple, foreground(NativeSystemAppearance.dark(host))});
-        bar.setItemIconTintList(tint); bar.setItemTextColor(tint);
+        bar.setItemIconTintList(null); bar.setItemTextColor(tint);
+        bar.setItemIconSize(dp(28));
+        bar.setLayerType(View.LAYER_TYPE_SOFTWARE, null);
         // The Activity applies system/IME insets once to its content, not again to this bar.
         ViewCompat.setOnApplyWindowInsetsListener(bar, (view, insets) -> insets);
         for (int index = 0; index < state.tabs.size(); index++) {
             NativeNavigationState.Tab tab = state.tabs.get(index);
-            MenuItem item = bar.getMenu().add(0, index + 1, index, tab.label).setIcon(icon(tab.icon));
+            MenuItem item = bar.getMenu().add(0, index + 1, index, "assistant".equals(tab.icon) ? "Trisha" : tab.label).setIcon(tabIcon(tab, tint));
             item.setChecked(tab.selected);
             if (tab.badge > 0) {
                 bar.getOrCreateBadge(index + 1).setNumber(tab.badge);
@@ -161,6 +213,7 @@ final class NativeBottomNavigation {
         });
         bar.setVisibility(showBar() ? View.VISIBLE : View.GONE);
         container.addView(bar, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+        updateAvatars();
     }
     private void openSheet(NativeNavigationState.Tab tab, NativeNavigationState state, long generation) {
         closeSheet(true);
@@ -183,7 +236,7 @@ final class NativeBottomNavigation {
         column.addView(scroll, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1));
         for (NativeNavigationState.Item item : tab.items) {
             Button button = row(dialog.getContext(), item.label + (item.detail == null || item.detail.isEmpty() ? "" : "\n" + item.detail), NativeSystemAppearance.dark(host), item.destructive);
-            boolean selected = nativeDashboardVisible ? "vendor-dashboard".equals(item.id) : item.selected;
+            boolean selected = nativeDestinationId.isEmpty() ? item.selected : nativeDestinationId.equals(item.id);
             button.setSelected(selected);
             if (selected && !item.destructive) {
                 button.setTextColor(NativeSystemAppearance.dark(host) ? Color.rgb(190, 159, 255) : Color.rgb(112, 51, 255));

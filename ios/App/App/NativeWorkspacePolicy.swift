@@ -4,6 +4,7 @@ import Foundation
 // No DOM state, HTML, persistent response cache, or web-renderer dependency.
 enum WorkspaceRoute: Hashable {
     case dashboard
+    case rentals
     case profile
     case calls(WorkspaceCallsQuery)
 
@@ -11,6 +12,7 @@ enum WorkspaceRoute: Hashable {
         guard WorkspacePolicy.sameOrigin(url, origin), let c = URLComponents(url: url, resolvingAgainstBaseURL: false) else { return nil }
         switch c.percentEncodedPath {
         case "/vendor/dashboard", "/vendor/dashboard/": return .dashboard
+        case "/vendor/rentals": return .rentals
         case "/vendor/profile":
             // These existing account actions remain web-owned in this slice.
             // Never intercept their links and strand the user on the overview.
@@ -71,6 +73,7 @@ struct WorkspaceDirectNavigation: Equatable {
     static func route(action: String) -> WorkspaceRoute? {
         switch action {
         case "vendor-dashboard": return .dashboard
+        case "vendor-rentals": return .rentals
         case "vendor-profile": return .profile
         case "vendor-call-history": return .calls(WorkspaceCallsQuery())
         default: return nil
@@ -85,6 +88,7 @@ struct WorkspaceDirectNavigation: Equatable {
         destination.query = nil; destination.fragment = nil
         switch route {
         case .dashboard: destination.path = "/vendor/dashboard"
+        case .rentals: destination.path = "/vendor/rentals"
         case .profile: destination.path = "/vendor/profile"
         case .calls(let query):
             destination.path = "/calls/history"
@@ -217,6 +221,186 @@ struct WorkspaceDashboard: Decodable {
               amounts.allSatisfy({ $0.isFinite }), counts.allSatisfy({ $0 >= 0 }),
               revenue.monthlyGrowthPercent?.isFinite != false else { throw WorkspaceError.invalidResponse }
         return self
+    }
+}
+
+// Rentals use the same authenticated workspace contract as profile/dashboard.
+// Keep IDs from the server (never UUIDs generated while rendering).
+struct WorkspaceRentalsMap: Decodable {
+    let version: Int
+    let generatedAt: String
+    let scope: WorkspaceDashboard.Scope
+    let orders: [WorkspaceRental]
+    let count: Int
+    let totalRentalCount: Int
+    let unmappedCount: Int
+
+    func validated(for profile: WorkspaceProfile, origin: URL) throws -> Self {
+        guard scope.userId == profile.user.id, scope.vendorId == profile.user.vendor?.id else { throw WorkspaceError.scopeChanged }
+        guard WorkspaceRentalsPolicy.allowed(profile) else { throw WorkspaceError.forbidden }
+        guard version == 1, WorkspaceRentalsPolicy.date(generatedAt) != nil,
+              count == orders.count, unmappedCount >= 0, totalRentalCount >= count,
+              totalRentalCount - count == unmappedCount,
+              Set(orders.map(\.id)).count == count,
+              orders.allSatisfy({ $0.isValid(origin: origin) }) else { throw WorkspaceError.invalidResponse }
+        return self
+    }
+
+    func filtered(search: String, status: String?) -> [WorkspaceRental] {
+        let needle = search.trimmingCharacters(in: .whitespacesAndNewlines)
+        return orders.filter { order in
+            (status == nil || order.status == status) && (needle.isEmpty ||
+                [order.label, order.customerName, order.address, order.confirmationCode, order.dumpsterSize,
+                 order.dumpsterDescription, order.status].compactMap { $0 }.joined(separator: " ")
+                    .localizedStandardContains(needle))
+        }
+    }
+    var statuses: [String] { Set(orders.map(\.status)).sorted() }
+}
+
+// Wire pages are never published: only a fully verified v1-shaped aggregate is.
+struct WorkspaceRentalsPage: Decodable {
+    let version: Int
+    let generatedAt: String
+    let scope: WorkspaceDashboard.Scope
+    let orders: [WorkspaceRental]
+    let count: Int
+    let mappedCount: Int
+    let totalRentalCount: Int
+    let unmappedCount: Int
+    let snapshot: String
+    let nextCursor: String?
+}
+
+struct WorkspaceRentalsAccumulator {
+    // A safety envelope, not a result cap: exceeding it fails the entire load
+    // with an explicit web fallback. The per-request 4 MiB limit is unchanged.
+    static let maxSerializedBytes = 32 * 1024 * 1024
+    private var serializedBytes = 0
+    private var first: WorkspaceRentalsPage?
+    private var orders: [WorkspaceRental] = []
+    private var ids = Set<String>()
+    private var cursors = Set<String>()
+    private var finished = false
+    private(set) var nextCursor: String?
+
+    var path: String {
+        var parts = URLComponents()
+        parts.path = "/api/vendor/rentals/map"
+        parts.queryItems = [URLQueryItem(name: "pageSize", value: "200")]
+        if let nextCursor = nextCursor { parts.queryItems?.append(URLQueryItem(name: "cursor", value: nextCursor)) }
+        return parts.string!
+    }
+
+    mutating func append(_ data: Data, profile: WorkspaceProfile, origin: URL) throws -> WorkspaceRentalsMap? {
+        guard !finished else { throw WorkspaceError.invalidResponse }
+        guard data.count <= Self.maxSerializedBytes - serializedBytes else {
+            throw WorkspaceError.server("This rental map exceeds the app's memory limit. Open Rental list · Web to view all rentals.")
+        }
+        struct Version: Decodable { let version: Int }
+        let decoder = JSONDecoder()
+        guard let version = try? decoder.decode(Version.self, from: data).version else { throw WorkspaceError.invalidResponse }
+        if version == 1, first == nil {
+            guard let legacy = try? decoder.decode(WorkspaceRentalsMap.self, from: data) else { throw WorkspaceError.invalidResponse }
+            let result = try legacy.validated(for: profile, origin: origin)
+            finished = true
+            return result
+        }
+        guard version == 2, data.count <= 256 * 1024,
+              let page = try? decoder.decode(WorkspaceRentalsPage.self, from: data) else { throw WorkspaceError.invalidResponse }
+        guard page.scope.userId == profile.user.id, page.scope.vendorId == profile.user.vendor?.id else { throw WorkspaceError.scopeChanged }
+        guard WorkspaceRentalsPolicy.allowed(profile) else { throw WorkspaceError.forbidden }
+        guard WorkspaceRentalsPolicy.date(page.generatedAt) != nil,
+              page.count == page.orders.count, page.count <= 200,
+              page.mappedCount >= 0, page.totalRentalCount >= page.mappedCount, page.unmappedCount >= 0,
+              page.totalRentalCount - page.mappedCount == page.unmappedCount,
+              page.snapshot.utf8.count == 64,
+              page.snapshot.utf8.allSatisfy({ (48...57).contains($0) || (97...102).contains($0) }),
+              page.orders.allSatisfy({ $0.isValid(origin: origin) }) else { throw WorkspaceError.invalidResponse }
+        if let first = first {
+            guard page.scope.userId == first.scope.userId, page.scope.vendorId == first.scope.vendorId else { throw WorkspaceError.scopeChanged }
+            guard page.snapshot == first.snapshot, page.mappedCount == first.mappedCount,
+                  page.totalRentalCount == first.totalRentalCount, page.unmappedCount == first.unmappedCount else { throw WorkspaceError.invalidResponse }
+        }
+        guard orders.count <= page.mappedCount, page.count <= page.mappedCount - orders.count else { throw WorkspaceError.invalidResponse }
+        let newCount = orders.count + page.count
+        if let cursor = page.nextCursor {
+            // Opaque URL-safe token: never interpret its offset or snapshot.
+            guard !cursor.isEmpty, cursor.utf8.count <= 256,
+                  cursor.utf8.allSatisfy({ (65...90).contains($0) || (97...122).contains($0) || (48...57).contains($0) || $0 == 45 || $0 == 95 }),
+                  !cursors.contains(cursor), page.count > 0, newCount < page.mappedCount else { throw WorkspaceError.invalidResponse }
+        } else {
+            guard newCount == page.mappedCount else { throw WorkspaceError.invalidResponse }
+        }
+        var pageIDs = Set<String>()
+        guard page.orders.allSatisfy({ !ids.contains($0.id) && pageIDs.insert($0.id).inserted }) else { throw WorkspaceError.invalidResponse }
+        // Commit this page only after every invariant passes. Positive progress,
+        // declared mappedCount and the byte envelope together bound the loop.
+        serializedBytes += data.count
+        ids.formUnion(pageIDs)
+        orders.append(contentsOf: page.orders)
+        if first == nil { first = page }
+        nextCursor = page.nextCursor
+        if let cursor = nextCursor { cursors.insert(cursor); return nil }
+        let result = WorkspaceRentalsMap(version: 1, generatedAt: first!.generatedAt, scope: page.scope,
+                                        orders: orders, count: orders.count, totalRentalCount: page.totalRentalCount, unmappedCount: page.unmappedCount)
+        finished = true
+        return try result.validated(for: profile, origin: origin)
+    }
+}
+
+struct WorkspaceRental: Decodable, Identifiable, Equatable {
+    let id: String
+    let label: String
+    let status: String
+    var source: String? = nil
+    var address: String? = nil
+    var customerName: String? = nil
+    var confirmationCode: String? = nil
+    var totalPrice: Price? = nil
+    var dumpsterSize: String? = nil
+    var dumpsterDescription: String? = nil
+    let href: String
+    var deliveryDate: String? = nil
+    var pickupDate: String? = nil
+    let lat: Double
+    let lng: Double
+
+    enum Price: Decodable, Equatable {
+        case text(String), number(Double)
+        init(from decoder: Decoder) throws {
+            let value = try decoder.singleValueContainer()
+            if let text = try? value.decode(String.self) { self = .text(text) }
+            else { self = .number(try value.decode(Double.self)) }
+        }
+    }
+    func isValid(origin: URL) -> Bool {
+        !id.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && !label.isEmpty && !status.isEmpty
+            && lat.isFinite && lng.isFinite && (-90...90).contains(lat) && (-180...180).contains(lng)
+            && WorkspaceRentalsPolicy.detailPath(href, origin: origin) != nil
+    }
+    var statusLabel: String { status.replacingOccurrences(of: "_", with: " ").replacingOccurrences(of: "-", with: " ").capitalized }
+}
+
+enum WorkspaceRentalsPolicy {
+    static func allowed(_ profile: WorkspaceProfile) -> Bool {
+        profile.user.id > 0 && (profile.user.vendor?.id ?? 0) > 0
+            && profile.user.roles.contains(where: { ["vendor", "manager", "admin"].contains($0) })
+            && (profile.user.vendorPermissions == nil || profile.user.vendorPermissions?["rentals"] == true)
+    }
+    static func date(_ raw: String) -> Date? {
+        let parser = ISO8601DateFormatter(); parser.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        return parser.date(from: raw) ?? ISO8601DateFormatter().date(from: raw)
+    }
+    static func detailPath(_ raw: String, origin: URL) -> String? {
+        guard let url = URL(string: raw, relativeTo: origin)?.absoluteURL,
+              WorkspacePolicy.sameOrigin(url, origin), let parts = URLComponents(url: url, resolvingAgainstBaseURL: false),
+              parts.query == nil, parts.fragment == nil else { return nil }
+        let prefix = "/vendor/rentals/"
+        guard parts.percentEncodedPath.hasPrefix(prefix) else { return nil }
+        let identifier = parts.percentEncodedPath.dropFirst(prefix.count)
+        guard !identifier.isEmpty, identifier.allSatisfy({ $0.isASCII && ($0.isLetter || $0.isNumber || $0 == "-" || $0 == "_") }) else { return nil }
+        return parts.percentEncodedPath
     }
 }
 

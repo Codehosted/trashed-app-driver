@@ -14,7 +14,7 @@ final class NativeWorkspaceRoute {
         if (destination.isEmpty() || session == null || session.isEmpty()
             || !NativeWorkspaceHistory.isWorkspaceURL(source, origin)) return null;
         return new NativeWorkspaceRoute(source, session, destination,
-            origin + ("dashboard".equals(destination) ? "/vendor/dashboard" : "profile".equals(destination) ? "/vendor/profile" : "/calls/history"), document);
+            origin + ("dashboard".equals(destination) ? "/vendor/dashboard" : "profile".equals(destination) ? "/vendor/profile" : "rentals".equals(destination) ? "/vendor/rentals" : "/calls/history"), document);
     }
     boolean valid(String source, String session, long document) {
         return this.document == document && Objects.equals(this.source, source)

@@ -7,6 +7,10 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		C10000011FED79650016851F /* NativeDockAvatar.swift in Sources */ = {isa = PBXBuildFile; fileRef = C10000021FED79650016851F; };
+		C20000011FED79650016851F /* NativeDockAvatarPolicy.swift in Sources */ = {isa = PBXBuildFile; fileRef = C20000021FED79650016851F; };
+		C30000011FED79650016851F /* Brand in Resources */ = {isa = PBXBuildFile; fileRef = C30000021FED79650016851F; };
+		B70000011FED79650016851F /* NativeRentalsMapView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B70000021FED79650016851F /* NativeRentalsMapView.swift */; };
 		B60000011FED79650016851F /* NativeWorkspacePush.swift in Sources */ = {isa = PBXBuildFile; fileRef = B60000021FED79650016851F /* NativeWorkspacePush.swift */; };
 		B40000011FED79650016851F /* NativeDashboardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B40000021FED79650016851F /* NativeDashboardView.swift */; };
 		B50000011FED79650016851F /* NativeSystemAppearance.swift in Sources */ = {isa = PBXBuildFile; fileRef = B50000021FED79650016851F /* NativeSystemAppearance.swift */; };
@@ -39,6 +43,10 @@
 		AA0000011FED79650016851F /* NativeChatInput.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA0000021FED79650016851F /* NativeChatInput.swift */; };
 
 /* Begin PBXFileReference section */
+		C10000021FED79650016851F /* NativeDockAvatar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NativeDockAvatar.swift; sourceTree = "<group>"; };
+		C20000021FED79650016851F /* NativeDockAvatarPolicy.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NativeDockAvatarPolicy.swift; sourceTree = "<group>"; };
+		C30000021FED79650016851F /* Brand */ = {isa = PBXFileReference; lastKnownFileType = folder; path = Brand; sourceTree = "<group>"; };
+		B70000021FED79650016851F /* NativeRentalsMapView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NativeRentalsMapView.swift; sourceTree = "<group>"; };
 		B60000021FED79650016851F /* NativeWorkspacePush.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NativeWorkspacePush.swift; sourceTree = "<group>"; };
 		B40000021FED79650016851F /* NativeDashboardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NativeDashboardView.swift; sourceTree = "<group>"; };
 		B50000021FED79650016851F /* NativeSystemAppearance.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NativeSystemAppearance.swift; sourceTree = "<group>"; };
@@ -120,12 +128,16 @@
 				504EC3071FED79650016851F /* AppDelegate.swift */,
 				A10000041FED79650016851F /* App.entitlements */,
 				A10000021FED79650016851F /* MainViewController.swift */,
+				C10000021FED79650016851F /* NativeDockAvatar.swift */,
+				C20000021FED79650016851F /* NativeDockAvatarPolicy.swift */,
+				C30000021FED79650016851F /* Brand */,
 				AD0000021FED79650016851F /* NativeWorkspacePolicy.swift */,
 				AE0000021FED79650016851F /* NativeWorkspaceAPI.swift */,
 				B60000021FED79650016851F /* NativeWorkspacePush.swift */,
 				AF0000021FED79650016851F /* NativeWorkspaceModel.swift */,
 				B30000021FED79650016851F /* NativeCallTranscript.swift */,
 				B40000021FED79650016851F /* NativeDashboardView.swift */,
+				B70000021FED79650016851F /* NativeRentalsMapView.swift */,
 				B50000021FED79650016851F /* NativeSystemAppearance.swift */,
 				B10000021FED79650016851F /* NativeWorkspaceView.swift */,
 				B20000021FED79650016851F /* NativeWorkspaceHost.swift */,
@@ -233,6 +245,7 @@
 			files = (
 				504EC3121FED79650016851F /* LaunchScreen.storyboard in Resources */,
 				AC0000011FED79650016851F /* NativeChatFonts in Resources */,
+				C30000011FED79650016851F /* Brand in Resources */,
 				504EC30F1FED79650016851F /* Assets.xcassets in Resources */,
 				50B271D11FEDC1A000F3C39B /* public in Resources */,
 				50379B232058CBB4000EE86E /* capacitor.config.json in Resources */,
@@ -308,12 +321,15 @@
 			files = (
 				504EC3081FED79650016851F /* AppDelegate.swift in Sources */,
 				A10000011FED79650016851F /* MainViewController.swift in Sources */,
+				C10000011FED79650016851F /* NativeDockAvatar.swift in Sources */,
+				C20000011FED79650016851F /* NativeDockAvatarPolicy.swift in Sources */,
 				AD0000011FED79650016851F /* NativeWorkspacePolicy.swift in Sources */,
 				AE0000011FED79650016851F /* NativeWorkspaceAPI.swift in Sources */,
 				B60000011FED79650016851F /* NativeWorkspacePush.swift in Sources */,
 				AF0000011FED79650016851F /* NativeWorkspaceModel.swift in Sources */,
 				B30000011FED79650016851F /* NativeCallTranscript.swift in Sources */,
 				B40000011FED79650016851F /* NativeDashboardView.swift in Sources */,
+				B70000011FED79650016851F /* NativeRentalsMapView.swift in Sources */,
 				B50000011FED79650016851F /* NativeSystemAppearance.swift in Sources */,
 				B10000011FED79650016851F /* NativeWorkspaceView.swift in Sources */,
 				B20000011FED79650016851F /* NativeWorkspaceHost.swift in Sources */,
@@ -471,7 +487,7 @@
 				INFOPLIST_FILE = App/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 14.0;
 				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/Frameworks";
-				MARKETING_VERSION = 1.0.5;
+				MARKETING_VERSION = 1.0.6;
 				OTHER_SWIFT_FLAGS = "$(inherited) \"-D\" \"COCOAPODS\" \"-DDEBUG\"";
 				PRODUCT_BUNDLE_IDENTIFIER = com.trashed.driver;
 				PRODUCT_NAME = "$(TARGET_NAME)";
@@ -494,7 +510,7 @@
 				INFOPLIST_FILE = App/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 14.0;
 				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/Frameworks";
-				MARKETING_VERSION = 1.0.5;
+				MARKETING_VERSION = 1.0.6;
 				PRODUCT_BUNDLE_IDENTIFIER = com.trashed.driver;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				PROVISIONING_PROFILE_SPECIFIER = "*[expo] com.trashed.driver AppStore 2025-12-07T19:19:09.367Z";

@@ -8,6 +8,7 @@ protocol WorkspaceServing: AnyObject {
     var onSessionChange: (() -> Void)? { get set }
     func profile() async throws -> WorkspaceProfile
     func dashboard() async throws -> WorkspaceDashboard
+    func rentals(scope: String) async throws -> WorkspaceRentalsMap
     func save(_ edit: WorkspaceProfileEdit, scope: String) async throws -> WorkspaceProfile
     func calls(query: WorkspaceCallsQuery, page: Int, scope: String) async throws -> WorkspaceCallsPage
     func recording(_ call: WorkspaceCall, scope: String) async throws -> (Data, String)
@@ -20,6 +21,8 @@ protocol WorkspaceServing: AnyObject {
 @MainActor
 extension WorkspaceServing {
     func renewedSession() -> (any WorkspaceServing)? { nil }
+    // Existing clients/mocks fail explicitly until they implement the new endpoint.
+    func rentals(scope: String) async throws -> WorkspaceRentalsMap { throw WorkspaceError.invalidResponse }
 }
 
 // The identity check and outgoing header MUST use the same immutable snapshot.
@@ -160,6 +163,33 @@ final class WorkspaceAPI: NSObject, WKHTTPCookieStoreObserver, WorkspaceServing 
         return try result.validated()
     }
 
+    func rentals(scope: String) async throws -> WorkspaceRentalsMap {
+        let generation = requestGeneration
+        let before = try await validateScope(scope)
+        guard WorkspaceRentalsPolicy.allowed(before) else { throw WorkspaceError.forbidden }
+        var aggregate = WorkspaceRentalsAccumulator()
+        while true {
+            try Task.checkCancellation()
+            guard generation == requestGeneration, !invalidated else { throw CancellationError() }
+            let data = try await rentalsPageData(aggregate.path)
+            try Task.checkCancellation()
+            guard generation == requestGeneration, !invalidated else { throw CancellationError() }
+            let after = try await validateScope(scope)
+            try Task.checkCancellation()
+            guard generation == requestGeneration, !invalidated else { throw CancellationError() }
+            // Every page uses the cookie/session guarded transport and rechecks
+            // the actor. Nothing leaves this method until the snapshot is whole.
+            if let result = try aggregate.append(data, profile: after, origin: origin) { return result }
+        }
+    }
+
+    private func rentalsPageData(_ path: String) async throws -> Data {
+        guard let url = URL(string: path, relativeTo: origin)?.absoluteURL else { throw WorkspaceError.unsafeURL }
+        let (data, response) = try await request(url, maxBytes: 4 * 1024 * 1024)
+        guard response.mimeType == "application/json" else { throw WorkspaceError.invalidResponse }
+        return data
+    }
+
     func calls(query: WorkspaceCallsQuery, page: Int, scope: String) async throws -> WorkspaceCallsPage {
         _ = try await validateScope(scope, calls: true)
         let result: WorkspaceCallsPage = try await json(query.path(page: page))
@@ -198,6 +228,19 @@ final class WorkspaceAPI: NSObject, WKHTTPCookieStoreObserver, WorkspaceServing 
         guard response.mimeType == "application/json" else { throw WorkspaceError.invalidResponse }
         do { return try JSONDecoder().decode(T.self, from: data) }
         catch { throw WorkspaceError.invalidResponse }
+    }
+
+    // Drain on the cooperative executor, not MainActor: hopping back to the UI
+    // executor for every byte makes multi-megabyte paginated maps impractical.
+    // Keep streaming enforcement even when Content-Length is absent or false.
+    private nonisolated static func collect(_ bytes: URLSession.AsyncBytes, maxBytes: Int) async throws -> Data {
+        var data = Data()
+        for try await byte in bytes {
+            try Task.checkCancellation()
+            if data.count >= maxBytes { throw WorkspaceError.tooLarge }
+            data.append(byte)
+        }
+        return data
     }
 
     private func request(_ url: URL, method: String = "GET", body: Data? = nil, maxBytes: Int) async throws -> (Data, HTTPURLResponse) {
@@ -243,11 +286,7 @@ final class WorkspaceAPI: NSObject, WKHTTPCookieStoreObserver, WorkspaceServing 
         if response.statusCode == 403 { throw WorkspaceError.forbidden }
         guard !(300..<400).contains(response.statusCode) else { throw WorkspaceError.unsafeURL }
         guard response.expectedContentLength <= maxBytes else { throw WorkspaceError.tooLarge }
-        var data = Data()
-        for try await byte in bytes {
-            if data.count >= maxBytes { throw WorkspaceError.tooLarge }
-            data.append(byte)
-        }
+        let data = try await Self.collect(bytes, maxBytes: maxBytes)
         try Task.checkCancellation()
         let finalSnapshot = WorkspaceCookieSnapshot(cookies: await allCookies(), origin: origin)
         try Task.checkCancellation()

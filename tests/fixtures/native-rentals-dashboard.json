@@ -1,0 +1,13 @@
+{
+  "version": 1,
+  "generatedAt": "2026-09-17T12:00:00Z",
+  "scope": { "userId": 12, "vendorId": 29 },
+  "businessName": "Local fixture workspace",
+  "currency": "USD",
+  "revenue": { "today": 450, "thisWeek": 1800, "thisMonth": 4500, "thisQuarter": 12000, "thisYear": 42000, "monthlyGrowthPercent": 12 },
+  "monthlyRevenue": [{ "month": "Aug", "revenue": 4000 }, { "month": "Sep", "revenue": 4500 }],
+  "rentals": { "total": 6, "active": 3, "pending": 1, "completed": 1 },
+  "inventory": { "total": 10, "available": 7, "rented": 3, "maintenance": 0 },
+  "customers": { "total": 6 },
+  "inventoryByType": [{ "name": "Roll-off", "count": 10 }]
+}

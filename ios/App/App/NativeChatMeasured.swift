@@ -54,6 +54,7 @@ final class NativeMeasuredNode: UIView, UITextViewDelegate {
     private var buffer: NativeDraftBuffer
     private var perform: ((String, String?) -> Void)?
     private var enabled = false
+    private var projectedAppearance = "light"
     private var datePicker: UIDatePicker?
     private static let dateFormatter: DateFormatter = {
         let formatter = DateFormatter()
@@ -97,7 +98,17 @@ final class NativeMeasuredNode: UIView, UITextViewDelegate {
         node.style?.background ?? (superview as? NativeMeasuredNode)?.brandedSurface ?? (superview as? NativeMeasuredRoot)?.inheritedSurface
     }
     private func color(_ hex: String?, role: NativeAdaptivePalette.Role = .foreground) -> UIColor? {
-        NativeAdaptivePalette.color(hex, role: role, surface: brandedSurface)
+        guard let (r, g, b) = NativeAdaptivePalette.rgb(hex) else { return nil }
+        let exact = UIColor(red: r, green: g, blue: b, alpha: 1)
+        let fallback = NativeAdaptivePalette.color(hex, role: role, surface: brandedSurface) ?? exact
+        let appearance = projectedAppearance
+        return UIColor { traits in
+            // Measured CSS is the design authority once it matches the OS mode.
+            // Adapt only during the short window before the web repaints a new
+            // system appearance; do not reinterpret white-on-purple as black.
+            let current = traits.userInterfaceStyle == .dark ? "dark" : "light"
+            return current == appearance ? exact : fallback.resolvedColor(with: traits)
+        }
     }
     override func traitCollectionDidChange(_ previousTraitCollection: UITraitCollection?) {
         super.traitCollectionDidChange(previousTraitCollection)
@@ -134,7 +145,7 @@ final class NativeMeasuredNode: UIView, UITextViewDelegate {
         return UIEdgeInsets(top: CGFloat(s?.paddingTop ?? s?.padding ?? 0), left: CGFloat(s?.paddingLeft ?? s?.padding ?? 0), bottom: CGFloat(s?.paddingBottom ?? s?.padding ?? 0), right: CGFloat(s?.paddingRight ?? s?.padding ?? 0))
     }
     func update(_ value: NativeComponentNode, state: NativeChatState, configured: URL, onAction: @escaping (String, String?) -> Void) {
-        node = value; perform = onAction
+        node = value; perform = onAction; projectedAppearance = state.appearance
         enabled = node.disabled != true && node.actionId.map(state.offers) == true
         backgroundColor = color(node.style?.background, role: .background) ?? .clear
         alpha = CGFloat(node.style?.opacity ?? 1)

@@ -31,8 +31,10 @@ if [[ "$MODE" == release ]]; then
   node scripts/check-mobile-backend.mjs
   node scripts/check-mobile-push-config.mjs
 fi
-rm -rf "$ARTIFACT_DIR"
 mkdir -p "$ARTIFACT_DIR"
+# Only replace outputs owned by this script; never recursively delete a caller path.
+rm -f "$ARTIFACT_DIR/trashed-driver-debug.apk" "$ARTIFACT_DIR/trashed-driver-release.apk" \
+  "$ARTIFACT_DIR/trashed-driver-release.aab" "$ARTIFACT_DIR/SHA256SUMS"
 
 npm ci
 npm test
@@ -82,10 +84,15 @@ fi
 
 (
   cd "$ARTIFACT_DIR"
-  shopt -s nullglob
-  artifacts=(./*.apk ./*.aab)
-  (( ${#artifacts[@]} > 0 )) || { echo 'no Android artifacts found for checksum generation' >&2; exit 1; }
-  sha256sum "${artifacts[@]}" | sort -k2 > SHA256SUMS
+  artifacts=(./trashed-driver-debug.apk)
+  if [[ "$MODE" == release ]]; then
+    artifacts=(./trashed-driver-release.apk ./trashed-driver-release.aab)
+  fi
+  if command -v sha256sum >/dev/null 2>&1; then
+    sha256sum "${artifacts[@]}" | sort -k2 > SHA256SUMS
+  else
+    shasum -a 256 "${artifacts[@]}" | sort -k2 > SHA256SUMS
+  fi
 )
 printf 'android_ci_mode=%s\nartifacts=%s\n' "$MODE" "$ARTIFACT_DIR"
 cat "$ARTIFACT_DIR/SHA256SUMS"

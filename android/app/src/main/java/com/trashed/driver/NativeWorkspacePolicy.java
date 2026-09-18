@@ -13,6 +13,7 @@ final class NativeWorkspacePolicy {
             URI uri = new URI(url);
             String path = uri.getRawPath();
             if ("/vendor/dashboard".equals(path)) return "dashboard";
+            if ("/vendor/rentals".equals(path) && !"list".equals(query(url,"view",""))) return "rentals";
             if ("/vendor/profile".equals(path) && Arrays.asList("", "about").contains(query(url, "view", ""))) return "profile";
             if ("/calls/history".equals(path) || "/vendor/trisha/calls".equals(path)) return "calls";
         } catch (Exception ignored) { }
@@ -21,6 +22,7 @@ final class NativeWorkspacePolicy {
     static String selection(String id) {
         if ("vendor-dashboard".equals(id)) return "dashboard";
         if ("vendor-profile".equals(id)) return "profile";
+        if ("vendor-rentals".equals(id)) return "rentals";
         return "vendor-call-history".equals(id) ? "calls" : "";
     }
     static String query(String url, String name, String fallback) {
