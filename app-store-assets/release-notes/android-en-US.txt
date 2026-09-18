@@ -1,1 +1,7 @@
-Updated the launcher icon to match the Google Play store listing.
+- Trashed Driver is now Trashed: one app for vendors and drivers.
+- New native Rentals map with search, status filters, rental selection, and reliable loading for larger lists.
+- Updated native navigation with an animated Trisha icon and your account photo.
+- Restored native assistant activation, stable typing, message display, and dialog dismissal.
+- Native Dashboard, Profile, and Calls improvements, including persistent navigation and clearer spacing.
+- Improved call search, session recovery, account-switch protection, and notification handling.
+- Reliability and accessibility fixes.
