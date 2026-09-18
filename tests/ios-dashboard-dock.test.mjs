@@ -53,7 +53,11 @@ test('dock uses adaptive intrinsic sizing and dashboard exposes its last footer'
   assert.match(dock, /\.accessibilityIdentifier\("workspace-bottom-dock"\)/);
   assert.match(dock, /\.accessibilityIdentifier\("trashed-native-tab-\\\(group\.rawValue\)"\)/);
   assert.match(dock, /\.isSelected/);
-  assert.doesNotMatch(dock, /ignoresSafeArea|UIScreen|\.frame\(height:|\.overlay/);
+  // Fixed icon height aligns symbols with raster avatars; the dock itself
+  // remains intrinsic and expands for accessibility text.
+  assert.match(dock, /Image\(systemName: group\.symbol\).*\.frame\(height: 28\)/);
+  const withoutIconSizing = dock.replace(/\.frame\(height: 28\)/g, '');
+  assert.doesNotMatch(withoutIconSizing, /ignoresSafeArea|UIScreen|\.frame\(height:|\.overlay/);
   assert.match(dashboard, /Revenue in[\s\S]*?\.fixedSize\(horizontal: false, vertical: true\)[\s\S]*?\.accessibilityIdentifier\("dashboard-scroll-end"\)/);
   assert.match(dashboard, /\.refreshable \{ await model\.loadDashboard\(\) \}/);
   assert.match(dashboard, /accessibilityIdentifier\("dashboard-refresh"\)/);

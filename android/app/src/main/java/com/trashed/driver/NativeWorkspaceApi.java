@@ -18,12 +18,13 @@ final class NativeWorkspaceApi {
     }
     static final class Profile {
         final long id, vendorId;
-        final String name, email, phone, business, roles, permissions;
+        final String name, email, phone, business, roles, permissions, image;
         final boolean calls, emailVerified;
         Profile(JSONObject response) throws Exception {
             JSONObject user = response.getJSONObject("user");
             id = integer(user, "id", 1);
             name = text(user, "name"); email = user.getString("email"); phone = text(user, "phone");
+            image = text(user, "image");
             JSONObject vendor = user.optJSONObject("vendor");
             vendorId = vendor == null ? 0 : integer(vendor, "id", 1); business = vendor == null ? "" : text(vendor, "businessName");
             JSONArray values = user.optJSONArray("roles"); List<String> labels = new ArrayList<>();

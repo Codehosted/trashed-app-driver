@@ -1,0 +1,10 @@
+{
+  "source": "trashed-app/public/images/trisha-avatar-smiling.gif",
+  "sourceSHA256": "4e8ad1bde09b0985c2cf5314a0ae662d13284ac643035c81cfb4c273cf40e3f8",
+  "transform": "RGBA upper square crop (0,0,480,480); Lanczos96px; alpha composite onto #f3edff before RGB quantization; every3frames accumulated durations;128colors",
+  "frames": 67,
+  "durationMs": 10000,
+  "fileBytes": 327385,
+  "motionPreference": "freeze on representative waving still when Reduce Motion/animator disabled",
+  "matte": "#f3edff"
+}

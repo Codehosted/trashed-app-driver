@@ -184,6 +184,12 @@ public class MainActivity extends BridgeActivity {
         authConfig = readAuthConfig();
         WebView webView = getBridge().getWebView();
         nativeNavigation = new NativeBottomNavigation(this, webView, this::canPresentNavigation);
+        nativeNavigation.avatarHost(new NativeDockAvatarLoader.Host() {
+            public String origin() { return chatOrigin(); }
+            public String identity() { return workspaceSession(); }
+            public long document() { return navigationDocument; }
+            public NativeWorkspaceApi.CookieSource cookies() { return new NativeWorkspaceCookieStore(chatOrigin()); }
+        });
         // Overlay only the web content slot, never the bottom navigation. Keep WebView running.
         ViewGroup webParent = (ViewGroup) webView.getParent();
         int webIndex = webParent.indexOfChild(webView);
@@ -371,6 +377,7 @@ public class MainActivity extends BridgeActivity {
         if (nativeWorkspace.hasFocus()) hideKeyboard();
         nativeWorkspace.dispose(); chatContainer.removeView(nativeWorkspace);
         nativeWorkspace = null; nativeWorkspaceURL = null;
+        if (nativeNavigation != null) nativeNavigation.refreshAvatar();
         getBridge().getWebView().setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_AUTO);
     }
     private boolean openDirectWorkspace(NativeNavigationState.Selection selection) {
@@ -496,13 +503,14 @@ public class MainActivity extends BridgeActivity {
         chatResumed = false;
         if (nativeChat != null) nativeChat.pause();
         if (nativeWorkspace != null) nativeWorkspace.suspend();
-        if (nativeNavigation != null) nativeNavigation.dismissSheet();
+        if (nativeNavigation != null) nativeNavigation.pause();
         super.onPause();
     }
 
     @Override public void onResume() {
         super.onResume();
         chatResumed = true;
+        if (nativeNavigation != null) nativeNavigation.resume();
         synchronizeAppearance();
         if (nativeChat != null) nativeChat.resume();
         if (nativeWorkspace != null) nativeWorkspace.resume();
@@ -513,7 +521,7 @@ public class MainActivity extends BridgeActivity {
         navigationDocument++;
         closeNativeWorkspace();
         if (nativeChat != null) nativeChat.reset(false, true);
-        if (nativeNavigation != null) nativeNavigation.reset();
+        if (nativeNavigation != null) nativeNavigation.dispose();
         super.onDestroy();
     }
 

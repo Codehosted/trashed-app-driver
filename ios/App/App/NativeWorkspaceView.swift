@@ -9,7 +9,7 @@ enum WorkspaceDockGroup: String, CaseIterable, Identifiable {
     var title: String {
         switch self {
         case .manage: return "Manage"
-        case .assistant: return "Assistant"
+        case .assistant: return "Trisha"
         case .calls: return "Calls"
         case .account: return "Account"
         }
@@ -189,6 +189,7 @@ struct WorkspaceScreen: View {
             if isRoot && !keyboardVisible {
                 WorkspaceBottomDock(
                     profile: model.profile,
+                    origin: model.api.origin,
                     selected: WorkspaceDockNavigation.selectedGroup(path.last ?? route),
                     enabled: !model.invalidated && !model.suspended,
                     select: selectDockEntry
@@ -249,6 +250,7 @@ enum WorkspaceStyle {
 @available(iOS 16.0, *)
 private struct WorkspaceBottomDock: View {
     let profile: WorkspaceProfile?
+    let origin: URL
     let selected: WorkspaceDockGroup
     let enabled: Bool
     let select: (WorkspaceDockGroup, String) -> Void
@@ -267,7 +269,13 @@ private struct WorkspaceBottomDock: View {
                     }
                 } label: {
                     VStack(spacing: 4) {
-                        Image(systemName: group.symbol).font(.body.weight(.semibold)).accessibilityHidden(true)
+                        if group == .assistant {
+                            NativeTrishaDockView(enabled: enabled).frame(width: 28, height: 28).accessibilityHidden(true)
+                        } else if group == .account {
+                            NativeDockAccountView(name: profile?.user.name, rawImage: profile?.user.image, origin: origin, identity: profile?.scope(origin: origin) ?? "", enabled: enabled)
+                        } else {
+                            Image(systemName: group.symbol).font(.body.weight(.semibold)).frame(height: 28).accessibilityHidden(true)
+                        }
                         Text(group.title).font(.caption.weight(.medium))
                             .fixedSize(horizontal: false, vertical: true)
                             .multilineTextAlignment(.center)

@@ -138,6 +138,25 @@ public class TrashedNavigationPlugin: CAPPlugin, CAPBridgedPlugin, UITabBarDeleg
     ]
     private var store = NativeNavigationStore()
     private let bar = UITabBar()
+    private let dockAnimator = NativeDockAnimator()
+    private var dockAccountStorage: AnyObject?
+    private var appPaused = false
+    @available(iOS 16.0, *)
+    private var dockAccount: NativeDockAccountLease {
+        if let value = dockAccountStorage as? NativeDockAccountLease { return value }
+        let value = NativeDockAccountLease()
+        value.changed = { [weak self] in self?.renderDockAccount() }
+        dockAccountStorage = value
+        return value
+    }
+    private func renderDockAccount() {
+        guard #available(iOS 16.0, *), let state = store.state else { return }
+        for (index, tab) in state.tabs.enumerated() where tab.icon == "account" || tab.id == "vendor-account" {
+            guard let items = bar.items, items.indices.contains(index) else { continue }
+            let image = dockAccount.image ?? NativeDockBrand.initials(nil)
+            items[index].image = image; items[index].selectedImage = image
+        }
+    }
     private let barBackground = UIView()
     private var barHeight: NSLayoutConstraint?
     private var observers: [NSObjectProtocol] = []
@@ -150,6 +169,25 @@ public class TrashedNavigationPlugin: CAPPlugin, CAPBridgedPlugin, UITabBarDeleg
     private var host: MainViewController? { bridge?.viewController as? MainViewController }
 
     func attach(to container: UIView) {
+        dockAnimator.shouldAnimate = { [weak self] in
+            guard let self = self else { return false }
+            return self.bar.window != nil && !self.bar.isHidden && !self.appPaused && self.host?.nativeNavigationAvailable == true
+        }
+        dockAnimator.render = { [weak self] image in
+            guard let self = self, let state = self.store.state, let items = self.bar.items else { return }
+            for (index, tab) in state.tabs.enumerated() where tab.icon == "assistant" {
+                guard items.indices.contains(index) else { continue }
+                items[index].image = image; items[index].selectedImage = image
+            }
+        }
+        for name in [UIApplication.willResignActiveNotification, UIApplication.didBecomeActiveNotification, UIAccessibility.reduceMotionStatusDidChangeNotification] {
+            observers.append(NotificationCenter.default.addObserver(forName: name, object: nil, queue: .main) { [weak self] notification in
+                guard let self = self else { return }
+                if notification.name == UIApplication.willResignActiveNotification { self.appPaused = true }
+                if notification.name == UIApplication.didBecomeActiveNotification { self.appPaused = false }
+                self.dockAnimator.stop(); self.refresh()
+            })
+        }
         bar.translatesAutoresizingMaskIntoConstraints = false
         bar.delegate = self
         bar.isHidden = true
@@ -229,10 +267,12 @@ public class TrashedNavigationPlugin: CAPPlugin, CAPBridgedPlugin, UITabBarDeleg
     }
 
     func refresh() {
-        guard let state = store.state, state.visible, !state.tabs.isEmpty, !keyboardVisible,
+        guard let state = store.state, state.visible, !state.tabs.isEmpty, !keyboardVisible, !appPaused,
               host?.nativeNavigationAvailable == true,
               NativeNavigationPolicy.isWorkspace(webView?.url, configured: bridge?.config.serverURL) else {
             bar.isHidden = true
+            dockAnimator.stop()
+            if #available(iOS 16.0, *) { dockAccount.clear() }
             barBackground.isHidden = true
             host?.setNativeNavigationHeight(0)
             dismissSheet()
@@ -256,7 +296,9 @@ public class TrashedNavigationPlugin: CAPPlugin, CAPBridgedPlugin, UITabBarDeleg
         bar.standardAppearance = appearance
         if #available(iOS 15.0, *) { bar.scrollEdgeAppearance = appearance }
         let items = state.tabs.enumerated().map { index, tab -> UITabBarItem in
-            let item = UITabBarItem(title: tab.label, image: Self.icon(tab.icon), tag: index)
+            let image = tab.icon == "assistant" ? NativeDockBrand.still : Self.icon(tab.icon)
+            let item = UITabBarItem(title: tab.icon == "assistant" ? "Trisha" : tab.label, image: image, tag: index)
+            if tab.icon == "assistant" { item.selectedImage = image; item.accessibilityLabel = "Trisha" }
             item.badgeValue = tab.badge > 0 ? String(tab.badge) : nil
             item.accessibilityIdentifier = "trashed-native-tab-" + tab.id
             return item
@@ -269,6 +311,15 @@ public class TrashedNavigationPlugin: CAPPlugin, CAPBridgedPlugin, UITabBarDeleg
         barHeight?.constant = height
         host?.setNativeNavigationHeight(height)
         barBackground.backgroundColor = .systemBackground
+        if #available(iOS 16.0, *) {
+            if let configured = bridge?.config.serverURL, let origin = NativeDockAvatarPolicy.origin(fromConfiguredURL: configured),
+               let document = webView?.url, let cookies = webView?.configuration.websiteDataStore.httpCookieStore {
+                dockAccount.update(context: state.context, document: document, origin: origin, cookies: cookies)
+                renderDockAccount()
+            }
+            if bar.window != nil && !UIAccessibility.isReduceMotionEnabled { dockAnimator.start() }
+            else { dockAnimator.stop() }
+        }
         if let sheet = sheet, let table = sheet.viewControllers.first as? NativeNavigationTable {
             guard sheetContext == state.context, let tab = state.tabs.first(where: { $0.id == sheetTabID }), !tab.items.isEmpty else { dismissSheet(); return }
             sheet.overrideUserInterfaceStyle = .unspecified
