@@ -601,16 +601,23 @@ class MainViewController: CAPBridgeViewController, UIGestureRecognizerDelegate {
         guard let url = workspaceLoadTarget, onboardingReady,
               nativeLoginController == nil, nativeOnboardingController == nil,
               NativeWorkspaceHistory.isWorkspaceURL(url, origin: makeDriverAuthConfig().origin) else { return }
+        if WorkspaceHomeRouting.isHomeTarget(url, origin: makeDriverAuthConfig().origin) {
+            returnFromWorkspaceLoad(); return
+        }
         webView?.stopLoading()
         showWorkspaceLoadCover(target: url)
         startWorkspaceWebLoad(url)
     }
 
     @objc private func returnFromWorkspaceLoad() {
+        guard onboardingReady, nativeLoginController == nil, nativeOnboardingController == nil else { return }
+        let config = makeDriverAuthConfig()
         webView?.stopLoading()
-        clearWorkspaceLoadCover()
+        // The profile request is asynchronous too. Keep a native surface until
+        // bootstrap presents a dashboard/login or finishes a role fallback load.
+        showWorkspaceLoadCover(target: URL(string: "/vendor/dashboard", relativeTo: config.origin)!.absoluteURL)
         nativeNavigation.reset(); nativeChat.reset()
-        loadDriverApp(makeDriverAuthConfig())
+        loadDriverApp(config)
     }
 
     @available(iOS 16.0, *)
@@ -696,11 +703,15 @@ class MainViewController: CAPBridgeViewController, UIGestureRecognizerDelegate {
                     self.stopWorkspacePush()
                     let url = URL(string: path, relativeTo: config.origin)!.absoluteURL
                     self.webView?.isHidden = false
-                    self.webView?.load(URLRequest(url: url))
+                    if self.workspaceLoadCover != nil {
+                        self.showWorkspaceLoadCover(target: url)
+                        self.startWorkspaceWebLoad(url)
+                    } else { self.webView?.load(URLRequest(url: url)) }
                 }
             } catch {
                 guard !Task.isCancelled, self.workspaceBootstrapGeneration == generation else { return }
                 if case WorkspaceError.expired = error { self.presentNativeLogin(config); return }
+                if self.workspaceLoadCover != nil { self.workspaceLoadFailed(nil); return }
                 let alert = UIAlertController(title: "Unable to open workspace", message: error.localizedDescription, preferredStyle: .alert)
                 alert.addAction(UIAlertAction(title: "Retry", style: .default) { [weak self] _ in self?.bootstrapWorkspace(config) })
                 alert.addAction(UIAlertAction(title: "Sign in again", style: .cancel) { [weak self] _ in self?.presentNativeLogin(config) })
