@@ -35,6 +35,7 @@ test('executable production bootstrap and routing reject HTML, unsafe URLs, deni
   try {
     const bootstrap = between(shell, '    private func bootstrapWorkspace(', '    #if DEBUG && targetEnvironment(simulator)\n    // Exercise').replace('private func bootstrapWorkspace', 'func bootstrapWorkspace');
     const entry = between(shell, '    private func loadDriverApp(', '    private func signIn(').replace('private func loadDriverApp', 'func loadDriverApp');
+    const home = between(shell, '    @objc private func returnFromWorkspaceLoad()', '    @available(iOS 16.0, *)\n    func prepareNativePushLogout').replace('@objc private func', 'func');
     writeFileSync(join(dir, 'Harness.swift'), `import Foundation
 final class WKHTTPCookieStore {}
 struct Store { let httpCookieStore = WKHTTPCookieStore() }
@@ -46,6 +47,7 @@ final class WebView {
 struct DriverAuthConfig { let origin: URL; func driverURL(theme: Bool) -> URL { URL(string:"/app", relativeTo:origin)!.absoluteURL } }
 struct History { mutating func beginSession() {} }
 final class Gesture { var isEnabled = false }
+final class Plugin { func reset() {} }
 enum Style { case alert, cancel, \`default\` }
 final class UIAlertAction { init(title:String, style:Style, handler:((UIAlertAction)->Void)? = nil) {} }
 final class UIAlertController { init(title:String, message:String?, preferredStyle:Style) {}; func addAction(_ action:UIAlertAction) {} }
@@ -60,12 +62,20 @@ final class UIAlertController { init(title:String, message:String?, preferredSty
  var webView: WebView? = WebView(); var onboardingReady=true; var nativeOnboardingController: Bool?; var nativeLoginController: Bool?
  var workspaceHistory=History(); var historyEdgeGesture: Gesture? = Gesture(); var currentDriverTheme=false
  var workspaceBootstrap: Task<Void,Never>?; var workspaceBootstrapGeneration=UUID(); var roots=0; var alerts=0; var logins=0
- func presentNativeWorkspace(route:WorkspaceRoute,url:URL,origin:URL,store:WKHTTPCookieStore,isRoot:Bool=false,profile:WorkspaceProfile?=nil) { precondition(route == .dashboard && isRoot && profile != nil); roots += 1 }
- func presentNativeLogin(_ config:DriverAuthConfig) { logins += 1 }
+ var workspaceLoadCover: Bool?; var recoveryFailures=0
+ let nativeNavigation=Plugin(), nativeChat=Plugin()
+ func clearWorkspaceLoadCover() { workspaceLoadCover=nil }
+ func showWorkspaceLoadCover(target:URL) { workspaceLoadCover=true }
+ func workspaceLoadFailed(_ navigation:Bool?) { recoveryFailures += 1 }
+ func startWorkspaceWebLoad(_ url:URL) { webView?.load(URLRequest(url:url)) }
+ func makeDriverAuthConfig()->DriverAuthConfig { DriverAuthConfig(origin:URL(string:"https://trashed.app")!) }
+ func presentNativeWorkspace(route:WorkspaceRoute,url:URL,origin:URL,store:WKHTTPCookieStore,isRoot:Bool=false,profile:WorkspaceProfile?=nil) { precondition(route == .dashboard && isRoot && profile != nil); roots += 1; clearWorkspaceLoadCover() }
+ func presentNativeLogin(_ config:DriverAuthConfig) { logins += 1; clearWorkspaceLoadCover() }
  func stopWorkspacePush() {}
  func present(_ alert:UIAlertController,animated:Bool) { alerts += 1 }
 ${bootstrap}
 ${entry}
+${home}
 }
 func profile(_ roles:[String], vendor:Int?=2, permissions:[String:Bool]?=nil) -> WorkspaceProfile {
  WorkspaceProfile(user:.init(id:1,name:"Fixture",email:"fixture@example.invalid",phone:nil,image:nil,roles:roles,vendor:vendor.map{.init(id:$0,businessName:"Fixture")},emailVerified:true,vendorPermissions:permissions),capabilities:.init(calls:true))
@@ -95,7 +105,23 @@ func check(_ yes:@autoclosure()->Bool,_ label:String) { if !yes() { fatalError(l
  while WorkspaceAPI.pending==nil { await Task.yield() }
  late.workspaceBootstrapGeneration=UUID(); WorkspaceAPI.pending!.resume(returning:profile(["vendor"])); await late.workspaceBootstrap?.value
  check(late.roots==0 && late.webView!.loads.isEmpty,"late identity result cannot restore retired root")
- print("PASS native dashboard bootstrap, role fallback, URL admission, expiry, offline and stale-result routing")
+ WorkspaceAPI.pending=nil; WorkspaceAPI.delay=true; let recovery=Host(); recovery.workspaceLoadCover=true
+ recovery.returnFromWorkspaceLoad()
+ while WorkspaceAPI.pending==nil { await Task.yield() }
+ check(recovery.workspaceLoadCover==true && recovery.roots==0,"Home retains recovery surface throughout pending profile")
+ WorkspaceAPI.pending!.resume(throwing:WorkspaceError.server("offline")); await recovery.workspaceBootstrap?.value
+ check(recovery.workspaceLoadCover==true && recovery.recoveryFailures==1,"offline Home retains retry surface")
+ WorkspaceAPI.pending=nil; recovery.returnFromWorkspaceLoad()
+ while WorkspaceAPI.pending==nil { await Task.yield() }
+ WorkspaceAPI.pending!.resume(returning:profile(["vendor"])); await recovery.workspaceBootstrap?.value
+ check(recovery.roots==1 && recovery.workspaceLoadCover==nil,"successful native root clears recovery surface")
+ WorkspaceAPI.delay=false; WorkspaceAPI.current=profile(["driver"]); let fallback=Host();fallback.workspaceLoadCover=true
+ fallback.returnFromWorkspaceLoad();await fallback.workspaceBootstrap?.value
+ check(fallback.workspaceLoadCover==true && fallback.webView!.loads.last?.path=="/driver","role fallback retains cover until navigation completion")
+ WorkspaceAPI.failure=WorkspaceError.expired;let signedOut=Host();signedOut.workspaceLoadCover=true
+ signedOut.returnFromWorkspaceLoad();await signedOut.workspaceBootstrap?.value
+ check(signedOut.logins==1 && signedOut.workspaceLoadCover==nil,"expired recovery transfers to native login")
+ print("PASS native dashboard bootstrap, role fallback, URL admission, expiry, offline, stale results and recovery Home")
 } }
 `);
     let result = spawnSync('xcrun', ['swiftc', '-parse-as-library', root + 'ios/App/App/NativeWorkspacePolicy.swift', join(dir, 'Harness.swift'), '-o', join(dir, 'run')], {encoding:'utf8',timeout:60000});
